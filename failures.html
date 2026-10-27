@@ -51,6 +51,12 @@
 <li><b>F28. The step-by-step speedup product used as a test.</b> It equals the total speedup for any numbers. Worked out: <a href="16-combining-speedups.html">page 16</a>, L03.</li>
 <li><b>F29. A register budget overshoot taken as proof of a slowdown.</b> Fewer threads fit, but they may still fill every wait. Worked out: <a href="16-combining-speedups.html">page 16</a>, L08.</li>
 <li><b>F30. Lab 1's line B reused in Lab 2.</b> Same in exact arithmetic, different counts at 23.8 percent of the Lab 2 picture. Worked out: <a href="07-waiting-chain.html">page 07</a>, L21 and L22.</li>
+<li><b>F31. A condition wrapped around each place's arithmetic.</b> Your version 1 took 461 ms against 208 ms: 18 of about 35 loop instructions were control. Worked out: <a href="18-two-places-per-thread.html">page 18</a>, L05 and L06.</li>
+<li><b>F32. A speedup from a small test expected to carry over.</b> In the prelab two chains doubled the rate, but the Mandelbrot loop already spends its wait beginning its own instructions. Worked out: <a href="18-two-places-per-thread.html">page 18</a>, L11 and L15.</li>
+<li><b>F33. A model that matches the measured time with impossible inputs.</b> A claimed 270,531 repetitions of the 32-thread set is 16 times below the floor of 4,319,369, yet the prediction "matched". Worked out: <a href="18-two-places-per-thread.html">page 18</a>, L14.</li>
+<li><b>F34. Doubling only the first place or only the step when each thread takes two places.</b> The first repeats 992 of 1024 places; the second leaves 496 unowned. Worked out: <a href="18-two-places-per-thread.html">page 18</a>, L04.</li>
+<li><b>F35. A per-cycle count taken as a held-at-once count.</b> At most 14 x 4 x 32 = 1,792 threads can begin an instruction per cycle; 14,336 can be held. Worked out: <a href="17-hardware-or-launch.html">page 17</a>, L05 and L06.</li>
+<li><b>F36. Different data taken as different instructions.</b> The threads of one 32-thread set, each on its own place, all wait on the same instruction; only another set of 32 or another independent instruction fills the wait. Worked out: <a href="18-two-places-per-thread.html">page 18</a>, L15.</li>
 </ol>
 
 <nav><a href="index.html">index</a><a href="symptoms.html">start from your symptom</a></nav>

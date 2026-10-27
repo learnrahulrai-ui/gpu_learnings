@@ -88,6 +88,18 @@ for a version that never wrote 1024 places.</pre>
 </details>
 </div>
 
+<div class="connect">
+<p class="label">A real bug the exact-zero rule caught</p>
+<p class="ln"><b>L09</b> While porting the Lab 1 kernel to Lab 2, the learner's first version had the sign of <code>window_y</code> wrong. The starter printed an average difference of 0.045. The fixed version printed exactly 0, at 221.97 ms for one block of 32 threads. <span class="from">from: the learner's chat</span></p>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> Total gap = 0.045 x 2,097,152,000 = ____ repetitions. Average gap per place = that / 1,048,576 = ____ repetitions. Compare 0.045 with L02's 0.000000000477 for a single place wrong by 1: ratio = ____ . <span class="from">from: L02, L09</span></p>
+<details><summary>CHECK</summary>
+<pre>0.045 * 2,097,152,000 = 94,371,840 repetitions; / 1,048,576 = 90 repetitions per place
+0.045 / 0.000000000477 = about 94 million
+A wrong window moves the whole picture, so the number is large and obvious.
+The dangerous bugs are the ones that move a few places: only "exactly 0" catches those.</pre>
+</details>
+</div>
+
 <div class="plain">
 <p class="label">In plain words</p>
 <p>A single summary number can hide the very thing you need to know. An average error near zero can come from one serious mistake or from many harmless roundings, and the fastest of several timings says nothing about the slow ones. Before trusting "correct and twice as fast", count the wrong answers directly and time both versions the same way.</p>

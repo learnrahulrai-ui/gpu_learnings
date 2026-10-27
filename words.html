@@ -15,6 +15,7 @@
 <dt>address</dt><dd>The number that says where a value sits in memory. Memory is a long list of bytes, numbered from 0; an address is one of those numbers.</dd>
 <dt>array</dt><dd>Many values of the same kind stored one after another in memory, reached by their place number: <code>out[5]</code> is the value at place 5 of the array <code>out</code>.</dd>
 <dt>AVX2</dt><dd>A set of instructions in the laptop's Ryzen processor that act on 256 bits at once, which is 8 fractions of 32 bits each.</dd>
+<dt>BRA, BSSY, BSYNC</dt><dd>GPU machine instructions that control where execution goes: BRA jumps to another instruction; BSSY and BSYNC mark where threads that took different paths meet again.</dd>
 <dt>bit, byte</dt><dd>A bit holds 0 or 1. A byte is 8 bits. A float or a <code>uint32_t</code> takes 32 bits, which is 4 bytes.</dd>
 <dt>block (CUDA)</dt><dd>A set of GPU threads started together. The launch <code>&lt;&lt;&lt;B, T&gt;&gt;&gt;</code> starts B blocks of T threads each. Each block executes on one SM.</dd>
 <dt>chain</dt><dd>A list of operations in which each one needs the value of the one before it, so they cannot overlap.</dd>
@@ -47,6 +48,7 @@
 <dt>operations per second (FLOP/s)</dt><dd>Arithmetic operations completed per second. A multiply-add counts as 2: one multiply and one add.</dd>
 <dt>owner</dt><dd>On this site: the worker (CPU thread or GPU thread) responsible for writing a given place of the output. A correct split gives every place exactly one owner.</dd>
 <dt>median</dt><dd>The middle value of a list once it is sorted. Of 10, 10, 11, 14, 30 it is 11.</dd>
+<dt>predication</dt><dd>An instruction that is executed for every thread but has effect only where a stated condition is true, so no jump is needed. Shown in a listing with a prefix such as <code>@!P2</code>.</dd>
 <dt>program counter</dt><dd>The address of the next instruction a thread will execute.</dd>
 <dt>pthread_create, pthread_join</dt><dd>CPU library calls: the first starts a new thread executing a given function; the second waits until that thread has finished.</dd>
 <dt>reduction</dt><dd>Turning many numbers into one, such as adding up an array. The work is easy to split; the dependence between partial results is the hard part.</dd>

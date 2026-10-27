@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A Second Place per Thread</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>18. Lab 2 on the GPU: two places per thread, 461 ms and 231 ms</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>Lab 2 Part 1 on the GPU keeps the launch of the Lab 1 kernel, a single block of 32 threads, and asks each thread to handle two places of the picture at once instead of one. The reason comes straight from the prelab: on this laptop, two independent chains of multiply-adds got through twice as many multiply-adds per cycle as one chain. A thread with two places has two independent chains. The obvious prediction was close to half the time.</p>
+<p>The learner first had to get the indexing right, and said exactly where the thinking broke: there were two ideas colliding, one about the step of 32 or 64 and one about two places, and it was not clear why the step should double when each thread still moves by one set of places at a time. Then came two working versions. Both gave exactly the right picture. Neither was faster.</p>
+<p>The baseline already has 32 threads working on 32 different places, all independent of each other. What can a second place inside the same thread give the hardware that those 32 independent places do not?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>A block of 32 threads computes the Lab 2 picture in about 208 ms. Give each thread two neighbouring places instead of one, with the same launch. Faster, slower, or about the same?</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "why would I increment by sixty four when my J is only incrementing by thirty two" / "there are two different ideas at play over here. This is where my brain breaks. One idea is this thirty two, sixty four part, and one idea is two pixel part, and both are colliding with each other" / "it is the same calculation for every pixel, right? Why one has to wait and the other not"</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The Lab 2 picture is 1024 by 1024 places with <code>max_iters = 2000</code>. The baseline kernel is the Lab 1 GPU kernel with Lab 2's constants: <code>&lt;&lt;&lt;1, 32&gt;&gt;&gt;</code>, thread t takes j = t, t + 32, t + 64, ... for every i. Measured on your GTX 1650 in three program executions: 222.90, 207.55, 208.67 ms, correctness exactly 0. <span class="from">from: your output</span></p>
+<p class="ln"><b>L02</b> The loop of the two-places version begins like this: <span class="from">from: your code</span></p>
+<pre>for (uint64_t j = threadIdx.x * 2; j &lt; img_size; j += blockDim.x * 2) {
+    float cx0 = (float(j) / float(img_size)) * window_zoom + window_x;
+    /* cx1 for j + 1, then both places' loops */
+}</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>for (uint64_t j = threadIdx.x * 2; j &lt; img_size; j += blockDim.x * 2) {</code><span>Give j a first value of twice this thread's number, then keep adding twice the number of threads in the block, while j is below img_size.</span></li>
+<li><code>float cx0 = (float(j) / float(img_size)) * window_zoom + window_x;</code><span>The middleman number for place j, using Lab 2's window: j divided by img_size, times the window size, plus the window's left edge.</span></li>
+<li><code>/* cx1 for j + 1, then both places' loops */</code><span>A note for people: the same for place j + 1, then the arithmetic for both places.</span></li>
+<li><code>}</code><span>End of the j loop.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> Thread t owns places j and j + 1. Thread 0's places for one i: ____ . Thread 31's first two places: ____ . Places per thread per i = 1024 / 32 = ____ . Does any place get two owners? ____ . <span class="from">from: L02</span></p>
+<details><summary>CHECK</summary>
+<pre>thread 0: 0, 1, 64, 65, 128, 129, ...  (j = 64k, plus j + 1)
+thread 31: 62, 63, then 126, 127, ...
+32 places per thread per i (16 pairs); every place exactly once</pre>
+</details>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> The two ideas, separated. Idea 1: each thread now holds 2 places, so thread t's first place is 2t. Idea 2: the 32 threads together cover 32 x 2 = ____ places per round, so each thread's next round begins ____ places later. Doubling only the first place (2t, step 32) gives, over 1024 places, ____ owned once and ____ owned twice. Doubling only the step (t, step 64) gives ____ owned by nobody and ____ owned twice. <span class="from">from: L02, L03, counted over 1024 places</span></p>
+<details><summary>CHECK</summary>
+<pre>64 places per round; next round begins 64 places later
+first place doubled only: 32 owned once, 992 owned twice (thread 16 repeats thread 0 from 32 on)
+step doubled only: 496 owned by nobody (33 to 63 in every 64), 496 twice, 32 once
+the first-place rule comes from "2 places per thread", the step from "32 threads x 2 places".</pre>
+</details>
+<p class="ln"><b>L05</b> Version 1 wrapped each place's arithmetic in <code>if (that place is still going)</code>. Measured in the same three executions as L01: 460.74, 461.50, 460.84 ms, correctness exactly 0. Its machine listing has 44 branch and convergence instructions (<code>BSSY</code>, <code>BSYNC</code>, <code>BRA</code>) in the kernel; of about 35 instructions inside the loop, 18 are control: 2 <code>BSSY</code>, 2 <code>BSYNC</code>, 2 <code>BMOV</code>, 1 <code>BREAK</code>, 6 <code>BRA</code>, 5 compare-and-set (<code>ISETP</code>, <code>FSETP</code>). <span class="from">from: your output, your listing</span></p>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> Time ratio in each execution: 460.74 / 222.90 = ____ , 461.50 / 207.55 = ____ , 460.84 / 208.67 = ____ . Share of the loop that is control = 18 / 35 = ____ percent. <span class="from">from: L01, L05</span></p>
+<details><summary>CHECK</summary>
+<pre>2.07, 2.22, 2.21 times slower
+18 / 35 = 51 percent of the loop's instructions decide where to go, not what to compute</pre>
+</details>
+<p class="ln"><b>L07</b> Version 2 always computes both places and only stops counting the finished one: <span class="from">from: your code</span></p>
+<pre>while ((x2_0 + y2_0 &lt;= 4.0f &amp;&amp; iters0 &lt; max_iters) ||
+       (x2_1 + y2_1 &lt;= 4.0f &amp;&amp; iters1 &lt; max_iters)) {
+    if (x2_0 + y2_0 &lt;= 4.0f &amp;&amp; iters0 &lt; max_iters) { ++iters0; }
+    if (x2_1 + y2_1 &lt;= 4.0f &amp;&amp; iters1 &lt; max_iters) { ++iters1; }
+    /* lines A to F for place 0, and lines A to F for place 1, with no if around them */
+}</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>while ((x2_0 + y2_0 &lt;= 4.0f &amp;&amp; iters0 &lt; max_iters) ||</code><span>Repeat while place 0 is still going (its x2 + y2 is at most 4 and its count is below max_iters),</span></li>
+<li><code>(x2_1 + y2_1 &lt;= 4.0f &amp;&amp; iters1 &lt; max_iters)) {</code><span>or place 1 is still going.</span></li>
+<li><code>if (x2_0 + y2_0 &lt;= 4.0f &amp;&amp; iters0 &lt; max_iters) { ++iters0; }</code><span>Add 1 to place 0's count only if place 0 is still going.</span></li>
+<li><code>if (x2_1 + y2_1 &lt;= 4.0f &amp;&amp; iters1 &lt; max_iters) { ++iters1; }</code><span>The same for place 1, with its own condition.</span></li>
+<li><code>/* lines A to F for place 0, and lines A to F for place 1, with no if around them */</code><span>A note for people: both places' arithmetic follows, executed on every repetition.</span></li>
+<li><code>}</code><span>End of the while loop.</span></li>
+</ol>
+</div>
+<p class="ln"><b>L08</b> Version 2's listing: inside the loop, no <code>BSSY</code>, <code>BSYNC</code> or <code>BREAK</code>; a count update became <code>IADD3</code> (add 1) followed by <code>@!P2 IADD3</code>, which puts the old value back when the place's condition P2 is false. That is called predication: an instruction that executes but has effect only where its condition is true. The loop has 28 instructions, 18 of them FP32 (12 <code>FADD</code>, 6 <code>FMUL</code>). Measured: 230.89, 231.50, 232.01 ms against same-execution baselines 221.11, 207.87, 207.82 ms; correctness exactly 0. <span class="from">from: your listing, your output</span></p>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> Ratios: 230.89 / 221.11 = ____ , 231.50 / 207.87 = ____ , 232.01 / 207.82 = ____ . The finished place keeps computing: is that safe? Its x2 + y2 is above 4, so its distance from (0, 0) is above 2, and squaring makes it farther again; far enough, the float becomes inf, then NaN, and <code>NaN &lt;= 4.0f</code> is ____ . <span class="from">from: L07, L08</span></p>
+<details><summary>CHECK</summary>
+<pre>1.044, 1.114, 1.116: about the same as the baseline, slightly slower
+NaN &lt;= 4.0f is false, so the count's condition stays false and the count never moves again;
+only the count is stored, so the extra arithmetic changes nothing in the picture.</pre>
+</details>
+<p class="ln"><b>L10</b> Measured facts restated: on your GTX 1650 a 32-thread FP32 instruction takes 2 cycles to begin (1031 - 519 = 512 cycles for 256 more multiply-adds in four chains), and an FP32 op that needs the previous one's value waits 4 cycles. The baseline loop has 9 FP32 instructions per repetition (6 <code>FADD</code>, 3 <code>FMUL</code>), and with Lab 2's line B its repeating chain is 4 ops: w - (x2 + y2), + cy, x + y, z * z. <span class="from">from: your output, the listing count reported in your chat (it matches the ops of lines A to F), the Lab 2 starter code</span></p>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> Baseline, one repetition: cycles to begin all FP32 instructions = 9 x 2 = ____ ; cycles along the repeating chain = 4 x 4 = ____ . Version 2: 18 x 2 = ____ ; chain = ____ (each place has its own). Which number is larger in each case? ____ . <span class="from">from: L08, L10</span></p>
+<details><summary>CHECK</summary>
+<pre>baseline: 18 cycles of FP32 starts against a 16-cycle chain: the starts already fill the wait
+version 2: 36 cycles of FP32 starts against a 16-cycle chain
+in both, beginning the FP32 instructions takes longer than waiting along the chain;
+a second place mostly adds starts, with little waiting left to fill.</pre>
+</details>
+<p class="ln"><b>L12</b> Name one repetition of the loop by the whole set of 32 threads a warp-repetition; NVIDIA calls the set a warp. The set keeps repeating until its slowest place is done. Computed from the iters of the Lab 2 picture in 32-bit fractions: the baseline, where each repetition covers 32 neighbouring places, needs 8,792,320 warp-repetitions; version 2, where each covers 64 neighbouring places, needs 5,470,868. <span class="from">from: float32 computation on the Lab 2 starter's constants</span></p>
+<p class="ln do"><b>L13</b> <b class="x">DO</b> Ratio 5,470,868 / 8,792,320 = ____ . Why not 0.5? ____ . If a version 2 repetition cost 2 baseline repetitions, time ratio = 2 x ____ = ____ ; if it cost 1, ____ . Measured (L09, middle execution) 1.114. Implied cost of a version 2 repetition = 1.114 / ____ = ____ baseline repetitions. <span class="from">from: L09, L11, L12</span></p>
+<details><summary>CHECK</summary>
+<pre>0.622, not 0.5: a set of 64 loops until the slowest of 64, which is at least as long as
+either half of 32 would have needed
+cost 2 -&gt; 1.244 (about 258 ms); cost 1 -&gt; 0.622 (about 129 ms); measured 1.114 (231.50 ms)
+implied: 1.114 / 0.622 = 1.79 baseline repetitions per version 2 repetition:
+the second place filled a little waiting, nowhere near half.</pre>
+</details>
+<p class="ln do"><b>L14</b> <b class="x">DO</b> A report in the chat claimed 270,531 baseline warp-repetitions and still predicted about the measured 231 ms. Check the claim: the picture's iters add up to 138,219,822, and a warp-repetition advances at most 32 places by one repetition, so the baseline needs at least 138,219,822 / 32 = ____ . Is 270,531 possible? ____ . <span class="from">from: L12, float32 computation</span></p>
+<details><summary>CHECK</summary>
+<pre>at least 4,319,369 warp-repetitions; 270,531 is about 16 times too few, so it is impossible.
+The report's ratio (0.62) happened to be right, which is why its time "matched".
+A prediction that lands on the measurement does not make its inputs true.</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L15</b> <b class="x">DO</b> The baseline has 32 threads with 32 independent places (L01). When the warp's current FP32 instruction waits 4 cycles for its value, which threads are waiting, and is there another instruction for the scheduler to begin? ____ . Then collect L06 (control made it 2.2 times slower), L09 (1.11), L11 (18 cycles of starts against a 16-cycle chain), L13 (0.622 and 1.79), and write one sentence on why two places per thread did not halve the time. <span class="from">from: L01, L06, L09, L11, L13</span></p>
+<details><summary>CHECK</summary>
+<pre>All 32 threads wait, because they are executing one and the same instruction; 32 different
+places are different DATA, not different INSTRUCTIONS, and only another instruction can fill
+the wait: from another warp, or from a second independent place inside the same thread.
+Here that second place had little to fill: the baseline's 9 FP32 instructions already take
+18 cycles to begin against a 16-cycle chain, so the second place mostly added starts
+(1.79 instead of 1 per repetition), while sets of 64 loop until their slowest place
+(0.622 instead of 0.5). Version 1 lost a further factor of about 2 to control instructions.
+
+Tempting answer that fails: "two independent chains doubled the rate in the prelab, so two
+places per thread should give about 111 ms". In the prelab a lone chain left half of every
+4-cycle wait empty; this loop's wait was already almost covered by its own starts (L11).</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>Giving each worker two jobs at once only helps if the worker spends time waiting that the second job can fill. Here the GPU was already busy beginning instructions for almost the whole wait, so a second job per thread mostly added work. A first attempt that checked "is this job still going?" around every step was twice as slow, because the checks cost more than the arithmetic.</p>
+<p>For a manager: a technique that doubled speed in a small test can do nothing in the real job. Ask what the small test was limited by, and whether the real job is limited by the same thing.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>Not faster. Version 1: about 2.2 times slower (461 ms). Version 2: about the same,
+slightly slower (231 ms against 208 to 221 ms). Both exactly correct.</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>At an assumed 1.5 GHz, the baseline spends 207.55 ms / 8,792,320 warp-repetitions, about 35 cycles per repetition, yet FP32 starts explain 18 and the chain 16. How would you find where the rest goes?</p>
+<details><summary>CHECK</summary>
+<pre>First replace the assumption: read the GPU clock during the measurement (nvidia-smi -q -d CLOCK).
+Then count every instruction in the baseline loop's listing, not only FP32: compares, integer
+adds, moves and branches also need cycles to begin, and the compare-then-branch at the top of
+each repetition waits on the FP32 sum. Finally, Nsight Compute's warp state statistics give the
+sampled reasons the warp could not begin an instruction, which separates waiting on values,
+waiting on a busy unit and waiting on a branch.</pre>
+</details>
+</div>
+
+<nav><a href="17-hardware-or-launch.html">prev: 17 fixed by the chip, or made by the launch</a><a href="failures.html">next: the failure list</a></nav>
+</main>
+</body>
+</html>

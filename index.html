@@ -57,7 +57,10 @@
                                                                           13 the 864 cliff
                                                                                   |
                                                                                   v
-                          14 ownership --&gt; 15 trusting a number --&gt; 16 combining speedups</pre>
+                          14 ownership --&gt; 15 trusting a number --&gt; 16 combining speedups
+                                                                                  |
+                                                                                  v
+                                   17 fixed by the chip, or made by the launch --&gt; 18 two places per thread</pre>
 
 <ol class="topics" start="0">
 <li><a href="00-what-a-gpu-is.html">What a GPU is, measured on one laptop</a>: 896 arithmetic circuits against 48, four timings, and why the fastest result does not prove what it seems to.</li>
@@ -77,8 +80,10 @@
 <li><a href="14-ownership.html">Who writes which place, and who finishes last</a>: the real Lab 2 picture split 6 ways, 4.72 times in bands against 5.98 in turns, and 1792 GPU threads that can use only 7 of 14 SMs.</li>
 <li><a href="15-trusting-a-number.html">What the two printed numbers can hide</a>: one wrong place prints 0.000000000477, and a version missing 1024 places prints 169 times less than a harmless rounding change.</li>
 <li><a href="16-combining-speedups.html">Do speedups multiply?</a>: a check that can never fail, and your own 4, 2, 2 cycles showing where the second technique stops helping.</li>
+<li><a href="17-hardware-or-launch.html">Fixed by the chip, or made by the launch?</a>: 14,336 threads held, 1,792 begun per cycle, 896 multiply-adds per cycle, and the 2 per scheduler that this work actually needs.</li>
+<li><a href="18-two-places-per-thread.html">A second place per thread on the GPU</a>: your 461 ms and 231 ms against a 208 ms baseline, the two indexing traps, and why 32 independent places do not fill a wait.</li>
 </ol>
-<p>And: <a href="failures.html">the failure list</a>, 30 ways a clean-looking result goes wrong, each pointing to the page that works it out.</p>
+<p>And: <a href="failures.html">the failure list</a>, 36 ways a clean-looking result goes wrong, each pointing to the page that works it out.</p>
 </main>
 </body>
 </html>

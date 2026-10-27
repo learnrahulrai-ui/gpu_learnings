@@ -156,6 +156,18 @@ L23 measures it at 29, 35, 41 and 9.</pre>
 
 </div>
 
+<div class="connect">
+<p class="label">Reported later in the chat: one kernel, three lengths</p>
+<p class="ln"><b>L26</b> A later summary in the learner's chat reports the single-chain kernel <code>fma_latency</code> at three lengths: 64 FFMAs = 281 cycles, 128 = 537, 192 = 793. The raw printouts for 128 and 192 are not in the export, so treat them as reported. <span class="from">from: the learner's chat (reported)</span></p>
+<p class="ln do"><b>L27</b> <b class="x">DO</b> Same-kernel subtraction: (537 - 281) / 64 = ____ , (793 - 537) / 64 = ____ . Outside part with 4 cycles per FFMA: 281 - 63 x 4 = ____ , 537 - 127 x 4 = ____ , 793 - 191 x 4 = ____ . Compare with L24's 4.03 from two different kernels. <span class="from">from: L22, L24, L26</span></p>
+<details><summary>CHECK</summary>
+<pre>256 / 64 = 4.00 and 256 / 64 = 4.00
+outside parts: 29, 29, 29: constant inside one kernel
+L24's 4.03 came from subtracting two different kernels (outside parts 29 and 35);
+inside one kernel the subtraction is exact. This is L25's rule, confirmed.</pre>
+</details>
+</div>
+
 <div class="plain">
 <p class="label">In plain words</p>
 <p>Every measurement contains the thing you want plus things you do not. Dividing by a count hides the unwanted part; subtracting two measurements removes it, but only when both measurements carry the same unwanted part. Here the learner's machine showed that "the same" means the same kernel, not merely the same timer.</p>

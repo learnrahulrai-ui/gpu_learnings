@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hardware or Launch</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>17. Fixed by the chip, or made by the launch?</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>Before writing any Lab 2 GPU code, the learner stopped and asked which of the words in the lab are real hardware and which only exist inside a program. The SMs come from the factory: they are there even if CUDA was never installed. But a block is something a program asks for at launch, so why would a block be "on" an SM? And is the 32-thread unit a piece of hardware, or just a word programmers use?</p>
+<p>Then came a calculation that looked natural: 14 SMs, 4 schedulers in each, 32 threads per unit, so 14 x 4 x 32 = 1,792 must be the most threads the GPU can hold. And a second puzzle: a block of 64 threads is two 32-thread units, and one scheduler has room for both, so why does the hardware spread them over two schedulers?</p>
+<p>Several of these numbers are real, but they count different things: what the chip holds at once, what it can begin in a single cycle, and what a program asks for. Which number is which, and which one decides how many threads a program needs?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>The GTX 1650 has 14 SMs, each with 4 warp schedulers, and the hardware handles threads in units of 32. Is 14 x 4 x 32 = 1,792 the most threads the whole GPU can hold at once? Yes or no.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "Even if I don't install CUDA libraries, even if I don't even open NVIDIA website ever on my laptop, these things just remain, yes or no" / "A block need not exist at all. But wrap scheduler always exists. So why would a wrap scheduler even know about blocks" / "the total number of threads which I can run on my hardware is what? 14 times 4 times 32, is this true or false?"</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> Fixed by the chip, present with or without CUDA installed: 14 SMs; in each SM, 4 warp schedulers, 64 FP32 units and 65,536 registers of 32 bits; each SM holds at most 32 units of 32 threads and at most 16 blocks at once. <span class="from">from: your hardware table, NVIDIA Turing Tuning Guide</span></p>
+<p class="ln"><b>L02</b> Made by a launch, absent before it: <code>&lt;&lt;&lt;B, T&gt;&gt;&gt;</code> asks for B blocks of T threads, every thread executing the same kernel. <span class="from">from: CUDA programming guide</span></p>
+<p class="ln"><b>L03</b> When a block reaches an SM, the hardware cuts its threads into consecutive sets of 32: threads 0 to 31 form the first set, 32 to 63 the second. NVIDIA calls such a set a warp. A warp scheduler is a circuit that holds warps and, every cycle, picks a ready one and begins its next instruction for all its threads. So the schedulers always exist; warps exist only while a kernel executes, made from the threads of the launch. <span class="from">from: L01, L02, CUDA programming guide</span></p>
+<p class="ln"><b>L04</b> Threads of one block may read and write the same shared memory of their SM and may wait for each other at <code>__syncthreads()</code>. Both only work inside one SM. That is why the hardware places a whole block on one SM and never splits a block across SMs; a block is the unit of placement, even though the program defines it. <span class="from">from: CUDA programming guide</span></p>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> Warps one scheduler can hold = 32 / 4 = ____ . Threads per scheduler = ____ x 32 = ____ . Threads per SM = ____ . Threads the whole GPU holds at once = 14 x ____ = ____ . <span class="from">from: L01, L03</span></p>
+<details><summary>CHECK</summary>
+<pre>8 warps per scheduler, 256 threads per scheduler, 1,024 per SM
+14 * 1,024 = 14,336 threads held at once</pre>
+</details>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> From L03, each scheduler begins at most one warp's instruction per cycle. Threads whose instruction can begin in one cycle = 14 x 4 x 32 = ____ . From L01, a scheduler has 64 / 4 = ____ FP32 units, so for a multiply-add the count per cycle is 14 x 4 x ____ = ____ . What does 1,792 count, and what does it not count? ____ . <span class="from">from: L01, L03, L05</span></p>
+<details><summary>CHECK</summary>
+<pre>1,792 threads can have an instruction begin in one cycle (an upper bound)
+16 FP32 units per scheduler -&gt; 14 * 4 * 16 = 896 thread multiply-adds per cycle
+1,792 counts "begun per cycle", not "held at once": 14,336 / 1,792 = 8,
+each scheduler holds 8 warps and begins at most one of them per cycle.</pre>
+</details>
+<p class="ln"><b>L07</b> Measured on your GTX 1650 in the Lab 2 prelab: a 32-thread multiply-add takes 2 cycles to begin (1031 - 519 = 512 cycles for 256 more multiply-adds in four independent chains), and a multiply-add that needs the previous one's value waits 4 cycles. A scheduler can begin an instruction of another kind, such as an integer add, in the cycle between. <span class="from">from: your output, NVIDIA Turing Tuning Guide</span></p>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> A block of 64 threads makes ____ warps. Suppose both sit on scheduler 0: they share its 16 FP32 units, so together they begin at most ____ FP32 instruction(s) per 2 cycles. On schedulers 0 and 1: ____ per 2 cycles. Which warp goes to which scheduler is not something CUDA lets a program choose or guarantees; the warps of a block are spread over the SM's schedulers when it arrives. Why spread them when scheduler 0 has room for 8? ____ . <span class="from">from: L03, L05, L07</span></p>
+<details><summary>CHECK</summary>
+<pre>2 warps
+both on scheduler 0: 1 FP32 instruction per 2 cycles for the pair
+on schedulers 0 and 1: 2 per 2 cycles
+room was never the reason: each scheduler brings its own 16 FP32 units and its own start
+per cycle, so spreading doubles what the two warps can begin.</pre>
+</details>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> The course file <code>warp_scheduler.cu</code> launches 48 x m blocks of 64 threads, whatever GPU it is on. For m = 1 on your laptop: will the program fail? ____ . Threads launched = 48 x 64 = ____ on both GPUs. Blocks per SM on the 48-SM course GPU = ____ ; on your 14 SMs: ____ SMs get 4 and ____ get 3. <span class="from">from: L04, the Lab 2 starter code</span></p>
+<details><summary>CHECK</summary>
+<pre>no: it launches and finishes; nothing in the hardware rejects 48 blocks on 14 SMs
+3,072 threads on both
+course GPU: 1 block per SM; yours: 48 = 3 * 14 + 6 -&gt; 6 SMs get 4 blocks, 8 get 3
+the difference is how much each SM must hold, not whether the program executes.</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> Collect L05 (14,336 held, 8 warps per scheduler), L06 (1,792 begun per cycle, 896 multiply-adds per cycle), L07 (2 cycles to begin, 4 cycles to wait), L08 (spreading doubles FP32 starts). In <code>warp_scheduler.cu</code> every warp is a single chain of dependent multiply-adds. How many warps does one scheduler need so that its FP32 units never sit idle? ____ . For the whole GPU: ____ warps. Write one sentence on the difference between that number and L05's. <span class="from">from: L05, L06, L07, L08</span></p>
+<details><summary>CHECK</summary>
+<pre>4-cycle wait / 2 cycles per start = 2 warps per scheduler
+(warp A begins at cycle 0, warp B at cycle 2, warp A's next is ready at cycle 4)
+14 SMs * 4 schedulers * 2 = 112 warps for the whole GPU
+L05's 8 per scheduler is what the hardware can HOLD; 2 is what this kind of work NEEDS.
+The maximum the chip allows is not the target; the target comes from the wait and the start rate.
+
+Tempting answer that fails: "fill every SM to its 32-warp maximum for the best speed".
+For chains of multiply-adds, past 2 warps per scheduler the FP32 units are already busy (L07).</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>A GPU has a fixed number of circuits, and a program asks for a number of threads. Between the two sit three different counts that are easy to confuse: how many threads the chip can keep at once, how many it can start work for in one tick of its clock, and how many it actually needs to stay busy. For the work in this lab the last number is far smaller than the first.</p>
+<p>For a manager: "the GPU supports N threads" is a ceiling, not a recommendation. The useful number depends on how long each step of the work waits, and it has to be worked out for each job.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>No. The GPU holds up to 14,336 threads at once (8 warps per scheduler).
+1,792 is how many threads can have an instruction begin in a single cycle.</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>A kernel uses 64 registers per thread. How many warps can one SM hold, and does that limit matter for chains of dependent multiply-adds? What changes at 128 registers per thread?</p>
+<details><summary>CHECK</summary>
+<pre>64 registers * 32 threads = 2,048 registers per warp; 65,536 / 2,048 = 32 warps: the full 32.
+128 registers: 4,096 per warp; 65,536 / 4,096 = 16 warps per SM, 4 per scheduler.
+Chains of multiply-adds need 2 per scheduler (L10), so neither limit should slow them by itself.
+Registers become the limit only when a kernel needs more warps per scheduler than they allow;
+measure before blaming them.</pre>
+</details>
+</div>
+
+<nav><a href="16-combining-speedups.html">prev: 16 combining speedups</a><a href="18-two-places-per-thread.html">next: 18 two places per thread</a></nav>
+</main>
+</body>
+</html>
