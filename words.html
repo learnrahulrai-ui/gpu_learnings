@@ -44,6 +44,7 @@
 <dt>middleman pair</dt><dd>The learner's word for (cx, cy), the two fractions computed from (i, j) that the Mandelbrot loop actually works on.</dd>
 <dt>profiler</dt><dd>A tool (here NVIDIA Nsight Compute) that counts what the GPU did, such as memory requests and sectors.</dd>
 <dt>operations per byte</dt><dd>How many arithmetic operations a program does for each byte it moves to or from memory. Below what the hardware needs to stay busy, memory sets the time.</dd>
+<dt>operations per second (FLOP/s)</dt><dd>Arithmetic operations completed per second. A multiply-add counts as 2: one multiply and one add.</dd>
 <dt>program counter</dt><dd>The address of the next instruction a thread will execute.</dd>
 <dt>reduction</dt><dd>Turning many numbers into one, such as adding up an array. The work is easy to split; the dependence between partial results is the hard part.</dd>
 <dt>register</dt><dd>A small storage cell inside the processor chip. Arithmetic reads its inputs only from registers.</dd>
@@ -54,6 +55,8 @@
 <dt>SM</dt><dd>Each of the identical blocks of hardware an NVIDIA GPU chip is built from. The GTX 1650 has 14, each with 64 FP32 units.</dd>
 <dt>tile</dt><dd>A small square piece of a large table, copied into shared memory so many threads can use each value without fetching it again.</dd>
 <dt>thread</dt><dd>A sequence of instructions being executed. On a GPU, thousands can exist at once, each with its own values.</dd>
+<dt>warp scheduler</dt><dd>A circuit in each SM that, every cycle, picks which warp's next instruction begins. Turing and Ada GPUs have 4 per SM.</dd>
+<dt>wave (second round)</dt><dd>When a launch has more blocks than the SMs can hold at once, the extra blocks wait until earlier ones finish and then execute as a further round.</dd>
 <dt>warp</dt><dd>NVIDIA's name for 32 consecutive threads of a block that the hardware handles together, one instruction at a time.</dd>
 </dl>
 

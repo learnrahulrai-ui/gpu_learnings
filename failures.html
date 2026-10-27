@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Failure List</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>The failure list: how a correct-looking result goes wrong</h1>
+<p class="sub">Each entry is a mistake that produces a number that looks fine. The first fifteen come from the learner's own Lab 2 notes (F1 to F15); the rest were found while building this site. Read the left half, cover the right half, and say why it fails before reading on. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<div class="story">
+<p>Most wrong results in performance work are not crashes. They are numbers that print cleanly, look plausible, and answer a different question than the one asked. An interviewer looking for people who measure rather than recite will put exactly these in front of a candidate. This list collects them, each with the page where the reasoning is worked out by hand.</p>
+</div>
+
+<p class="label">From the Lab 2 notes</p>
+<ol class="topics">
+<li><b>F1. An assumed number reported as measured.</b> "An FFMA takes 4 cycles" written as the GTX 1650 result before any measurement. Fails because a model value is not evidence about this chip. Worked out: <a href="10-cycles-per-ffma.html">page 10</a>.</li>
+<li><b>F2. Timing to the last instruction begun instead of the last value ready.</b> With 16 FFMAs in two chains, the last begins well before its value exists. Fails because the reported time leaves out the final wait. Worked out: <a href="09-clock-read-trap.html">page 09</a>, L14.</li>
+<li><b>F3. FMA in the source, no FFMA in the machine listing.</b> The compiler simplified or removed the arithmetic. Fails because the timed code is not the code you meant. Worked out: <a href="10-cycles-per-ffma.html">page 10</a>, L18.</li>
+<li><b>F4. Comparing kernels with different FFMA counts or different timer placement.</b> Fails because cycles per FFMA from unequal setups do not compare. Worked out: <a href="10-cycles-per-ffma.html">page 10</a>, L23 and L24.</li>
+<li><b>F5. Assuming the listing keeps the source order.</b> The compiler alternated loops written one after the other. Fails because conclusions about the hardware were really about the compiler. Worked out: <a href="10-cycles-per-ffma.html">page 10</a>, L20.</li>
+<li><b>F6. The course GPU's 48 SMs used for a 14-SM laptop.</b> Fails because every figure per scheduler is off: 192 schedulers assumed, 56 present. Worked out: <a href="12-the-48-trap.html">page 12</a>.</li>
+<li><b>F7. A slowdown blamed on "8 blocks per SM" without checking.</b> Fails because 8 is a possible limit for this kernel, not a measured one, and the hardware limit is higher. Worked out: <a href="13-the-864-cliff.html">page 13</a>, L10.</li>
+<li><b>F8. A sweep that grows in steps of 96 units of 32 threads on a GPU whose natural step is 56.</b> Fails because each setting lands at a different point of the curve than intended. Worked out: <a href="12-the-48-trap.html">page 12</a>, L14.</li>
+<li><b>F9. An FFMA counted as 1 operation instead of 2.</b> Fails because the reported rate comes out at half its true value. Worked out: <a href="13-the-864-cliff.html">page 13</a>, L03.</li>
+<li><b>F10. Different clock speeds or temperatures compared as if equal.</b> Fails because cycle counts and times then disagree between measurements. Record the clock with every measurement (<code>nvidia-smi</code>).</li>
+<li><b>F11. GPU time read without waiting for the GPU to finish.</b> The launch returns at once; the work is still going. Fails because the time misses the work. The lab's timing code already waits; adding your own timing around it measures something else.</li>
+<li><b>F12. Setup, memory reads or clock reads inside the timed region.</b> Fails because their cost is added to the operation being measured. Worked out: <a href="09-clock-read-trap.html">page 09</a>.</li>
+<li><b>F13. Chains that read each other.</b> Writing x into y "for convenience" makes them one chain. Fails because the measurement is of one chain, not two. Worked out: <a href="10-cycles-per-ffma.html">page 10</a>, L19.</li>
+<li><b>F14. A single test size taken as proof of correctness for all sizes.</b> Fails because a size like 256 can hide rounding that other sizes expose. Worked out: <a href="04-simd-cx.html">page 04</a>, L22 to L24.</li>
+<li><b>F15. A speaker's name from a summary used in place of the slide's credited author.</b> Fails because the source of a claim must be the source actually checked.</li>
+</ol>
+
+<p class="label">Found while building this site</p>
+<ol class="topics" start="16">
+<li><b>F16. Dividing one measurement by a count.</b> For example, 281 cycles / 64 FFMAs = 4.39 "cycles per FFMA". Fails because the fixed part is spread over the count. Worked out: <a href="10-cycles-per-ffma.html">page 10</a>, L05.</li>
+<li><b>F17. A "prediction" fitted after the measurement.</b> "Overhead 25 to 39, so 295" when 39 = 295 - 256. Fails because a range chosen to contain the answer predicts nothing.</li>
+<li><b>F18. Equal numbers of items taken as equal work.</b> For example, four bands of the picture, 16384 places each, gave 2.10 times on 4 workers. Fails because the cost per place ranges from 1 to 1000. Worked out: <a href="02-square-and-add.html">page 02</a>, L25.</li>
+<li><b>F19. Speedup credited to the instructions instead of the data.</b> 8-at-once code gave 7.07 times on neighbours and would give 2.23 on shuffled places. Worked out: <a href="05-simd-while-loop.html">page 05</a>, L25.</li>
+<li><b>F20. More threads expected to fix a job limited by memory.</b> Adding two arrays moves 12 bytes per add. Fails because the time is set by bytes, not by arithmetic. Worked out: <a href="t1-add-two-arrays.html">T1</a>.</li>
+<li><b>F21. The plain-loop sum trusted as the exact answer.</b> Summed in order, 20 million ones give 16,777,216. Worked out: <a href="t2-sum-an-array.html">T2</a>.</li>
+<li><b>F22. A course file executed unchanged on different hardware.</b> Fails because hardware numbers written into the file describe the course machine. Worked out: <a href="12-the-48-trap.html">page 12</a>.</li>
+</ol>
+
+<nav><a href="index.html">index</a><a href="symptoms.html">start from your symptom</a></nav>
+</main>
+</body>
+</html>

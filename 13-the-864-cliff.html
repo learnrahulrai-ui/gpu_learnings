@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The 864 Cliff</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>13. Lab 2: 12.5 percent more work, 87 percent more time</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>The Lab 2 program <code>warp_scheduler.cu</code> gives the GPU more and more threads and prints how many arithmetic operations per second it achieves. On the course's GPU, an NVIDIA RTX 4000 Ada, the number climbs as threads are added, as everyone expects. Then, at one step, it falls by about 40 percent.</p>
+<p>At that step the program added only one eighth more work. The time did not grow by one eighth; it nearly doubled. A learner who believes "more threads, more speed" has no way to explain that, and a learner who knows the definition of every term involved usually has no way either, because the explanation needs several numbers put side by side.</p>
+<p>The learner of this site had already separated two facts in a voice note: how many SMs a chip has does not tell you how many threads or schedulers are busy. What do the numbers say happened between the last good setting and the first bad one, and what would the same reasoning predict for the GTX 1650 in this laptop?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>On the course GPU, going from 768 to 864 threads-of-32 adds 12.5 percent more work. Does the time grow by about 12.5 percent, or by much more? If much more, write a rough number.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "Confirm me this part, okay? I have 14 SMs. Yes or no?" / "Okay, just because I have an SM ... doesn't mean I know how many threads or schedulers you run. That is a different piece of information, yes or no?"</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> NVIDIA facts: a launch makes blocks of threads; each block executes on one SM; an SM handles a block's threads in units of 32 consecutive threads, which NVIDIA names a warp. Each SM has 4 warp schedulers, circuits that each pick, every cycle, which warp's next instruction begins. <span class="from">from: CUDA programming guide</span></p>
+<p class="ln"><b>L02</b> From your Lab 2 notes, which read <code>warp_scheduler.cu</code>: 64 threads per block; each block handles 2048 numbers; each number is updated 263 x 20 = 5260 times by the line below; the file launches 48 x m blocks for a multiplier m. <span class="from">from: your Lab 2 notes</span></p>
+<pre>tmp += tmp * 3.0f;</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>tmp += tmp * 3.0f;</code><span>Multiply tmp by 3.0 and add the product to tmp, in one multiply-add instruction (FFMA). The next update reads this new tmp, so each number's 5260 updates form a chain.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> Counting the multiply and the add as 2 operations: operations per number = 2 x 5260 = ____ . Per block = 2048 x that = ____ . Warps per block = 64 / 32 = ____ . <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>10,520 per number
+2048 * 10,520 = 21,544,960 per block
+2 warps per block</pre>
+</details>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> Multiplier m = 8: blocks = 48 x 8 = ____ , warps = ____ , operations = ____ . Multiplier m = 9: blocks = ____ , warps = ____ , operations = ____ . <span class="from">from: L02, L03</span></p>
+<details><summary>CHECK</summary>
+<pre>m = 8: 384 blocks, 768 warps, 384 * 21,544,960 = 8,273,264,640 operations
+m = 9: 432 blocks, 864 warps, 432 * 21,544,960 = 9,307,422,720 operations</pre>
+</details>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> Reported for the course GPU in your notes: 768 warps gave 26.4575 x 10^12 operations per second; 864 warps gave 15.9401 x 10^12. Time = operations / rate. At 768: ____ ms. At 864: ____ ms. <span class="from">from: L04, your Lab 2 notes</span></p>
+<details><summary>CHECK</summary>
+<pre>8,273,264,640 / 26.4575e12 = 0.3127 ms
+9,307,422,720 / 15.9401e12 = 0.5839 ms</pre>
+</details>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> Work ratio = 432 / 384 = ____ . Time ratio = 0.5839 / 0.3127 = ____ . <span class="from">from: L04, L05</span></p>
+<details><summary>CHECK</summary>
+<pre>work ratio 1.125   (12.5 percent more)
+time ratio 1.867   (87 percent more)</pre>
+</details>
+<p class="ln"><b>L07</b> Course GPU facts, from the Lecture 2 slides via your notes and NVIDIA's listing: RTX 4000 Ada, 48 SMs, 4 schedulers per SM, 128 FP32 units per SM (6144 in all), about 26.7 x 10^12 operations per second at full use. <span class="from">from: Lecture 2 slides, NVIDIA specifications</span></p>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> Schedulers = 48 x 4 = ____ . FP32 units per scheduler = 128 / 4 = ____ , so a 32-thread FFMA takes ____ cycle(s) to begin. With the chain of L02, each FFMA waits 4 cycles for the one before (assume the same 4 cycles as Turing). Independent warps each scheduler needs so that one FFMA can begin every cycle = ____ . <span class="from">from: L01, L02, L07</span></p>
+<details><summary>CHECK</summary>
+<pre>192 schedulers
+32 units per scheduler -&gt; 32 threads begin in 1 cycle
+4-cycle wait / 1 cycle per begin = 4 independent warps per scheduler</pre>
+</details>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> Warps per scheduler at 768 = 768 / 192 = ____ . At 864 = ____ . Blocks per SM at 768 = 384 / 48 = ____ . At 864 = ____ . Share of L07's full rate reached at 768 = 26.4575 / 26.7 = ____ percent. <span class="from">from: L04, L05, L07, L08</span></p>
+<details><summary>CHECK</summary>
+<pre>768: 4 warps per scheduler, 8 blocks per SM, 99 percent of the full rate
+864: 4.5 warps per scheduler, 9 blocks per SM</pre>
+</details>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> Hypothesis, not a measured fact: an SM can hold at most 8 blocks of this kernel at once. Then at 864, blocks beyond 48 x 8 = ____ wait: ____ blocks, a second round. If the second round costs as much as the first, time = 2 x 0.3127 = ____ ms. Measured 0.5839. Gap = ____ ms, ____ percent. <span class="from">from: L04, L05, L09</span></p>
+<details><summary>CHECK</summary>
+<pre>384 held at once; 432 - 384 = 48 blocks wait
+predicted 0.6254 ms against 0.5839 measured; gap 0.0415 ms, 6.6 percent
+close, but not equal: suggestive, not proof.
+NVIDIA lists 24 resident blocks per SM as the hardware limit for this GPU generation; registers
+or shared memory used by this kernel may lower it, and only a measurement says by how much.</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> Collect L06 (work 1.125, time 1.867), L08 (4 warps per scheduler needed), L09 (768 gives exactly 4, at 99 percent), L10 (a second round predicts 0.6254). Write one sentence explaining why 768 is the best setting and why going past it costs so much. <span class="from">from: L06, L08, L09, L10</span></p>
+<details><summary>CHECK</summary>
+<pre>At 768 every scheduler has exactly the 4 independent warps needed to begin an FFMA every cycle,
+so the GPU is at 99 percent of its full rate and has nothing left to gain. Extra warps can only add
+time, and if the extra blocks cannot all be held at once they wait for a second round, which by
+itself predicts most of the 87 percent.
+
+Tempting answer that fails: "more warps keep raising the rate until the GPU is full, then it stays
+flat". L06 shows it does not stay flat: work went up 12.5 percent and time 87 percent.</pre>
+</details>
+<p class="ln do"><b>L12</b> <b class="x">DO</b> The same reasoning on the GTX 1650 in this laptop: 14 SMs x 4 schedulers = ____ . Turing has 64 FP32 units per SM, so per scheduler ____ , and a 32-thread FFMA takes ____ cycles to begin (your own measurement agreed: 1031 - 519 = 512 cycles for 256 more FFMAs). Warps per scheduler needed to cover a 4-cycle wait = 4 / ____ = ____ . Total warps for that = ____ , blocks of 2 warps = ____ , blocks per SM = ____ . <span class="from">from: L03, L08, Turing layout, your measurement</span></p>
+<details><summary>CHECK</summary>
+<pre>56 schedulers; 64 / 4 = 16 units per scheduler; 32 / 16 = 2 cycles per FFMA begin
+4 / 2 = 2 warps per scheduler
+56 * 2 = 112 warps = 56 blocks = 4 blocks per SM
+Your notes predicted 224 warps by assuming 1 cycle per begin, the course GPU's number.
+On this laptop the measured 2 cycles halve it.</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>A GPU reaches its full speed when each part of it has just enough independent work to never sit idle. Past that point, extra work cannot go any faster, and if the extra work does not fit on the chip at once it has to wait its turn, which can almost double the time for a small increase in work.</p>
+<p>For a manager: the best batch size for a GPU job is a specific number that depends on the chip. A batch slightly too large can be far slower than one slightly too small, and the right number on one GPU is wrong on another.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>Much more: the time grew 87 percent (0.3127 ms to 0.5839 ms, from the course GPU's reported rates).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>How would you prove or rule out the second-round explanation of L10, with measurements instead of arithmetic?</p>
+<details><summary>CHECK</summary>
+<pre>Compile with -Xptxas -v to see registers per thread for this kernel; call
+cudaOccupancyMaxActiveBlocksPerMultiprocessor for the real kernel and block size 64 to get the
+blocks one SM holds at once. If it says 8, sweep m in finer steps (block counts just below and just
+above 48 * 8) and look for the jump exactly there; Nsight Compute's occupancy section reports the
+same limit and which resource sets it.</pre>
+</details>
+</div>
+
+<nav><a href="12-the-48-trap.html">prev: 12 the 48 in warp_scheduler.cu</a><a href="failures.html">next: the failure list</a></nav>
+</main>
+</body>
+</html>

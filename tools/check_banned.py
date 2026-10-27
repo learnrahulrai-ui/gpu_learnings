@@ -33,7 +33,7 @@ ANALOGY = re.compile(r"\b(think of it as|it is like a|just like a|imagine a|simi
 THINK_IN_DO = re.compile(r"\b(think|imagine|understand)\b", re.I)
 
 # Allowed exceptions: warp is defined on these pages before use; program output quoted verbatim.
-WARP_OK = {"11-program-counter.html", "12-the-48-trap.html", "words.html"}
+WARP_OK = {"11-program-counter.html", "12-the-48-trap.html", "13-the-864-cliff.html", "words.html"}
 OUTPUT_OK = re.compile(r"Latency of \w+ code snippet")
 
 

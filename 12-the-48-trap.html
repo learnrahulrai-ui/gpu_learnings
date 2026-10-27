@@ -88,6 +88,20 @@ whether any line of the table is a clean measurement.</pre>
 
 </div>
 
+<div class="connect">
+<p class="label">Confirmed by your Lab 2 notes</p>
+<p class="ln"><b>L12</b> Your Lab 2 notes, written after reading <code>warp_scheduler.cu</code> itself, confirm L03: 64 threads per block, 2048 numbers per block, 263 x 20 = 5260 updates per number, and the literal 48 when building N. They add facts L03 lacked: the launcher ignores the tile size handed to it, and the block count comes from N / block_size in whole-number division. <span class="from">from: your Lab 2 notes</span></p>
+<p class="ln"><b>L13</b> The same notes identify the course GPU from the Lecture 2 slides: an RTX 4000 Ada with 48 SMs, so the 48 in the file is that GPU's SM count, no longer unverified. It has 4 schedulers per SM, 192 in all. <span class="from">from: your Lab 2 notes, Lecture 2 slides</span></p>
+<p class="ln do"><b>L14</b> <b class="x">DO</b> Your GTX 1650: 14 SMs x 4 schedulers = ____ . At m = 1 the file launches 96 warps (L06). Warps per scheduler on the course GPU = 96 / 192 = ____ . On yours = 96 / ____ = ____ . The same m means ____ times as many warps per scheduler on your laptop. <span class="from">from: L06, L13</span></p>
+<details><summary>CHECK</summary>
+<pre>56 schedulers
+course: 96 / 192 = 0.5 warps per scheduler
+yours : 96 / 56  = 1.714 warps per scheduler
+1.714 / 0.5 = 3.43 times as many: every line of the original table sits at a different place on
+your laptop's curve than on the course machine's, so the two tables cannot be compared line by line.</pre>
+</details>
+</div>
+
 <div class="plain">
 <p class="label">In plain words</p>
 <p>Lab files written for one machine carry that machine's numbers inside them. Executed on another machine they still produce a table that looks fine, and every line of it can be wrong in a way the table itself does not show. Before trusting a sweep, find every hardware number written into the program and replace it with yours.</p>
@@ -114,7 +128,7 @@ so every table says which hardware it describes.</pre>
 </details>
 </div>
 
-<nav><a href="11-program-counter.html">prev: 11 a program counter for every thread</a><a href="index.html">index</a></nav>
+<nav><a href="11-program-counter.html">prev: 11 a program counter for every thread</a><a href="13-the-864-cliff.html">next: 13 the 864 cliff</a></nav>
 </main>
 </body>
 </html>
