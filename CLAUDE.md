@@ -1,5 +1,7 @@
 # Writing rules for this site (from the owner)
 
+Full list of banned words and patterns, and the checker to run before every commit: see `AGENTS.md` and `python3 tools/check_banned.py`.
+
 The site turns long Claude/ChatGPT chats into exercise pages. Pages are plain HTML5 plus `style.css`. No JavaScript, no Markdown rendering, no LaTeX. Drawings are ASCII inside `<pre>`. Answers hide inside `<details><summary>CHECK</summary>`.
 
 ## The axiom rule (every line)
