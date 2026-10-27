@@ -71,3 +71,6 @@ ol.code-en code { display: block; font-size: 13px; color: var(--dim); white-spac
 ol.code-en span { display: block; }
 dl.words dt { font-weight: bold; margin-top: 14px; }
 dl.words dd { margin: 2px 0 0 0; }
+.guess { border: 2px dashed var(--ok); border-radius: 8px; padding: 12px 16px 4px; margin: 20px 0 16px; }
+.interview { border-left: 4px solid var(--mark); background: var(--box); border-radius: 0 8px 8px 0; padding: 12px 16px 4px; margin: 20px 0 16px; }
+.guess > .label, .interview > .label { margin-top: 0; }

@@ -18,6 +18,12 @@
 <p>Can those numbers be forced out of the original cx line, so they stop being something to remember? And a harder question: the vector code matched the original code exactly on the 256 by 256 picture. Is that proof that the method is exact?</p>
 </div>
 
+<div class="guess">
+<p class="label">Guess first</p>
+<p>At picture size 1000, the 8-at-once method and the plain method each compute 1000 values of cx. How many of the 1000 do you think differ, even slightly?</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
 <p class="you">Your words: "Zero to seven makes no sense, right? They are alien to me. This program never specified this floating point numbers." / "CX itself is just one number, not eight numbers. DX is just one number. Only offsets are eight numbers, right?" / "Why is the calculation of CY vector so easy?"</p>
 
 <p class="label">Work it out</p>
@@ -158,6 +164,28 @@ the reason here was the test size.</pre>
 <p class="label">In plain words</p>
 <p>Doing 8 things at once forces you to describe the 8 things with one rule. Here the rule is: neighbour k sits k steps of dx from the first one. Finding that rule is the actual work; typing the intrinsic is not.</p>
 <p>For a manager: a test that succeeds on round numbers can hide a defect that only appears on ordinary numbers. Ask what the test size was and why.</p>
+</div>
+
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>Computed in 32-bit fractions: 572 of 1000 differ in the last digit, and 3281 of 1,000,000 places
+get a different iters.</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>How would you make the 8-at-once method give exactly the plain method's values at any picture size, and what does it cost?</p>
+<details><summary>CHECK</summary>
+<pre>Build the 8 values of j + k as fractions in one register, then apply the same divide, multiply and
+subtract as the plain line, at all 8 at once. The rounding then happens in the same steps as the
+plain code. Cost: an 8-at-once divide per block of 8, the step the shortcut was avoiding.
+Also read the plain code's machine listing: the compiler may fuse its multiply and subtract into
+one multiply-add, and the 8-at-once version must then do the same to match.</pre>
+</details>
 </div>
 
 <nav><a href="03-the-w-line.html">prev: 03 the w line</a><a href="05-simd-while-loop.html">next: 05 SIMD and the while loop</a></nav>

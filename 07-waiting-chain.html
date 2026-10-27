@@ -18,6 +18,12 @@
 <p>Can the chain be built from the loop's own lines, counted, and turned into a number of idle cycles? And if a second, independent set of work goes into the same loop, how much of the idle time does it fill on this particular machine?</p>
 </div>
 
+<div class="guess">
+<p class="label">Guess first</p>
+<p>Putting a second, independent set of work into the same loop gives the hardware something to do while the first set waits. On this GPU, how much faster do you think the loop gets?</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
 <p class="you">Your words: "There is nothing which stops me from adding the original ones before I square the original ones. Everybody knows that." / "So this is something called as longest waiting chain. I don't know what it is." / "I don't even know what a group is."</p>
 
 <p class="label">Work it out</p>
@@ -146,6 +152,26 @@ your measured begin rate, and the copies of L14 still cost registers.</pre>
 <p class="label">In plain words</p>
 <p>Hardware can sit idle even when a program looks busy, because each step waits for the step before it. The fix is to give the hardware independent work to do during the wait. How much that fix is worth cannot be guessed from the code alone; it depends on how long the wait is compared with how fast the hardware can begin new work, and both have to be measured on the actual machine.</p>
 <p>For a manager: "do more things in parallel" helps only up to the point where the hardware is already full. Past that point, extra parallel work just queues.</p>
+</div>
+
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>Model with this GPU's measured rate of one 32-thread multiply-add begun every 2 cycles:
+from 20 to 18 cycles per set, 10 percent. Under the 1-per-cycle assumption it would be 50 percent.</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>A GPU with twice as many FP32 units per scheduler as this one appears. Redo the estimate: does the second set help more, less, or the same?</p>
+<details><summary>CHECK</summary>
+<pre>Twice the units feed 32 threads in 1 cycle per begin. One set: 9 begins in a 20-cycle chain,
+9 of 20 cycles used. Two sets: 18 of 20. Per set: 20 then 10 cycles, a 50 percent gain.
+The same code gains 5 times more on that GPU than on this one.</pre>
+</details>
 </div>
 
 <nav><a href="06-gpu-threads.html">prev: 06 GPU threads</a><a href="08-fat-loop-stop.html">next: 08 when the fat loop stops</a></nav>

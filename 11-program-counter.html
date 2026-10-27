@@ -18,6 +18,12 @@
 <p>That question can be answered with counts instead of opinions: how many instructions begin, and how much of each instruction's room for 32 threads does useful work?</p>
 </div>
 
+<div class="guess">
+<p class="label">Guess first</p>
+<p>In a set of 32 threads, 1 thread takes a 10-instruction side of a branch and 31 take a 2-instruction side. What share of the hardware's room do you think does useful work?</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
 <p class="you">Your words: "People say warp run in lockstep that is impossible to select a warp and a real instructions there is no way to know which of the 32 is waiting on which line" / "that will require two program counters, right? ... The program counter never goes back" / "So program counter are distinct, right, per thread? Then the concept of warp is useless, right?"</p>
 
 <p class="label">Work it out</p>
@@ -105,6 +111,25 @@ They make branches correct; L12 shows the cost is unchanged.</pre>
 <p class="label">In plain words</p>
 <p>A GPU is fast when many threads do the same instruction at the same moment. Modern NVIDIA GPUs let threads go separate ways correctly, but when they do, the card does each way one after the other, and threads not on the current way wait. A single thread taking a long, unusual path can hold 31 others idle.</p>
 <p>For a manager: on a GPU, the expensive cases are not the common ones; they are the rare ones that make the common ones wait.</p>
+</div>
+
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>Counted: 72 useful out of 384, 18.75 percent.</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>How would you restructure such a program so that the 31 threads do not wait for the 1?</p>
+<details><summary>CHECK</summary>
+<pre>Separate the rare long case from the common short one: first let every thread do the short case,
+and put the places that need the long case on a list; then process that list with threads that
+all take the long case together. Each set of 32 then does the same instructions.</pre>
+</details>
 </div>
 
 <nav><a href="10-cycles-per-ffma.html">prev: 10 cycles per FFMA</a><a href="12-the-48-trap.html">next: 12 the 48 in warp_scheduler.cu</a></nav>

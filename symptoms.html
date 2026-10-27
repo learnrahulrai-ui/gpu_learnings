@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Start From Your Symptom</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>Start from your symptom</h1>
+<p class="sub">You are in the middle of the lab and something does not add up. Find the sentence that sounds like what you are seeing, and go straight to the page for it. Every page restarts from zero, so you can enter anywhere.</p>
+
+<div class="story">
+<p>Most people do not arrive at a site like this at the beginning. They arrive stuck, often holding code that works but that they could not have written alone and could not defend. Each page here opens with a "Guess first" box: write a number before reading. Each page closes by comparing your guess with what a real laptop measured, and with the question an interviewer would ask next. Keep a tally on paper, one line per page, marking whether your guess was close. The tally is yours; nobody else sees it.</p>
+</div>
+
+<p class="label">What are you seeing?</p>
+<ol class="topics">
+<li>"My GPU version is slower than my CPU version." <a href="00-what-a-gpu-is.html">page 00</a>, then <a href="06-gpu-threads.html">page 06</a>.</li>
+<li>"I do not see where -2.0, 2.5 and 1.25 come from, or why my picture size changes the results." <a href="01-image-to-middleman.html">page 01</a>.</li>
+<li>"Some places take forever and others finish at once; splitting the picture between cores gave far less than the number of cores." <a href="02-square-and-add.html">page 02</a>.</li>
+<li>"The lab's loop does not look like the formula; there is a w and subtractions I cannot explain." <a href="03-the-w-line.html">page 03</a>.</li>
+<li>"My 8-at-once version matches at one picture size and mismatches at another", or "values in each block of 8 come out mirror-reversed." <a href="04-simd-cx.html">page 04</a>.</li>
+<li>"I use 8-at-once instructions but I am not 8 times faster", or "I cannot see how one loop gives 8 places different counts." <a href="05-simd-while-loop.html">page 05</a>.</li>
+<li>"32 GPU threads, but not 32 times faster", or "the profiler's request and sector counts mean nothing to me." <a href="06-gpu-threads.html">page 06</a>.</li>
+<li>"I added a second independent set of work to the loop and gained far less than I expected." <a href="07-waiting-chain.html">page 07</a>.</li>
+<li>"With two sets in one loop, my counts are wrong, or the loop never stops at the right time." <a href="08-fat-loop-stop.html">page 08</a>.</li>
+<li>"My timer shows cycles I cannot explain, or the number changes when I move setup lines." <a href="09-clock-read-trap.html">page 09</a>.</li>
+<li>"Cycles divided by the number of operations gives a strange number like 4.39", or "the compiler seems to ignore the order of my loops." <a href="10-cycles-per-ffma.html">page 10</a>.</li>
+<li>"Threads that take different sides of an if-else are slow, and I thought each thread was independent." <a href="11-program-counter.html">page 11</a>.</li>
+<li>"A table printed by a course file looks wrong on my GPU." <a href="12-the-48-trap.html">page 12</a>.</li>
+</ol>
+
+<nav><a href="index.html">index</a><a href="words.html">words used on this site</a></nav>
+</main>
+</body>
+</html>

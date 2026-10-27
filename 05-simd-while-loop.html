@@ -18,6 +18,12 @@
 <p>The learner's three statements are the constraints. Any solution has to respect all of them at once and still give every one of the 8 places its correct count. Before reading the code, try to say what such a solution would have to waste.</p>
 </div>
 
+<div class="guess">
+<p class="label">Guess first</p>
+<p>The Ryzen's 8-at-once instructions handle 8 places per instruction. What speedup over the plain code do you think this laptop measured?</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
 <p class="you">Your words: "SIMD does not even understand while loop. So where is the connection between this while loop and SIMD?" / "How can I tell SIMD that don't update 8, 9 but only update 10, 11, 12?" / "Suppose one square finishes after two repetitions, but another needs five. There is no way to know." / "It just happens that the mask contains negative numbers, right?"</p>
 
 <p class="label">Work it out</p>
@@ -183,6 +189,25 @@ instructions and loses two thirds of the speedup.</pre>
 <p class="label">In plain words</p>
 <p>Doing 8 things with one instruction only pays when the 8 things need the same amount of work. The vector code here gets about 7 times faster than plain code because neighbouring parts of this picture happen to need similar work. Pick the 8 badly and the same hardware gives barely 2 times.</p>
 <p>For a manager: hardware speedups quoted as "8 times" or "32 times" are maximums. The real number depends on how similar the units of work are, and that is a property of your data, not of the chip.</p>
+</div>
+
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>Measured: 61.6 ms plain, 8.71 ms with 8-at-once instructions: 7.07 times.</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>Suppose a picture where neighbouring places have unrelated costs, like the shuffled case at 2.23 times. What would you change so the 8-at-once code wins again?</p>
+<details><summary>CHECK</summary>
+<pre>Put places of similar cost into the same register: for example compute a coarse, low-resolution
+picture first, use its counts to sort places by expected cost, then fill each register with
+places from the same cost class, and write each result back to its own place.</pre>
+</details>
 </div>
 
 <nav><a href="04-simd-cx.html">prev: 04 eight cx values</a><a href="06-gpu-threads.html">next: 06 GPU threads</a></nav>

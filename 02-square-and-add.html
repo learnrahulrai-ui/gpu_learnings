@@ -18,6 +18,12 @@
 <p>Keep one question in mind while you calculate: could you have predicted any of these counts before doing the work?</p>
 </div>
 
+<div class="guess">
+<p class="label">Guess first</p>
+<p>In the 256 by 256 picture, about a quarter of the places hit the cap of 1000 repetitions. What share of all the arithmetic in the picture do you think those places take?</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
 <p class="you">Your words: "if i start at 00 squaring means nothing there shall be no change at all ever" / "whyy would i start form 00 when i alreadyyy started with 1 0" / "You have not defined escape from what ... A point 9 7 is going to be at 9 7."</p>
 
 <p class="label">Work it out</p>
@@ -191,6 +197,26 @@ L25 measures that idea at 2.10 instead of 4.</pre>
 <p class="label">In plain words</p>
 <p>The Mandelbrot picture is used in this course for one reason: its work is uneven and unpredictable. Most real workloads look like this. Some customer requests are cheap and some are expensive; some pages of a document are blank and some are dense. Splitting work into equal-sized piles of items does not split the effort equally.</p>
 <p>Every speed trick in the pages that follow has to deal with the fact found here: places that need 1000 repetitions sit next to places that need 1, and nobody knows which is which in advance.</p>
+</div>
+
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>Measured on the real iters: 97.7 percent of all repetitions (15902 places x 1000 out of 16274722).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>You must share the picture among 4 workers without knowing any iters in advance. Splitting into 4 bands of i gave only 2.10 times. What sharing would you use instead, and what would you expect?</p>
+<details><summary>CHECK</summary>
+<pre>Interleave: worker k takes every 4th value of i (k, k+4, k+8, ...). Each worker then gets a slice of
+every band, cheap and costly alike.
+Computed on the real iters: shares 25.2, 25.0, 24.9, 25.0 percent, speedup 3.97 out of 4.
+No knowledge of iters was needed; only the fact that costly places sit together.</pre>
+</details>
 </div>
 
 <nav><a href="01-image-to-middleman.html">prev: 01 middleman pair</a><a href="03-the-w-line.html">next: 03 the w line</a></nav>

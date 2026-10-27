@@ -18,6 +18,12 @@
 <p>Each of these numbers is easy to compute with. The question is what they mean together: what does one multiply-add cost when it must wait for the previous one, what does it cost when it does not, and what part of every measurement is not about multiply-adds at all?</p>
 </div>
 
+<div class="guess">
+<p class="label">Guess first</p>
+<p>On this GPU, how many cycles do you think one multiply-add takes when it must wait for the previous one?</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
 <p class="you">Your words: "Write down your predicted cycle count for 64 multiply-adds per chain before you write any code ... explain this" / "you are introducing new ideas without deriving them"</p>
 
 <p class="label">Work it out</p>
@@ -154,6 +160,26 @@ L23 measures it at 29, 35, 41 and 9.</pre>
 <p class="label">In plain words</p>
 <p>Every measurement contains the thing you want plus things you do not. Dividing by a count hides the unwanted part; subtracting two measurements removes it, but only when both measurements carry the same unwanted part. Here the learner's machine showed that "the same" means the same kernel, not merely the same timer.</p>
 <p>The results themselves: on this GPU, a multiply-add that waits for the previous one costs 4 cycles, and with independent work available the card begins one every 2 cycles for 32 threads. Going from one chain to two doubled the speed; going from two to four did not change it.</p>
+</div>
+
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>Measured by subtraction: 4 cycles (4.03 when two different kernels are subtracted).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>The outside part was 41 cycles with two chains but 9 with four chains. Propose a reason, and a measurement that would test it.</p>
+<details><summary>CHECK</summary>
+<pre>A hypothesis, not a measured fact: with more chains, more of the final multiply-adds are under way
+together, so the wait after the last one begins overlaps more of the others.
+Test: measure 1, 2, 3 and 4 chains at two lengths each, compute the outside part for each, and see
+whether it shrinks steadily with the number of chains.</pre>
+</details>
 </div>
 
 <nav><a href="09-clock-read-trap.html">prev: 09 clock read trap</a><a href="11-program-counter.html">next: 11 a program counter for every thread</a></nav>

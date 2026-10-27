@@ -18,6 +18,12 @@
 <p>Once the stopping rule is settled, the cost: the fat loop clearly does more useless arithmetic. Does it finish sooner or later than two thin loops, and by how much on the whole picture?</p>
 </div>
 
+<div class="guess">
+<p class="label">Guess first</p>
+<p>Pairing each block of 8 places with its neighbour block into one fat loop: over the whole picture, how many times fewer cycles do you think it takes than separate loops?</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
 <p class="you">Your words: "My while loop becomes longer and fatter. Then what is a pass? A pass is a collection of a fat while loop or a thin while loop?" / "It was already difficult to do for 8. Now I have to do for 16." / "My brain refuses to see that I actually solved the problem in lab 1."</p>
 
 <p class="label">Work it out</p>
@@ -134,6 +140,24 @@ the waste and the cycles separately, and the cycles win.</pre>
 <p class="label">In plain words</p>
 <p>Combining two jobs into one loop means the loop ends when the slower job ends, so the faster job's share of the loop is wasted. It still pays when the hardware was otherwise idle, and it pays most when the two jobs are about the same size. Choosing which jobs to combine is part of the design.</p>
 <p>For a manager: batching work together is cheapest when the batched items are alike. Batching one huge item with one tiny one buys almost nothing.</p>
+</div>
+
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>Computed on the real iters, under the 20-cycles-per-repetition model: 1.85 times fewer.</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>Would pairing each block with a randomly chosen block instead of its neighbour be better or worse, and by how much?</p>
+<details><summary>CHECK</summary>
+<pre>Worse. Random partners differ more in cost, so the fat loop more often waits for one costly block.
+Computed on the real iters: 1.16 times fewer cycles with random pairs, against 1.85 with neighbours.</pre>
+</details>
 </div>
 
 <nav><a href="07-waiting-chain.html">prev: 07 the waiting chain</a><a href="09-clock-read-trap.html">next: 09 clock read trap</a></nav>

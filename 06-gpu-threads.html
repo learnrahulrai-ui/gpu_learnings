@@ -18,6 +18,12 @@
 <p>The only evidence that settles it is a pair of profiler counts the learner's own machine printed: 2,048 and 8,192. And once that is settled, a second question nobody in the chat asked: did the same one-line choice decide anything besides memory?</p>
 </div>
 
+<div class="guess">
+<p class="label">Guess first</p>
+<p>Going from 1 GPU thread to 32 GPU threads, what speedup do you think this laptop measured?</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
 <p class="you">Your words: "no proof this how can 7 and 39 and all be nearby stuff" / "On one hand you are saying nearby, and on one hand you are saying spacing. You cannot space out and do nearby at the same time" / "Threads don't talk to each other. A thread doesn't know about other threads, right?"</p>
 
 <p class="label">Work it out</p>
@@ -145,6 +151,25 @@ the predicted speedup if chosen the other way, through waiting alone.</pre>
 <p class="label">In plain words</p>
 <p>On a GPU, the decision of which thread handles which piece of data is the most important line in the program. Here a single line decided both how much memory traffic there is and how much of the arithmetic is wasted waiting. Getting it wrong does not produce an error; it produces a correct picture, slower.</p>
 <p>For a manager: a GPU program can be correct and still leave most of the card idle. Only measurements like the profiler counts on this page reveal which.</p>
+</div>
+
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>Measured: 403.435 ms to 17.732 ms: 22.75 times, not 32.</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>With all 14 SMs available, how would you choose the number of blocks and threads per block, and what new limit appears once every SM has work?</p>
+<details><summary>CHECK</summary>
+<pre>Many blocks, each a multiple of 32 threads, enough per SM that waiting threads are covered by
+others. New limit: blocks covering the middle of the picture cost far more than blocks at its
+edges, so some SMs finish early and sit idle. Many small blocks spread that unevenness out.</pre>
+</details>
 </div>
 
 <nav><a href="05-simd-while-loop.html">prev: 05 SIMD and the while loop</a><a href="07-waiting-chain.html">next: 07 the waiting chain</a></nav>

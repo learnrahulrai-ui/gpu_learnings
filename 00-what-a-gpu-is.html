@@ -18,6 +18,12 @@
 <p>The measurements come from one learner's laptop: an AMD Ryzen 5 4600H CPU and an NVIDIA GeForce GTX 1650 GPU, working through Lab 1 of MIT course 6.S894. The lab computes one picture, the Mandelbrot set, four different ways and times each one. Before any detail, look at the four times and ask a single question: is the GPU fast or slow at this job?</p>
 </div>
 
+<div class="guess">
+<p class="label">Guess first</p>
+<p>On this laptop, the picture was computed by one CPU core using its 8-at-once instructions, and by the GPU using 32 threads. Which one finished first, and by how many times?</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
 <p class="you">Your words: "I know what is GPU and I know what is threadIdx ... But what is the exact intellectual step I have to do?" / "any idiot can say we will put all the things in parallel because they all work on the GPU"</p>
 
 <p class="label">Work it out</p>
@@ -66,6 +72,26 @@ whole chip, and the GPU result used a far smaller share.</pre>
 <p class="label">In plain words</p>
 <p>A GPU is not fast by itself. It is fast when a program gives most of its circuits the same instruction at the same time. The first GPU version in this lab used one thread and lost to the CPU by more than six times; the second used 32 threads and still left over 96 percent of the arithmetic circuits unused.</p>
 <p>For a manager: the hardware you buy and the hardware your software uses are two different numbers. Ask for the second one.</p>
+</div>
+
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>Measured: CPU with 8-at-once instructions 8.71 ms, GPU with 32 threads 17.732 ms.
+The CPU finished first, about 2.04 times sooner (17.732 / 8.71).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>If you could change only the launch, how would you find out whether this GPU can beat 8.71 ms, and which two numbers would you watch?</p>
+<details><summary>CHECK</summary>
+<pre>Launch enough blocks to give all 14 SMs work (many blocks, each a multiple of 32 threads), then time it.
+Watch the time, and the total of all iters (it must stay 16274722, or the speed is fake).
+Expect the uneven cost of places to limit the gain, so measure instead of dividing 17.732 by 28.</pre>
+</details>
 </div>
 
 <nav><a href="index.html">index</a><a href="01-image-to-middleman.html">next: 01 middleman pair</a></nav>

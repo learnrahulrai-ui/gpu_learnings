@@ -18,6 +18,12 @@
 <p>Where exactly did the compiler put each instruction, and what does each possible placement of the clock reads include or leave out? The learner's own machine listing is the evidence.</p>
 </div>
 
+<div class="guess">
+<p class="label">Guess first</p>
+<p>The source code puts the two setup additions above the first clock read. Will the compiled program keep them above it? Yes or no.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
 <p class="you">Your words: "Okay, now I am seeing this data type, start and clock time ... I see a thread fence ... What code I should write and what should I think to finish this function?" / "I am confused with all these things, right? So can you clearly tell me what line of code I have to write and why?"</p>
 
 <p class="label">Work it out</p>
@@ -180,6 +186,25 @@ It is small because it leaves out part of the chain.</pre>
 <p class="label">In plain words</p>
 <p>A timer measures whatever the compiled program puts between its two readings, not what the source code appears to say. Compilers move instructions when nothing forbids it. The only way to know what was timed is to read the compiled instructions, and the way to control it is to make the readings depend on the values you care about.</p>
 <p>For a manager: a benchmark number without the exact compiled code behind it is a claim, not a measurement.</p>
+</div>
+
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>No. In the learner's machine listing the clock read came first, and both additions came after it,
+inside the timed region.</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>Without reading the machine listing, how could you detect that the timer includes setup work?</p>
+<details><summary>CHECK</summary>
+<pre>Change only the setup (add a few more additions before the first clock read) and measure again.
+If the printed cycles grow, the setup is inside the timed region. If they stay the same, it is outside.</pre>
+</details>
 </div>
 
 <nav><a href="08-fat-loop-stop.html">prev: 08 fat loop stop</a><a href="10-cycles-per-ffma.html">next: 10 cycles per FFMA</a></nav>

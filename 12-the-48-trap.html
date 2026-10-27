@@ -18,6 +18,12 @@
 <p>The file contains the number 48. Where did it come from, and what happens to every line of the printed table when the program executes on a GPU that has 14 SMs?</p>
 </div>
 
+<div class="guess">
+<p class="label">Guess first</p>
+<p>The original file sweeps a multiplier from 1 to 48. On this laptop's 14 SMs, how many of those 48 settings give a clean measurement, evenly spread and with every block held at once?</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
 <p class="you">Your words: "Confirm me this part, okay? I have 14 SMs. Yes or no?" / "just because I have SMs doesn't mean I know how many threads or schedulers you run. That is a different piece of information, yes or no?" / "Okay, so now what exactly I have to do?"</p>
 
 <p class="label">Work it out</p>
@@ -86,6 +92,26 @@ whether any line of the table is a clean measurement.</pre>
 <p class="label">In plain words</p>
 <p>Lab files written for one machine carry that machine's numbers inside them. Executed on another machine they still produce a table that looks fine, and every line of it can be wrong in a way the table itself does not show. Before trusting a sweep, find every hardware number written into the program and replace it with yours.</p>
 <p>For a manager: a benchmark copied from a vendor or a course measures their hardware's shape, not yours, until someone checks the constants.</p>
+</div>
+
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>Counted: none. Even spread needs the multiplier to be a multiple of 7; every block held needs it
+to be at most 4.</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>How would you make the file correct on any GPU without editing a number into it?</p>
+<details><summary>CHECK</summary>
+<pre>Ask the GPU for its SM count when the program begins (cudaGetDeviceProperties gives
+multiProcessorCount) and use that number wherever the file had 48. Then print it with the table,
+so every table says which hardware it describes.</pre>
+</details>
 </div>
 
 <nav><a href="11-program-counter.html">prev: 11 a program counter for every thread</a><a href="index.html">index</a></nav>

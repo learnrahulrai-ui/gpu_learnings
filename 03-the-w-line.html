@@ -18,6 +18,12 @@
 <p>Then the page asks the question a reviewer should ask about any clever rewrite: what did it save, and what did it cost? Is counting multiplications even the right way to answer it?</p>
 </div>
 
+<div class="guess">
+<p class="label">Guess first</p>
+<p>The lab's loop avoids writing 2 times x times y and saves multiplications. Does it do fewer arithmetic operations per repetition than the textbook version? Yes or no.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
 <p class="you">Your words: "you are bullshitting you are asking for square and then doing substractioon" / "so this is complex number i time i is -1" / "Help me recall why am I doing add? I was just doing subtract."</p>
 
 <p class="label">Work it out</p>
@@ -162,6 +168,25 @@ Tempting answer that fails: "fewer multiplications means faster". L15 shows the 
 <p class="label">In plain words</p>
 <p>Code that has been tuned often stops looking like the formula it computes. The tuning was done for a reason on some machine at some time, and the reason may not hold on the next machine. Reading such code means recovering the formula first, and then asking which cost the rewrite was trading against.</p>
 <p>For a manager: "we optimized it" is a claim about one cost on one machine. Ask which cost, and on which machine.</p>
+</div>
+
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>No. Both do 10 per repetition: textbook 6 multiplications and 4 additions, lab 3 and 7.</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>How would you decide, by measurement and not by counting, which of the two loop versions is faster on this GPU?</p>
+<details><summary>CHECK</summary>
+<pre>Write both as GPU kernels of identical shape, time each at two loop lengths with clock reads tied
+to the values, and subtract within each version. Read both machine listings to see what the
+compiler fused into multiply-adds, since that changes the real chain.</pre>
+</details>
 </div>
 
 <nav><a href="02-square-and-add.html">prev: 02 the while loop by hand</a><a href="04-simd-cx.html">next: 04 eight cx values</a></nav>
