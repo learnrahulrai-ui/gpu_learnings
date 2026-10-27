@@ -9,7 +9,7 @@
 <body>
 <main>
 <h1>06. GPU: one changed line, and the proof of "nearby"</h1>
-<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
 
 <p class="label">The story</p>
 <div class="story">
@@ -31,6 +31,21 @@
     }
 }
 mandelbrot_gpu_vector&lt;&lt;&lt;1, 32&gt;&gt;&gt;(img_size, max_iters, out);</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>__global__ void mandelbrot_gpu_vector(uint32_t img_size, uint32_t max_iters, uint32_t *out) {</code><span>Define a function that executes on the GPU (__global__ marks it). It receives img_size, max_iters, and out, the address of the output array in the graphics card's memory. void means it hands nothing back.</span></li>
+<li><code>for (uint64_t i = 0; i &lt; img_size; ++i) {</code><span>Give i the values 0 up to img_size minus 1, one after another.</span></li>
+<li><code>for (uint64_t j = threadIdx.x; j &lt; img_size; j += blockDim.x) {</code><span>Give j a first value equal to this thread's own number, threadIdx.x, then keep adding blockDim.x, the number of threads in the block, while j is below img_size.</span></li>
+<li><code>/* cx, cy, and the scalar while loop that makes iters */</code><span>A note for people: the cx line, the cy line and the plain while loop go here.</span></li>
+<li><code>out[i * img_size + j] = iters;</code><span>Store the whole number iters into the array out, at place number i times img_size plus j.</span></li>
+<li><code>}</code><span>End of the block opened by the matching brace above.</span></li>
+<li><code>}</code><span>End of the block opened by the matching brace above.</span></li>
+<li><code>}</code><span>End of the block opened by the matching brace above.</span></li>
+<li><code>mandelbrot_gpu_vector&lt;&lt;&lt;1, 32&gt;&gt;&gt;(img_size, max_iters, out);</code><span>From the CPU, start the GPU function: 1 block of 32 threads, every thread executing the whole function with these three values.</span></li>
+</ol>
+</div>
+
 <p class="ln"><b>L02</b> Your machine printed, for <code>img_size = 256</code>, <code>max_iters = 1000</code>, GTX 1650: <span class="from">from: your output</span></p>
 <pre>CPU scalar, 1 core                61.6   ms
 GPU &lt;&lt;&lt;1, 1&gt;&gt;&gt;  (scalar function)  403.435 ms

@@ -63,3 +63,11 @@ p, li { overflow-wrap: anywhere; }
 .plain { background: var(--box); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px 4px; margin: 24px 0 12px; font-size: 18px; line-height: 1.7; }
 .readers { border-left: 4px solid var(--line); padding-left: 12px; }
 .connect > .label, .plain > .label { margin-top: 0; }
+.english { border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px 6px; margin: -4px 0 16px; }
+.english > .label { margin-top: 0; }
+ol.code-en { margin: 0; padding-left: 22px; }
+ol.code-en li { margin: 0 0 10px; }
+ol.code-en code { display: block; font-size: 13px; color: var(--dim); white-space: pre-wrap; }
+ol.code-en span { display: block; }
+dl.words dt { font-weight: bold; margin-top: 14px; }
+dl.words dd { margin: 2px 0 0 0; }

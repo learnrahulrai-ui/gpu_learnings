@@ -23,3 +23,5 @@ The site turns long Claude/ChatGPT chats into exercise pages. Pages are plain HT
 4. **Connect the numbers**: collect 5 to 10 earlier results (by line number) and ask for the one meaning behind them, often with a twist computed from real data. The CHECK states the meaning, then names the tempting answer that fails and the line that refutes it. The point of the site is this step, not the arithmetic.
 5. **In plain words**: what it means for a non-coder, including one line for a manager.
 - Never delete existing technical content; add around it.
+- Every code block (C++, intrinsics, machine listing) gets a "Read the code in English, line by line" panel right under it: one plain sentence per code line.
+- Every technical word used anywhere goes into `words.html` with a plain-English definition.

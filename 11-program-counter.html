@@ -9,7 +9,7 @@
 <body>
 <main>
 <h1>11. A program counter for every thread: is the 32-thread unit useless?</h1>
-<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
 
 <p class="label">The story</p>
 <div class="story">
@@ -29,6 +29,15 @@
 <pre>0x100:  if (threadIdx.x &lt; 16)  a = a + 1;     // ADD
 0x200:  else                   b = b * 2;     // MUL
 0x300:  /* both sides continue here */</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>0x100:  if (threadIdx.x &lt; 16)  a = a + 1;     // ADD</code><span>At instruction address 0x100: threads numbered below 16 add 1 to their own a.</span></li>
+<li><code>0x200:  else                   b = b * 2;     // MUL</code><span>At address 0x200: every other thread doubles its own b.</span></li>
+<li><code>0x300:  /* both sides continue here */</code><span>At address 0x300: both kinds of thread continue from here.</span></li>
+</ol>
+</div>
+
 <p class="ln do"><b>L06</b> <b class="x">DO</b> After the <code>if</code>, the program counter of threads 0 to 15 = ____ , of threads 16 to 31 = ____ . From L03, can ADD and MUL begin as one instruction? ____ . <span class="from">from: L01, L03, L04, L05</span></p>
 <details><summary>CHECK</summary>
 <pre>threads 0..15  -&gt; 0x100 (ADD)

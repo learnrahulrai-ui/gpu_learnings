@@ -9,7 +9,7 @@
 <body>
 <main>
 <h1>05. SIMD and the while loop: eight iters, one loop</h1>
-<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
 
 <p class="label">The story</p>
 <div class="story">
@@ -27,6 +27,17 @@
     ++iters;
 }
 out[i * img_size + j] = iters;</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>while (x2 + y2 &lt;= 4.0f &amp;&amp; iters &lt; max_iters) {</code><span>Before each repetition, test two things: is x2 plus y2 at most 4, and is iters below max_iters? If both are true, do the lines inside the braces once and test again. If either is false, continue after the closing brace.</span></li>
+<li><code>/* lines A to F: x, y, x2, y2, z, w */</code><span>A note for people standing in for lines A to F, which compute x, y, x2, y2, z, w.</span></li>
+<li><code>++iters;</code><span>Add 1 to iters.</span></li>
+<li><code>}</code><span>End of the block opened by the matching brace above.</span></li>
+<li><code>out[i * img_size + j] = iters;</code><span>Store the whole number iters into the array out, at place number i times img_size plus j.</span></li>
+</ol>
+</div>
+
 <p class="ln"><b>L02</b> Each (i, j) leaves this loop after its own number of repetitions, so each (i, j) gets its own iters. <span class="from">from: L01</span></p>
 <p class="ln"><b>L03</b> Your vector code holds 8 neighbours in one <code>__m256</code>: same i, j to j+7 at index 0 to 7. One <code>_mm256_..._ps</code> instruction does one operation at all 8 indexes. <span class="from">from: your code, AVX2</span></p>
 <p class="ln"><b>L04</b> From L02 and L03, the 8 indexes need different numbers of repetitions, but L03 makes every instruction act on all 8. That is the conflict. <span class="from">from: L02, L03</span></p>
@@ -41,6 +52,22 @@ while (iter &lt; max_iters) {
     /* lines A to F, each one an _mm256_..._ps instruction */
     ++iter;
 }</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>__m256  four      = _mm256_set1_ps(4.0f);</code><span>Copy the fraction 4.0 into all 8 indexes of a variable named four.</span></li>
+<li><code>__m256i iters_vec = _mm256_setzero_si256();</code><span>Make 8 whole-number counters, all 0, in one 256-bit variable named iters_vec. The i at the end of __m256i means whole numbers.</span></li>
+<li><code>uint32_t iter = 0;</code><span>Make one whole-number counter named iter, holding 0. It counts how many times the loop itself repeats.</span></li>
+<li><code>while (iter &lt; max_iters) {</code><span>Repeat the lines in braces as long as iter is below max_iters.</span></li>
+<li><code>__m256 mask = _mm256_cmp_ps(_mm256_add_ps(x2_vec, y2_vec), four, _CMP_LE_OQ);</code><span>At each index, add x2 and y2, then compare the sum with 4. Where the sum is at most 4, put 32 bits all set to 1; elsewhere put 32 bits all 0. Keep the 8 answers in mask.</span></li>
+<li><code>if (_mm256_testz_ps(mask, mask)) break;</code><span>If all 256 bits of mask are 0, leave the while loop immediately.</span></li>
+<li><code>iters_vec = _mm256_sub_epi32(iters_vec, _mm256_castps_si256(mask));</code><span>Read the bits of mask as 8 whole numbers, and subtract them from the 8 counters, index by index.</span></li>
+<li><code>/* lines A to F, each one an _mm256_..._ps instruction */</code><span>A note for people: lines A to F go here, each written as an instruction that acts on all 8 indexes.</span></li>
+<li><code>++iter;</code><span>Add 1 to iter.</span></li>
+<li><code>}</code><span>End of the block opened by the matching brace above.</span></li>
+</ol>
+</div>
+
 <p class="ln"><b>L06</b> L05 holds two counters. <code>iter</code> is one number: how many times the while loop repeated. <code>iters_vec</code> holds 8 numbers: one iters per index. <span class="from">from: L05</span></p>
 <p class="ln"><b>L07</b> <code>_mm256_cmp_ps(..., _CMP_LE_OQ)</code> checks x2 + y2 &lt;= 4 at each index. True writes 32 bits all 1 at that index. False writes 32 bits all 0. That is <code>mask</code>. <span class="from">from: L05, intrinsic definition</span></p>
 <p class="ln"><b>L08</b> <code>_mm256_testz_ps(mask, mask)</code> returns 1 when all 256 bits of mask are 0. Then <code>break</code> leaves the while loop. <span class="from">from: L05, intrinsic definition</span></p>

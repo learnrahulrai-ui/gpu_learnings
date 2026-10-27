@@ -9,7 +9,7 @@
 <body>
 <main>
 <h1>08. Lab 2: when does the fat while loop stop?</h1>
-<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
 
 <p class="label">The story</p>
 <div class="story">
@@ -30,6 +30,19 @@
     /* lines A to F at all 8 indexes */
     ++iter;
 }</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>while (iter &lt; max_iters) {</code><span>Repeat the lines in braces as long as iter is below max_iters.</span></li>
+<li><code>__m256 mask = _mm256_cmp_ps(_mm256_add_ps(x2_vec, y2_vec), four, _CMP_LE_OQ);</code><span>At each index, add x2 and y2, then compare the sum with 4. Where the sum is at most 4, put 32 bits all set to 1; elsewhere put 32 bits all 0. Keep the 8 answers in mask.</span></li>
+<li><code>if (_mm256_testz_ps(mask, mask)) break;</code><span>If all 256 bits of mask are 0, leave the while loop immediately.</span></li>
+<li><code>iters_vec = _mm256_sub_epi32(iters_vec, _mm256_castps_si256(mask));</code><span>Read the bits of mask as 8 whole numbers, and subtract them from the 8 counters, index by index.</span></li>
+<li><code>/* lines A to F at all 8 indexes */</code><span>A note for people: lines A to F go here, acting on all 8 indexes.</span></li>
+<li><code>++iter;</code><span>Add 1 to iter.</span></li>
+<li><code>}</code><span>End of the block opened by the matching brace above.</span></li>
+</ol>
+</div>
+
 <p class="ln"><b>L03</b> In L02, mask holds T (all bits 1, read as -1) at each index where x2 + y2 &lt;= 4, else F (all bits 0, read as 0). Subtracting it adds 1 to iters at T indexes and 0 at F indexes. testz returns 1 when all 8 are F, and then the loop is left. <span class="from">from: L02, intrinsic definitions</span></p>
 <p class="ln"><b>L04</b> Lab 2 puts a second set of 8 middleman pairs into the same while loop. Call the Lab 1 set A and the new set B. Each has its own x2, y2, w, iters_vec, and so its own mask. Your fat while loop: <span class="from">from: L02, L03, Lab 2</span></p>
 <pre>while (iter &lt; max_iters) {
@@ -39,6 +52,19 @@
     lines A..F on set A             lines A..F on set B
     ++iter;
 }</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>while (iter &lt; max_iters) {</code><span>Repeat the lines in braces as long as iter is below max_iters.</span></li>
+<li><code>maskA = (x2A + y2A &lt;= 4)        maskB = (x2B + y2B &lt;= 4)</code><span>Written in short form, not real C++: compare set A's x2 plus y2 with 4 at each index, and the same for set B.</span></li>
+<li><code>/* stopping test: ____ (not decided yet) */</code><span>A blank for the rule that decides when to leave the loop. Deciding it is the exercise.</span></li>
+<li><code>itersA = itersA - maskA         itersB = itersB - maskB</code><span>Short form: subtract each set's mask from that set's counters, index by index.</span></li>
+<li><code>lines A..F on set A             lines A..F on set B</code><span>Short form: lines A to F for set A, and lines A to F for set B, in the same repetition.</span></li>
+<li><code>++iter;</code><span>Add 1 to iter.</span></li>
+<li><code>}</code><span>End of the block opened by the matching brace above.</span></li>
+</ol>
+</div>
+
 <p class="ln"><b>L05</b> A repetition of L04 = everything inside its braces once: lines A to F for set A and lines A to F for set B. <span class="from">from: L04</span></p>
 <p class="ln"><b>L06</b> Real data from the scalar code (<code>img_size = 256</code>, <code>max_iters = 1000</code>), i = 40: <span class="from">from: scalar code</span></p>
 <pre>set A, j = 208..215, scalar iters:  12   8   7   6   6   6   5   5

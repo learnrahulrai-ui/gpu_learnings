@@ -9,7 +9,7 @@
 <body>
 <main>
 <h1>09. Lab 2 prelab: what sits between the clock reads</h1>
-<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
 
 <p class="label">The story</p>
 <div class="story">
@@ -28,6 +28,18 @@
         asm volatile("mov.u64 %0, %%clock64;" : "=l"(ret)); \
         ret; \
     })</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>#define clock_cycle() \</code><span>Define a shorthand named clock_cycle(). The backslash at the end continues the definition on the next line.</span></li>
+<li><code>({ \</code><span>Begin a block whose last value becomes the value of the shorthand.</span></li>
+<li><code>unsigned long long ret; \</code><span>Make a 64-bit whole number named ret.</span></li>
+<li><code>asm volatile(&quot;mov.u64 %0, %%clock64;&quot; : &quot;=l&quot;(ret)); \</code><span>Insert one GPU instruction by hand: copy the 64-bit clock counter into ret. volatile tells the compiler not to delete it. Nothing is listed as an input.</span></li>
+<li><code>ret; \</code><span>The value of the block is ret.</span></li>
+<li><code>})</code><span>End of the block.</span></li>
+</ol>
+</div>
+
 <p class="ln"><b>L02</b> <code>%clock64</code> is a 64-bit counter inside the GPU chip that goes up by 1 at every tick of the GPU clock. A tick of the clock is called a cycle. L01 copies the counter into <code>ret</code>. <span class="from">from: L01, PTX definition</span></p>
 <p class="ln"><b>L03</b> If the reads return s and e, they are e - s cycles apart. The kernel stores s in <code>*d_start</code> and e in <code>*d_end</code>, and <code>main</code> prints e - s. <span class="from">from: L02, code</span></p>
 <p class="ln"><b>L04</b> Your <code>fma_latency</code> kernel, the lines that matter, copied without change: <span class="from">from: your code</span></p>
@@ -39,6 +51,20 @@ start_time = clock_cycle();
 for (int i = 0; i &lt; 64; ++i)
     x = x * 1.0000001f + 0.00000001f;
 end_time = clock_cycle();</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>data_type x = *n;                  // data_type is float (using data_type = float;)</code><span>Read the fraction stored at address n in the graphics card's memory and keep it in x. data_type is another name for float, set by the line using data_type = float;.</span></li>
+<li><code>__threadfence();</code><span>A memory fence. The starter file's own note says it is there to make sure the read of *n is done.</span></li>
+<li><code>x = x + 3;</code><span>Add 3 to x.</span></li>
+<li><code>start_time = clock_cycle();</code><span>Read the clock counter into start_time.</span></li>
+<li><code>#pragma unroll</code><span>Tell the compiler to write the loop out as separate copies of its line instead of a loop that jumps back.</span></li>
+<li><code>for (int i = 0; i &lt; 64; ++i)</code><span>Repeat the next line 64 times.</span></li>
+<li><code>x = x * 1.0000001f + 0.00000001f;</code><span>Multiply x by 1.0000001, add 0.00000001, and put the result back into x. The next copy uses this new x.</span></li>
+<li><code>end_time = clock_cycle();</code><span>Read the clock counter into end_time.</span></li>
+</ol>
+</div>
+
 <p class="ln"><b>L05</b> <code>*n</code> lives in DRAM: memory chips on the graphics card, outside the GPU chip. Arithmetic reads its inputs only from registers: storage inside the chip. So <code>x = *n</code> becomes an instruction that copies 32 bits from DRAM into a register. In the listing of your binary it is <code>LDG</code>. <span class="from">from: L04, listing</span></p>
 <p class="ln"><b>L06</b> Hardware fact: the chip begins the instruction after LDG without waiting for the copy. An instruction that reads LDG's register is held until the copy arrives. The record of registers still waiting is called a scoreboard. <span class="from">from: Jia et al. 2019, Dissecting the NVIDIA Turing T4 GPU</span></p>
 <p class="ln do"><b>L07</b> <b class="x">DO</b> In L04, the first line that reads x after <code>x = *n</code> is ____ . From L06, the wait for DRAM is paid by that line. Is it above or below <code>start_time = clock_cycle()</code>? ____ . <span class="from">from: L04, L06</span></p>
@@ -55,6 +81,16 @@ That is the only job of "x = x + 3".</pre>
 /*0060*/  CS2R R6, SR_CLOCKLO ;        start_time read
 /*0080*/  FADD R3, R2.reuse, 3 ;       x = x + 3.0f
 /*0090*/  FADD R5, R2, 4 ;             y = y + 4.0f</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>/*0020*/  LDG.E.SYS R2, [UR4] ;        load of *n into R2</code><span>At instruction address 0x20: LDG loads 32 bits from the graphics card's memory into register R2. The words at the end are a note added by the report.</span></li>
+<li><code>/*0060*/  CS2R R6, SR_CLOCKLO ;        start_time read</code><span>At address 0x60: CS2R copies the clock counter into register R6. This is the start read.</span></li>
+<li><code>/*0080*/  FADD R3, R2.reuse, 3 ;       x = x + 3.0f</code><span>At address 0x80: FADD is a float add, R3 = R2 + 3. The .reuse is a hint to keep R2 at hand for the next instruction.</span></li>
+<li><code>/*0090*/  FADD R5, R2, 4 ;             y = y + 4.0f</code><span>At address 0x90: R5 = R2 + 4.</span></li>
+</ol>
+</div>
+
 <p class="ln do"><b>L10</b> <b class="x">DO</b> In L09, which instructions sit after the start read? ____ . Which register do they read? ____ . From L06, which wait now falls inside the e - s window? ____ . <span class="from">from: L06, L09</span></p>
 <details><summary>CHECK</summary>
 <pre>FADD at 0080 and FADD at 0090, both after CS2R at 0060
@@ -71,10 +107,32 @@ The source said "add before the clock"; the binary says "add after the clock".</
         ret; \
     })
 start_time = clock_cycle_dep2(x, y);</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>#define clock_cycle_dep2(a, b) \</code><span>Define a shorthand named clock_cycle_dep2 that takes two values, a and b.</span></li>
+<li><code>({ \</code><span>Begin a block whose last value becomes the value of the shorthand.</span></li>
+<li><code>unsigned long long ret; \</code><span>Make a 64-bit whole number named ret.</span></li>
+<li><code>asm volatile(&quot;mov.u64 %0, %%clock64;&quot; : &quot;=l&quot;(ret) : &quot;f&quot;(a), &quot;f&quot;(b)); \</code><span>Same clock copy, but after the second colon a and b are listed as float inputs, so the instruction cannot begin before a and b have values.</span></li>
+<li><code>ret; \</code><span>The value of the block is ret.</span></li>
+<li><code>})</code><span>End of the block.</span></li>
+<li><code>start_time = clock_cycle_dep2(x, y);</code><span>Read the clock into start_time, tied to x and y.</span></li>
+</ol>
+</div>
+
 <p class="ln"><b>L12</b> With L11, the listing of your binary became: <span class="from">from: your listing</span></p>
 <pre>/*0030*/  FADD R3, R0.reuse, 3 ;       x = x + 3.0f
 /*0040*/  FADD R5, R0, 4 ;             y = y + 4.0f
 /*0080*/  CS2R R6, SR_CLOCKLO ;        start_time read</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>/*0030*/  FADD R3, R0.reuse, 3 ;       x = x + 3.0f</code><span>At address 0x30: R3 = R0 + 3.</span></li>
+<li><code>/*0040*/  FADD R5, R0, 4 ;             y = y + 4.0f</code><span>At address 0x40: R5 = R0 + 4.</span></li>
+<li><code>/*0080*/  CS2R R6, SR_CLOCKLO ;        start_time read</code><span>At address 0x80: copy the clock counter into R6, the start read. It now sits after both adds.</span></li>
+</ol>
+</div>
+
 <p class="ln do"><b>L13</b> <b class="x">DO</b> In L12, FADDs after the start read = ____ . Suppose only x is given as input, <code>clock_cycle_dep(x)</code>. Which FADD may the compiler still move after the read? ____ . <span class="from">from: L08, L11, L12</span></p>
 <details><summary>CHECK</summary>
 <pre>0 FADDs inside the window

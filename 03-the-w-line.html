@@ -9,7 +9,7 @@
 <body>
 <main>
 <h1>03. The w line: where is the squaring?</h1>
-<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
 
 <p class="label">The story</p>
 <div class="story">
@@ -31,6 +31,21 @@
     w = z * z;                     // line F
     ++iters;
 }</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>while (x2 + y2 &lt;= 4.0f &amp;&amp; iters &lt; max_iters) {</code><span>Before each repetition, test two things: is x2 plus y2 at most 4, and is iters below max_iters? If both are true, do the lines inside the braces once and test again. If either is false, continue after the closing brace.</span></li>
+<li><code>float x = x2 - y2 + cx;        // line A</code><span>Line A: subtract y2 from x2, add cx, keep it in x.</span></li>
+<li><code>float y = w - x2 - y2 + cy;    // line B</code><span>Line B: from w subtract x2, then subtract y2, then add cy, keep it in y.</span></li>
+<li><code>x2 = x * x;                    // line C</code><span>Line C: multiply x by itself and put the result in x2, replacing the old x2.</span></li>
+<li><code>y2 = y * y;                    // line D</code><span>Line D: multiply y by itself and put the result in y2.</span></li>
+<li><code>float z = x + y;               // line E</code><span>Line E: add x and y, keep it in z.</span></li>
+<li><code>w = z * z;                     // line F</code><span>Line F: multiply z by itself and put the result in w.</span></li>
+<li><code>++iters;</code><span>Add 1 to iters.</span></li>
+<li><code>}</code><span>End of the block opened by the matching brace above.</span></li>
+</ol>
+</div>
+
 <p class="ln"><b>L02</b> Lines C, D, F of one repetition write x2, y2, w. Lines A, B of the next repetition read them. Name the (x, y) of the earlier repetition (a, b). <span class="from">from: L01</span></p>
 <p class="ln"><b>L03</b> Then line C gave x2 = a times a, line D gave y2 = b times b, line E gave z = a + b, line F gave w = (a + b) times (a + b). <span class="from">from: L01, L02</span></p>
 
@@ -88,6 +103,18 @@ iters = 3</pre>
     x = xt;
     ++iters;
 }</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>while (x*x + y*y &lt;= 4.0f &amp;&amp; iters &lt; max_iters) {</code><span>Before each repetition, test: is x times x plus y times y at most 4, and is iters below max_iters? Both true: do the lines in braces once.</span></li>
+<li><code>float xt = x*x - y*y + cx;</code><span>Compute the new first number into a temporary named xt. It cannot go straight into x, because the next line still needs the old x.</span></li>
+<li><code>y = 2*x*y + cy;</code><span>Compute the new second number from the old x and y, and put it in y.</span></li>
+<li><code>x = xt;</code><span>Now replace x with the new first number kept in xt.</span></li>
+<li><code>++iters;</code><span>Add 1 to iters.</span></li>
+<li><code>}</code><span>End of the block opened by the matching brace above.</span></li>
+</ol>
+</div>
+
 <p class="ln do"><b>L13</b> <b class="x">DO</b> Count each <code>*</code> executed in one repetition, check included. L12: ____ . L01: ____ . For an (i, j) that hits <code>max_iters = 1000</code>, multiplications saved by L01 = ____ . <span class="from">from: L01, L12</span></p>
 <details><summary>CHECK</summary>
 <pre>L12: check x*x, y*y (2) + xt: x*x, y*y (2) + 2*x*y (2) = 6

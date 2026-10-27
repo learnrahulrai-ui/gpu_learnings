@@ -9,7 +9,7 @@
 <body>
 <main>
 <h1>10. Lab 2 prelab: cycles per FFMA from your own measurements</h1>
-<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
 
 <p class="label">The story</p>
 <div class="story">
@@ -25,6 +25,15 @@
 <pre>#pragma unroll
 for (int i = 0; i &lt; 64; ++i)
     x = x * 1.0000001f + 0.00000001f;</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>#pragma unroll</code><span>Tell the compiler to write the loop out as separate copies of its line instead of a loop that jumps back.</span></li>
+<li><code>for (int i = 0; i &lt; 64; ++i)</code><span>Repeat the next line 64 times.</span></li>
+<li><code>x = x * 1.0000001f + 0.00000001f;</code><span>Multiply x by 1.0000001, add 0.00000001, and put the result back into x. The next copy uses this new x.</span></li>
+</ol>
+</div>
+
 <p class="ln"><b>L02</b> Each line of the loop multiplies and adds in one instruction, named FFMA in the listing. Each FFMA reads the x that the FFMA before it wrote. So FFMA k cannot begin until FFMA k - 1 has its value. Call such a list of FFMAs a chain. <span class="from">from: L01, listing</span></p>
 <p class="ln"><b>L03</b> A cycle is one tick of the GPU clock. The kernel prints e - s, the cycles between the start clock read and the end clock read. <span class="from">from: code</span></p>
 <p class="ln"><b>L04</b> Your GTX 1650 printed, for L01 with 64 FFMAs in the chain: <code>Latency of fma_latency code snippet = 281 cycles</code>. <span class="from">from: your output</span></p>

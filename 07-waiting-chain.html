@@ -9,7 +9,7 @@
 <body>
 <main>
 <h1>07. Lab 2: which line waits for which line</h1>
-<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
 
 <p class="label">The story</p>
 <div class="story">
@@ -28,6 +28,18 @@ x2 = x * x;                    // line C
 y2 = y * y;                    // line D
 float z = x + y;               // line E
 w = z * z;                     // line F</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>float x = x2 - y2 + cx;        // line A</code><span>Line A: subtract y2 from x2, add cx, keep it in x.</span></li>
+<li><code>float y = w - x2 - y2 + cy;    // line B</code><span>Line B: from w subtract x2, then subtract y2, then add cy, keep it in y.</span></li>
+<li><code>x2 = x * x;                    // line C</code><span>Line C: multiply x by itself and put the result in x2, replacing the old x2.</span></li>
+<li><code>y2 = y * y;                    // line D</code><span>Line D: multiply y by itself and put the result in y2.</span></li>
+<li><code>float z = x + y;               // line E</code><span>Line E: add x and y, keep it in z.</span></li>
+<li><code>w = z * z;                     // line F</code><span>Line F: multiply z by itself and put the result in w.</span></li>
+</ol>
+</div>
+
 <p class="ln"><b>L02</b> The machine does one add, subtract or multiply per instruction. Line A has a subtract and an add, so it is split into op 1 and op 2. Line B is split into op 3, op 4, op 5, left to right. <span class="from">from: L01</span></p>
 <pre>op 1:  t1 = x2 - y2          op 6:  x2 = x * x      (line C)
 op 2:  x  = t1 + cx          op 7:  y2 = y * y      (line D)
