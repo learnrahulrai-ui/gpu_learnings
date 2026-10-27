@@ -26,3 +26,4 @@ The site turns long Claude/ChatGPT chats into exercise pages. Pages are plain HT
 - Every code block (C++, intrinsics, machine listing) gets a "Read the code in English, line by line" panel right under it: one plain sentence per code line.
 - Every technical word used anywhere goes into `words.html` with a plain-English definition.
 - Every page opens (after the story) with a "Guess first" box asking for one number or yes/no, and closes with "Your guess against the machine" (the real measured or computed value) and "The interviewer's next question" (a harder follow-up with its answer under CHECK). New pages also get a line in `symptoms.html`.
+- The GPU basics track (`tutorial.html`, `t1-...`, `t2-...`, `t3-...`) is a general tutorial in the same style and structure, not tied to the course. Where the learner's laptop has no measurement, numbers are computed from published specs with assumptions stated, and a DO line asks the reader to measure their own.

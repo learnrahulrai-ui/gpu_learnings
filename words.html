@@ -18,6 +18,7 @@
 <dt>bit, byte</dt><dd>A bit holds 0 or 1. A byte is 8 bits. A float or a <code>uint32_t</code> takes 32 bits, which is 4 bytes.</dd>
 <dt>block (CUDA)</dt><dd>A set of GPU threads started together. The launch <code>&lt;&lt;&lt;B, T&gt;&gt;&gt;</code> starts B blocks of T threads each. Each block executes on one SM.</dd>
 <dt>chain</dt><dd>A list of operations in which each one needs the value of the one before it, so they cannot overlap.</dd>
+<dt>cache</dt><dd>Small, fast memory that keeps recently read values so a second read of the same value does not go back to the slow memory chips. The program does not control it directly.</dd>
 <dt>CHECK</dt><dd>On this site, the fold-out box under each exercise that holds the worked answer. Open it only after writing your own.</dd>
 <dt>compiler</dt><dd>The program (here <code>g++</code> for the CPU and <code>nvcc</code> for the GPU) that turns source code into machine instructions. It may reorder instructions when nothing forbids it.</dd>
 <dt>core</dt><dd>A part of a CPU that executes its own sequence of instructions. The Ryzen 5 4600H has 6.</dd>
@@ -42,12 +43,16 @@
 <dt>max_iters</dt><dd>The cap on repetitions, 1000 in the lab measurements on this site.</dd>
 <dt>middleman pair</dt><dd>The learner's word for (cx, cy), the two fractions computed from (i, j) that the Mandelbrot loop actually works on.</dd>
 <dt>profiler</dt><dd>A tool (here NVIDIA Nsight Compute) that counts what the GPU did, such as memory requests and sectors.</dd>
+<dt>operations per byte</dt><dd>How many arithmetic operations a program does for each byte it moves to or from memory. Below what the hardware needs to stay busy, memory sets the time.</dd>
 <dt>program counter</dt><dd>The address of the next instruction a thread will execute.</dd>
+<dt>reduction</dt><dd>Turning many numbers into one, such as adding up an array. The work is easy to split; the dependence between partial results is the hard part.</dd>
 <dt>register</dt><dd>A small storage cell inside the processor chip. Arithmetic reads its inputs only from registers.</dd>
 <dt>repetition</dt><dd>A single trip through the lines inside a loop.</dd>
 <dt>scoreboard</dt><dd>A record inside the GPU of registers still waiting for a value; an instruction that needs one of them is held until it arrives.</dd>
+<dt>shared memory</dt><dd>Storage inside each SM that all threads of one block can read and write, much faster than the graphics card's memory chips. At most 64 KB per SM on Turing.</dd>
 <dt>SIMD</dt><dd>Single instruction, multiple data: one instruction acting on several values at once, as AVX2 does with 8.</dd>
 <dt>SM</dt><dd>Each of the identical blocks of hardware an NVIDIA GPU chip is built from. The GTX 1650 has 14, each with 64 FP32 units.</dd>
+<dt>tile</dt><dd>A small square piece of a large table, copied into shared memory so many threads can use each value without fetching it again.</dd>
 <dt>thread</dt><dd>A sequence of instructions being executed. On a GPU, thousands can exist at once, each with its own values.</dd>
 <dt>warp</dt><dd>NVIDIA's name for 32 consecutive threads of a block that the hardware handles together, one instruction at a time.</dd>
 </dl>

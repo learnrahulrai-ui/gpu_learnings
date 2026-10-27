@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multiply Matrices</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>T3. Multiplying matrices: same arithmetic, very different times</h1>
+<p class="sub">GPU basics track. Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>Matrix multiplication is the calculation underneath most of modern AI. It is famous as the job GPUs are best at, because it has a huge amount of arithmetic: for two square tables of 1024 by 1024 numbers, over two billion multiplications and additions.</p>
+<p>Every GPU course then shows the same sequence of programs: a plain version where each thread computes one answer, a "tiled" version that copies small squares of the tables into fast memory inside the chip, and then faster and faster versions. People memorize the sequence. The learner of this site described exactly that trap: it is one thing to know the definition of tiling, and another to derive the need for it.</p>
+<p>The arithmetic is identical in every version; nobody removes a single multiplication. So what is every faster version actually changing, and how far does it have to go?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>Multiplying two 1024 by 1024 tables with the plain one-thread-per-answer program on the GTX 1650: is the time set by the arithmetic or by memory, and by roughly how many times?</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "It's one thing to know the definition; it's another thing to derive the need for the definition. Always think: if you introduce something, what problem does it solve, and can I solve that problem without introducing that thing?"</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> Tables A, B and the answer C are n by n, stored as arrays with down-number i and right-number j at place i x n + j. The answer at (i, j) is the sum over k of A at (i, k) times B at (k, j): the A values with down-number i (a left-to-right strip of A) meet the B values with right-number j (an up-to-down strip of B). <span class="from">from: definition</span></p>
+<p class="ln"><b>L02</b> The plain program, one thread per answer (n is assumed to be a multiple of the block size): <span class="from">from: code</span></p>
+<pre>__global__ void matmul(const float *A, const float *B, float *C, int n) {
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
+    float s = 0.0f;
+    for (int k = 0; k &lt; n; ++k)
+        s += A[i * n + k] * B[k * n + j];
+    C[i * n + j] = s;
+}</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>__global__ void matmul(const float *A, const float *B, float *C, int n) {</code><span>Define a GPU function receiving the addresses of tables A, B, C in the graphics card's memory, and their size n.</span></li>
+<li><code>int i = blockIdx.y * blockDim.y + threadIdx.y;</code><span>Each thread computes its down-number i from its block's and its own numbers in the up-down direction.</span></li>
+<li><code>int j = blockIdx.x * blockDim.x + threadIdx.x;</code><span>And its right-number j from the left-right direction.</span></li>
+<li><code>float s = 0.0f;</code><span>Make a total so far s holding 0.</span></li>
+<li><code>for (int k = 0; k &lt; n; ++k)</code><span>Repeat the next line for k = 0 up to n minus 1.</span></li>
+<li><code>s += A[i * n + k] * B[k * n + j];</code><span>Read A at (i, k) and B at (k, j) from memory, multiply them, and add the product to s.</span></li>
+<li><code>C[i * n + j] = s;</code><span>Store the total as the answer at (i, j).</span></li>
+<li><code>}</code><span>End of the function.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> Take n = 1024. Multiply-adds = n x n x n = ____ . Counting each multiply and each add as one operation, operations = 2 x that = ____ . <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>1024^3 = 1,073,741,824 multiply-adds
+2,147,483,648 operations</pre>
+</details>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> The least memory traffic possible: read A once, read B once, write C once, 4 bytes each. Bytes = 3 x 1024 x 1024 x 4 = ____ . Operations per byte at that minimum = L03 / this = ____ . <span class="from">from: L03</span></p>
+<details><summary>CHECK</summary>
+<pre>12,582,912 bytes
+2,147,483,648 / 12,582,912 = 170.7 operations per byte</pre>
+</details>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> In L02, each thread reads n values of A and n of B. If nothing read by one thread is reused by another (no caches), bytes read from memory = (number of threads) x 2 x n x 4 = 1024 x 1024 x 2 x 1024 x 4 = ____ . Operations per byte = ____ . <span class="from">from: L02, L03</span></p>
+<details><summary>CHECK</summary>
+<pre>8,589,934,592 bytes (8.6 billion)
+2,147,483,648 / 8,589,934,592 = 0.25 operations per byte</pre>
+</details>
+<p class="ln"><b>L06</b> Hardware facts and assumptions, as in T1: memory moves 128 billion bytes per second (GDDR5 version; 192 for GDDR6); 896 FP32 units each begin one multiply-add (2 operations) per cycle; 1.5 billion cycles per second assumed. <span class="from">from: NVIDIA specifications, assumption</span></p>
+<p class="ln do"><b>L07</b> <b class="x">DO</b> Memory time for L05 at 128 billion bytes per second = ____ ms. Arithmetic time = 2,147,483,648 / (896 x 2 x 1.5 billion) = ____ ms. Ratio = ____ . <span class="from">from: L03, L05, L06</span></p>
+<details><summary>CHECK</summary>
+<pre>8,589,934,592 / 128e9 = 67.1 ms
+896 * 2 * 1.5e9 = 2.688e12 operations per second; 2,147,483,648 / 2.688e12 = 0.799 ms
+67.1 / 0.799 = 84</pre>
+</details>
+<p class="ln"><b>L08</b> Hardware fact: each SM has shared memory, storage inside the SM that all threads of a block can read many times faster than the graphics card's memory; Turing allows at most 64 KB of it per SM. Tiling: a block of T by T threads copies a T by T square of A and one of B into shared memory, and every value copied is then used by T threads instead of being read T times from memory. <span class="from">from: NVIDIA Turing Tuning Guide, definition</span></p>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> With T = 16, bytes read from memory = L05 / 16 = ____ . Memory time at 128 billion = ____ ms. Operations per byte = ____ . <span class="from">from: L05, L06, L08</span></p>
+<details><summary>CHECK</summary>
+<pre>8,589,934,592 / 16 = 536,870,912 bytes
+536,870,912 / 128e9 = 4.19 ms
+2,147,483,648 / 536,870,912 = 4 operations per byte</pre>
+</details>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> T for which memory time equals arithmetic time = L07's ratio = ____ . Shared memory for the two T by T squares of floats at that T = 2 x T x T x 4 = ____ bytes, which is ____ KB, against the 64 KB of L08. <span class="from">from: L07, L08</span></p>
+<details><summary>CHECK</summary>
+<pre>T = 84
+2 * 84 * 84 * 4 = 56,448 bytes = 55.1 KB of the 64 KB in one SM</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> Operations the GPU can do per byte its memory moves = 2.688e12 / 128e9 = ____ . Fill: plain program ____ (L05), T = 16 ____ (L09), most the matrix allows ____ (L04). <span class="from">from: L04, L05, L06, L09</span></p>
+<details><summary>CHECK</summary>
+<pre>needed to keep the units busy: 21 operations per byte
+plain: 0.25     T = 16: 4     matrix allows: 170.7</pre>
+</details>
+<p class="ln do"><b>L12</b> <b class="x">DO</b> Collect L03, L04, L05, L07, L09, L10, L11. The arithmetic never changes. Write one sentence on what every faster version changes, how far it must go, and what stops square tiles in shared memory from getting there comfortably. <span class="from">from: L03, L04, L05, L07, L09, L10, L11</span></p>
+<details><summary>CHECK</summary>
+<pre>Every faster version raises how many times each byte fetched from memory is used: from 0.25
+operations per byte (plain) toward the 21 needed, while the matrix itself would allow 170.7.
+Square tiles alone need T = 84 to get there, and at T = 84 one block takes 55 of an SM's 64 KB,
+so no second block fits on the SM to cover the first one's waits. Faster versions therefore also
+reuse values held in each thread's registers, not only in shared memory.
+
+Tempting answer that fails: "matrix multiplication is arithmetic-heavy, so it is limited by the
+arithmetic". L07 puts the plain program 84 times on the memory side.</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>Multiplying large tables has plenty of arithmetic, but a simple program fetches the same numbers from memory over and over, and the fetching, not the arithmetic, sets the time. Each well-known speed-up is a way to fetch a number once and use it many times while it is close to the arithmetic circuits.</p>
+<p>For a manager: when a team says a model "is compute-bound", ask for the number of operations per byte of memory traffic. Below about 21 on this card, it is not.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>Memory sets the time, by about 84 times (model from published specs, ignoring caches).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>The GPU has caches, so the measured plain-program time is far below 67 ms. How would you show, with a measurement, how much reuse the caches provided?</p>
+<details><summary>CHECK</summary>
+<pre>Measure the bytes actually read from the graphics card's memory with the profiler
+(Nsight Compute, metric dram__bytes_read.sum). Compare with 8.59 billion (no reuse, L05) and
+12.6 million (perfect reuse, L04). Operations divided by measured bytes gives the operations per
+byte the program really achieved, to set against the 21 of L11.</pre>
+</details>
+</div>
+
+<nav><a href="t2-sum-an-array.html">prev: T2 summing an array</a><a href="tutorial.html">GPU basics track</a></nav>
+</main>
+</body>
+</html>

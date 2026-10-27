@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GPU Basics Track</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>GPU basics track: the standard programs, the hard way</h1>
+<p class="sub">A general tutorial, not tied to any course, for people who learn by doing the arithmetic themselves. Same rules as the lab pages: every line uses only what came before it, every number is real or computed from published figures, and every page ends with a puzzle that connects the results.</p>
+
+<p class="label">Who this is for</p>
+<div class="story">
+<p>Every GPU course teaches the same first programs: add two arrays, add up an array, multiply two tables. Most tutorials show the code, explain the syntax, and move on. If you have read several of them, can recite every definition, and still could not predict how fast any of these programs will go or why, this track is written for you.</p>
+<p>Each page takes one standard program and asks the question the tutorials skip: what actually limits it? You answer by calculating, with pencil and paper, from the code and the hardware's published numbers, then by measuring on your own GPU where you can. Words are defined before they are used, code is read out in English line by line, and nothing is taken on trust.</p>
+<p>The figures here are for an NVIDIA GTX 1650 laptop GPU. If yours differs, redo each line with your own numbers; the method does not change.</p>
+</div>
+
+<ol class="topics">
+<li><a href="t1-add-two-arrays.html">T1. Adding two arrays: what actually limits the GPU</a>: 201 million bytes against 16.7 million adds, and why more threads change nothing.</li>
+<li><a href="t2-sum-an-array.html">T2. Summing an array: the chain, the tree, and the wrong answer</a>: a chain of 20 million against 25 levels, and a plain loop that stops counting at 16,777,216.</li>
+<li><a href="t3-multiply-matrices.html">T3. Multiplying matrices: same arithmetic, very different times</a>: 0.25 operations per byte against the 21 needed, and the 55 KB tile.</li>
+</ol>
+
+<p>Once these feel natural, the <a href="index.html">lab pages</a> apply the same reasoning to a real course assignment, with measurements from a real laptop.</p>
+
+<nav><a href="index.html">index</a><a href="t1-add-two-arrays.html">start: T1</a></nav>
+</main>
+</body>
+</html>

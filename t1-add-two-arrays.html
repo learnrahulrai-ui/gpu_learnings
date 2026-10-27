@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add Two Arrays</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>T1. Adding two arrays: what actually limits the GPU</h1>
+<p class="sub">GPU basics track, in the same style as the lab pages. Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>Almost every GPU tutorial begins with the same program: take two lists of numbers, add them place by place, store the answers in a third list. It is the "hello world" of GPU programming, and it teaches the launch syntax well. What it usually does not teach is the one thing that decides how fast it goes.</p>
+<p>The common belief is the one the learner of this site wrote down: put everything in parallel, because the GPU has many arithmetic circuits, and it will be fast. The GTX 1650 in this laptop has 896 of them. Adding 16.7 million pairs of numbers sounds like exactly the work they were built for.</p>
+<p>Before believing that, ask what each addition needs besides the addition itself. Where do the two numbers come from, where does the answer go, and how long does carrying them take compared with adding them?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>Adding two arrays of 16.7 million numbers on the GTX 1650: is the time set by the arithmetic or by moving the numbers to and from memory, and by roughly how many times?</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "SIMD is a dumb thing. It only does addition, right?" / "I can say that, okay, put all the things in parallel because they all work on the GPU, right?"</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The standard program, as written in most tutorials: <span class="from">from: code</span></p>
+<pre>__global__ void add(const float *a, const float *b, float *c, int n) {
+    int k = blockIdx.x * blockDim.x + threadIdx.x;
+    if (k &lt; n) c[k] = a[k] + b[k];
+}
+add&lt;&lt;&lt;(n + 255) / 256, 256&gt;&gt;&gt;(a, b, c, n);</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>__global__ void add(const float *a, const float *b, float *c, int n) {</code><span>Define a function that executes on the GPU. It receives the addresses of three arrays of fractions in the graphics card's memory, a, b and c, and their length n. const means a and b are only read.</span></li>
+<li><code>int k = blockIdx.x * blockDim.x + threadIdx.x;</code><span>Each thread computes its own number k: its block's number times the threads per block, plus its own number inside the block.</span></li>
+<li><code>if (k &lt; n) c[k] = a[k] + b[k];</code><span>If k is inside the arrays, read a at place k and b at place k, add them, and store the sum in c at place k.</span></li>
+<li><code>}</code><span>End of the function.</span></li>
+<li><code>add&lt;&lt;&lt;(n + 255) / 256, 256&gt;&gt;&gt;(a, b, c, n);</code><span>From the CPU, start the function with blocks of 256 threads, and enough blocks to cover all n places: n plus 255, divided by 256, rounded down.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L02</b> <b class="x">DO</b> Take n = 16,777,216. Blocks = (16,777,216 + 255) / 256 rounded down = ____ . The thread with k = 1,000,000 is in block ____ with threadIdx.x = ____ . <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>blocks = 65536
+1,000,000 / 256 = 3906.25 -&gt; block 3906; 3906 * 256 = 999,936; 1,000,000 - 999,936 = 64
+k = 1,000,000 is block 3906, threadIdx.x 64</pre>
+</details>
+<p class="ln"><b>L03</b> From L01, each k reads a[k] (4 bytes), reads b[k] (4 bytes), writes c[k] (4 bytes), and does one add. <span class="from">from: L01</span></p>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> Bytes moved for n = 16,777,216: 12 x n = ____ . Adds = ____ . Adds per byte moved = ____ . <span class="from">from: L02, L03</span></p>
+<details><summary>CHECK</summary>
+<pre>bytes = 12 * 16,777,216 = 201,326,592
+adds  = 16,777,216
+adds per byte = 1 / 12 = 0.083</pre>
+</details>
+<p class="ln"><b>L05</b> Hardware fact: the GTX 1650 laptop GPU has a 128-bit memory bus, 16 bytes per transfer. With GDDR5 at 8 billion transfers per second per pin it moves 16 x 8 = 128 billion bytes per second; with GDDR6 at 12 billion, 192 billion. Your hardware table said "GDDR6 / GDDR5", so read your memory type with <code>nvidia-smi -q</code>. <span class="from">from: NVIDIA GTX 1650 laptop specifications</span></p>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> Time to move L04's bytes at 128 billion bytes per second = ____ ms. At 192 billion = ____ ms. <span class="from">from: L04, L05</span></p>
+<details><summary>CHECK</summary>
+<pre>201,326,592 / 128e9 = 1.573 ms
+201,326,592 / 192e9 = 1.049 ms</pre>
+</details>
+<p class="ln"><b>L07</b> Hardware fact: 896 FP32 units, each able to begin one add per cycle. Laptop clocks vary; this page assumes 1.5 billion cycles per second. Read yours with <code>nvidia-smi -q -d CLOCK</code> and redo the line. <span class="from">from: NVIDIA Turing layout, assumption</span></p>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> Adds per second = 896 x 1.5 billion = ____ . Time for L04's adds = ____ ms. Ratio of L06's 128-billion time to this = ____ . <span class="from">from: L04, L06, L07</span></p>
+<details><summary>CHECK</summary>
+<pre>896 * 1.5e9 = 1.344e12 adds per second
+16,777,216 / 1.344e12 = 0.0125 ms
+1.573 / 0.0125 = 126</pre>
+</details>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> Measure on your machine: time the kernel alone, for example with <code>nsys profile --stats=true ./add</code>, and write it: ____ ms. Is it nearer L06 or L08? ____ . <span class="from">from: L06, L08, your machine</span></p>
+<details><summary>CHECK</summary>
+<pre>If moving bytes is the limit, expect between 1.05 and 1.57 ms (L06), plus a little.
+Arithmetic alone would be 0.0125 ms (L08). A result near L06 confirms which one decides.
+This page has no measured value from the learner's laptop; yours is the first.</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> Adds the GPU can do per byte the memory can move = (adds per second) / (bytes per second) = 1.344e12 / 128e9 = ____ . This program does ____ adds per byte (L04). <span class="from">from: L04, L05, L08</span></p>
+<details><summary>CHECK</summary>
+<pre>1.344e12 / 128e9 = 10.5 adds per byte to keep all 896 units busy
+this program: 0.083 adds per byte, about 126 times too few</pre>
+</details>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> Collect L04, L06, L08, L09, L10. Someone proposes making this program faster with 8-at-once instructions inside each thread, or with twice the threads. Write one sentence on what that changes in the time, and what would actually help. <span class="from">from: L04, L06, L08, L09, L10</span></p>
+<details><summary>CHECK</summary>
+<pre>Nothing measurable: the time is set by the 201 million bytes, and neither proposal moves fewer bytes.
+What helps is fewer bytes (16-bit numbers instead of 32-bit halve them and so halve the time)
+or more arithmetic per byte (doing several operations on each number while it is loaded).
+
+Tempting answer that fails: "more parallel arithmetic, more speed". L08 puts the arithmetic at
+0.0125 ms out of about 1.5.</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>A GPU's arithmetic is so fast that, for simple jobs, the arithmetic is almost free and the real cost is carrying numbers in and out of memory. Adding two lists is such a job: the GPU spends over 99 percent of the time waiting for numbers to arrive.</p>
+<p>For a manager: "the GPU has N cores" says little about speed. Ask how many bytes the job moves per calculation, and compare with what the card's memory can deliver.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>Moving the numbers sets the time: about 126 times longer than the arithmetic at 128 billion
+bytes per second (model from published specs; measure yours with L09).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>You must compute d = (a + b + c) times e for arrays of n numbers. Three small kernels (add, add, multiply), or one kernel that does all of it? Give the bytes moved per place for each choice and the expected ratio of times.</p>
+<details><summary>CHECK</summary>
+<pre>three kernels: a+b -&gt; t (12 bytes), t+c -&gt; u (12), u*e -&gt; d (12) = 36 bytes per place
+one kernel   : read a, b, c, e and write d                  = 20 bytes per place
+memory sets the time, so one kernel should take about 20/36 of the time: 1.8 times faster.</pre>
+</details>
+</div>
+
+<nav><a href="tutorial.html">GPU basics track</a><a href="t2-sum-an-array.html">next: T2 summing an array</a></nav>
+</main>
+</body>
+</html>

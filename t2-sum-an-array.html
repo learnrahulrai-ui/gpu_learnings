@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sum an Array</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>T2. Summing an array: the chain, the tree, and the wrong answer</h1>
+<p class="sub">GPU basics track. Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>Adding two arrays gives every thread its own independent piece of work. Adding up all the numbers of one array does not: every partial total depends on the totals before it. This job, called a reduction, is the second program in every GPU course, and it is where "just put it in parallel" first stops working.</p>
+<p>The plain loop keeps one total so far and adds each number to it in turn. Each addition needs the result of the one before. The learner of this site had already met that shape in the labs and said it plainly: one of the inputs of the next step is the result of the previous step, and everybody knows it cannot start early. True. The question is what to do about it.</p>
+<p>There is a second, quieter question that most tutorials skip. If the parallel version adds the numbers in a different order, does it give the same total? And if not, which total is right?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>Add 20 million copies of the number 1.0, one after another, using 32-bit fractions. What total comes out?</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "So the only obvious thing is that one of the operands for the second one will be the results of the first one." / "You cannot blindly just go to the next while loop unless the stuff needed to calculate the condition in the while loop is calculated within the while loop."</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The plain loop: <span class="from">from: code</span></p>
+<pre>float s = 0.0f;
+for (int k = 0; k &lt; n; ++k)
+    s = s + a[k];</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>float s = 0.0f;</code><span>Make a fraction named s holding 0. It will hold the total so far.</span></li>
+<li><code>for (int k = 0; k &lt; n; ++k)</code><span>Repeat the next line for k = 0, 1, 2, and so on up to n minus 1.</span></li>
+<li><code>s = s + a[k];</code><span>Add the number at place k of the array to the total so far, and keep the result as the new total.</span></li>
+</ol>
+</div>
+<p class="ln"><b>L02</b> From L01, each add reads s, which the add before it wrote. So the n adds form one chain: none can begin before the previous one has its value. <span class="from">from: L01</span></p>
+<p class="ln"><b>L03</b> Measured fact from this site's Lab 2 prelab on the GTX 1650: an add or multiply-add that waits for the previous one costs 4 cycles. This page assumes 1.5 billion cycles per second. <span class="from">from: the learner's measurements, assumption</span></p>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> Take n = 20,000,000. Chain length = ____ adds. Cycles = ____ x 4 = ____ . Time at 1.5 billion cycles per second = ____ ms. <span class="from">from: L02, L03</span></p>
+<details><summary>CHECK</summary>
+<pre>chain of 20,000,000 adds
+80,000,000 cycles
+80,000,000 / 1.5e9 = 53.3 ms, however many threads the GPU has</pre>
+</details>
+<p class="ln"><b>L05</b> The tree: add the numbers in neighbouring pairs, giving half as many partial totals (one left over joins the next level when the count is odd). Repeat on the partial totals until one is left. Every pair at one level is independent of every other pair at that level. <span class="from">from: definition</span></p>
+<pre>level 0:  1   1   1   1   1   1   1   1
+           \ /     \ /     \ /     \ /
+level 1:    2       2       2       2
+             \     /         \     /
+level 2:        4               4
+                  \           /
+level 3:                8</pre>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> Each add turns two totals into one, so the number of totals goes down by 1 per add. Adds needed to go from 20,000,000 totals to 1 = ____ . Levels: 20,000,000, then 10,000,000, then ____ , ... until 1. Number of levels = ____ . Check with powers of 2: 2^24 = 16,777,216 and 2^25 = 33,554,432. <span class="from">from: L05</span></p>
+<details><summary>CHECK</summary>
+<pre>adds = 19,999,999
+levels: 20000000, 10000000, 5000000, 2500000, 1250000, 625000, 312500, 156250, 78125,
+        39063, 19532, 9766, 4883, 2442, 1221, 611, 306, 153, 77, 39, 20, 10, 5, 3, 2, 1
+25 levels (16,777,216 &lt; 20,000,000 &lt;= 33,554,432)</pre>
+</details>
+<p class="ln"><b>L07</b> A float holds 24 significant bits. Between 16,777,216 (2^24) and 33,554,432 the float values are spaced 2 apart, so 16,777,217 cannot be stored. <span class="from">from: IEEE 754 float32</span></p>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> With L01, after 16,777,216 adds of 1.0 the total is 16,777,216. The next add gives 16,777,217, which must be rounded to a neighbouring float: 16,777,216 or 16,777,218? The rule is: on a tie, choose the one whose last bit is 0, which is ____ . What happens to every later add of 1.0? ____ . <span class="from">from: L01, L07</span></p>
+<details><summary>CHECK</summary>
+<pre>tie between 16,777,216 and 16,777,218; 16,777,216 = 2^24 ends in a 0 bit -&gt; 16,777,216
+every later add of 1.0 rounds back to 16,777,216: the total stops growing</pre>
+</details>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> Real computation in 32-bit fractions on 20,000,000 ones: the L01 order gives 16,777,216; a tree order gives 20,000,000. Error of the L01 order = ____ , which is ____ percent of the true total. <span class="from">from: L08, float32 computation</span></p>
+<details><summary>CHECK</summary>
+<pre>20,000,000 - 16,777,216 = 3,222,784
+3,222,784 / 20,000,000 = 16.1 percent</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> Collect L04 (a chain of 20,000,000), L06 (19,999,999 adds in 25 levels), L07, L08, L09. The two orders do almost the same number of adds. Write one sentence on everything the tree changes, and why both changes come from the same property of the tree. <span class="from">from: L04, L06, L07, L08, L09</span></p>
+<details><summary>CHECK</summary>
+<pre>The tree keeps the work (19,999,999 adds against 20,000,000) but cuts the longest chain from
+20,000,000 to 25, so the adds of each level can be spread over many threads; and it adds totals
+of similar size, so the partial totals never get large next to what is added to them, and the
+rounding of L08 never swallows a whole 1.0. Both come from pairing equals instead of adding
+each new number to one ever-growing total.
+
+Tempting answer that fails: "reordering for parallelism costs accuracy; the plain loop is the
+correct one". L09 measures the plain loop 16.1 percent wrong.</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>Adding up a long list can be done step after step or as a tournament of pairs. The tournament has the same amount of work but finishes in 25 rounds instead of 20 million, which is what lets a GPU help. With computer fractions it is also more accurate, because the step-after-step total grows so large that small numbers added to it are rounded away.</p>
+<p>For a manager: two correct programs can give different totals from the same data. Ask which order of operations produced a number before trusting it to many digits.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>16,777,216, not 20,000,000 (computed in 32-bit fractions).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>On real data your GPU tree sum and your CPU loop sum disagree in the fifth digit. Which do you trust, and how do you settle it?</p>
+<details><summary>CHECK</summary>
+<pre>Neither by default. Compute a reference with 64-bit fractions (53 significant bits instead of 24)
+and compare both against it. The tree is usually closer, because its partial totals stay
+similar in size, but that is a tendency, not a guarantee: the reference settles it.</pre>
+</details>
+</div>
+
+<nav><a href="t1-add-two-arrays.html">prev: T1 adding two arrays</a><a href="t3-multiply-matrices.html">next: T3 multiplying matrices</a></nav>
+</main>
+</body>
+</html>
