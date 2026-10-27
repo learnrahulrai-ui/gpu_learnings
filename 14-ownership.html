@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ownership</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>14. Lab 2: who writes which place, and who finishes last</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>Lab 2 Part 2 asks the program to use every core of the CPU and every SM of the GPU. The learner's first reaction was surprise: they thought Lab 2 was only about making the 8-at-once code faster, and suddenly there were threads to create and blocks to launch.</p>
+<p>Splitting the picture between workers has a correctness side and a speed side. The correctness side is strict: every place of the picture must be written by exactly one worker, never two and never none. The speed side is easy to miss: the job ends when the slowest worker ends, so a split that is perfectly fair in places can be unfair in work.</p>
+<p>The Lab 2 picture is 1024 by 1024 places, and the laptop has 6 CPU cores. Dividing 1024 by 6 does not even give a whole number. What split is correct, and of the correct ones, which finishes first?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>Suppose six CPU workers each take an equal band of consecutive values of i in the Lab 2 picture (as near equal as 1024 / 6 allows). If time is proportional to repetitions, how many times faster than one worker is that?</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "One question. So in this assignment I have to make threads? I thought I am just extending SIMD." / "Help me recall my working memory is zero."</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The Lab 2 starter computes a 1024 by 1024 picture, <code>max_iters = 2000</code>, and stores the value for (i, j) at <code>out[i * 1024 + j]</code>, with i counting down from 0 to 1023. <span class="from">from: Lab 2 starter code</span></p>
+<p class="ln"><b>L02</b> Define an owner: the worker that writes a given place of <code>out</code>. A split is correct only if every place has exactly one owner. <span class="from">from: definition</span></p>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> Split by i among 6 owners in consecutive bands. 1024 / 6 = ____ . Rounded up = ____ . Taking six bands of that size covers ____ values of i, which is ____ too many. Write the bands as [first, one past last): [0, 171), [171, ____), [____, ____), [____, ____), [____, ____), [855, ____). <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>1024 / 6 = 170.67, rounded up 171; 6 * 171 = 1026, 2 too many
+[0,171) [171,342) [342,513) [513,684) [684,855) [855,1024)
+sizes 171, 171, 171, 171, 171, 169 = 1024; each band begins where the one before ends,
+so no i is in two bands and none is missing</pre>
+</details>
+<p class="ln"><b>L04</b> Real data: the Lab 2 picture computed in 32-bit fractions from the starter's own constants. Total repetitions 138,219,822. Sum per band of L03: 20,219,285; 20,203,424; 28,346,172; 29,263,472; 19,303,420; 20,884,049. <span class="from">from: float32 computation on the Lab 2 starter's constants</span></p>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> Percent of the work per band = ____ , ____ , ____ , ____ , ____ , ____ . If time follows repetitions, the job ends with the largest band. Speedup over one worker = 138,219,822 / ____ = ____ . <span class="from">from: L04</span></p>
+<details><summary>CHECK</summary>
+<pre>14.6, 14.6, 20.5, 21.2, 14.0, 15.1 percent
+138,219,822 / 29,263,472 = 4.72, not 6</pre>
+</details>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> Interleave instead: owner t takes i = t, t + 6, t + 12, ... while i &lt; 1024. Owner of i = 1023 = 1023 divided by 6, remainder ____ . Why can no i have two owners? ____ . Sums per owner from the same data: 23,029,821; 23,043,321; 23,099,034; 23,079,169; 22,974,325; 22,994,152. Speedup = 138,219,822 / ____ = ____ . <span class="from">from: L02, L04</span></p>
+<details><summary>CHECK</summary>
+<pre>1023 = 170 * 6 + 3 -&gt; owner 3
+each i has exactly one remainder when divided by 6, so exactly one owner
+largest 23,099,034; speedup 138,219,822 / 23,099,034 = 5.98</pre>
+</details>
+<p class="ln"><b>L07</b> On the CPU, each owner is a thread started with <code>pthread_create</code> and waited for with <code>pthread_join</code>. A correct form of the start: <span class="from">from: POSIX threads definition</span></p>
+<pre>struct Args { uint32_t first; uint32_t step; uint32_t *out; };
+Args args[6];
+pthread_t tid[6];
+for (uint32_t t = 0; t &lt; 6; ++t) {
+    args[t] = {t, 6, out};
+    pthread_create(&amp;tid[t], nullptr, worker, &amp;args[t]);
+}
+for (uint32_t t = 0; t &lt; 6; ++t) pthread_join(tid[t], nullptr);</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>struct Args { uint32_t first; uint32_t step; uint32_t *out; };</code><span>Describe what one worker needs: the first i it owns, the step to its next i, and the address of the picture.</span></li>
+<li><code>Args args[6];</code><span>Make 6 such descriptions, one per worker, all alive until this function ends.</span></li>
+<li><code>pthread_t tid[6];</code><span>Make 6 handles, one per worker thread.</span></li>
+<li><code>for (uint32_t t = 0; t &lt; 6; ++t) {</code><span>For t = 0 up to 5:</span></li>
+<li><code>args[t] = {t, 6, out};</code><span>Fill worker t's own description: first i is t, step is 6.</span></li>
+<li><code>pthread_create(&amp;tid[t], nullptr, worker, &amp;args[t]);</code><span>Start a thread executing the function worker, handing it the address of its own description.</span></li>
+<li><code>}</code><span>End of the loop that starts the threads.</span></li>
+<li><code>for (uint32_t t = 0; t &lt; 6; ++t) pthread_join(tid[t], nullptr);</code><span>Wait for each of the 6 threads to finish before going on.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> Suppose L07 used one shared <code>Args a;</code> filled inside the loop instead of <code>args[t]</code>. Thread 0 may read its description after the loop has already written t = ____ into it. Then two threads own the same i values and owner ____ 's values have no owner. And if the <code>pthread_join</code> line is removed, when does the caller know the picture is finished? ____ . <span class="from">from: L02, L07</span></p>
+<details><summary>CHECK</summary>
+<pre>thread 0 may see t = 1 (or any later t) -&gt; two threads share that owner's i values,
+and owner 0's i values (i = 0, 6, 12, ...) are written by nobody.
+without join: never; the function could return while workers are still writing.</pre>
+</details>
+<p class="ln"><b>L09</b> On the GPU, <code>&lt;&lt;&lt;B, T&gt;&gt;&gt;</code> makes B blocks of T threads; <code>threadIdx.x</code> goes from 0 to T - 1 in every block, and each block executes on one SM. Your GTX 1650 has 14 SMs. A unit of 32 threads is a warp. <span class="from">from: CUDA programming guide, your hardware table</span></p>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> With <code>&lt;&lt;&lt;2, 32&gt;&gt;&gt;</code>, if each thread owns place number <code>threadIdx.x</code>, block 1's thread 0 owns place ____ , the same as block ____ 's thread 0. Fix: own place <code>blockIdx.x * 32 + threadIdx.x</code>. Block 1's thread 0 now owns ____ . <span class="from">from: L02, L09</span></p>
+<details><summary>CHECK</summary>
+<pre>without blockIdx.x: block 1 thread 0 owns place 0, the same as block 0 thread 0 -&gt; two owners
+with blockIdx.x * 32 + threadIdx.x: block 1 thread 0 owns place 32</pre>
+</details>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> Warps for each launch: <code>&lt;&lt;&lt;14,128&gt;&gt;&gt;</code> = 14 x 4 = ____ , <code>&lt;&lt;&lt;28,64&gt;&gt;&gt;</code> = ____ , <code>&lt;&lt;&lt;7,256&gt;&gt;&gt;</code> = ____ . From L09, most SMs that can be working at once: ____ , ____ , ____ . <span class="from">from: L09</span></p>
+<details><summary>CHECK</summary>
+<pre>all three: 56 warps
+SMs at most busy: 14, 14, 7   (7 blocks, each on one SM)
+and none of them guarantees one block per SM: the hardware chooses where blocks go.</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L12</b> <b class="x">DO</b> Collect L03 (an exact split), L05 (4.72), L06 (5.98), L08 (one shared description breaks ownership), L10, L11 (56 warps, 7 SMs). Write one sentence on what a split must get right, and why "equal sizes" and "equal warp counts" are not it. <span class="from">from: L03, L05, L06, L08, L10, L11</span></p>
+<details><summary>CHECK</summary>
+<pre>A split must give every place exactly one owner (L03, L08, L10) and give every owner nearly the
+same WORK; equal numbers of places can carry very different work in this picture (4.72 against 5.98),
+and equal numbers of warps can leave half the SMs empty (7 of 14). Both checks are about what the
+workers actually do, not about how the split looks on paper.
+
+Tempting answer that fails: "1024 values of i over 6 equal workers gives 6 times". L05 computes 4.72.</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>Sharing work among many workers has two rules. Everything must be done exactly once, and nobody should be left with the hardest part. In this picture the hard part sits in the middle bands, so handing out the lines of the picture in turns (worker 1, 2, ..., 6, then again) shares the effort far better than handing out solid bands of them.</p>
+<p>For a manager: "we split it six ways" says nothing until you know whether the six shares are equal in effort, not in size.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>4.72 times, from the real repetition counts of the Lab 2 picture (a prediction from counts;
+your measured time will also include thread start-up and memory effects).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>Both <code>&lt;&lt;&lt;7,256&gt;&gt;&gt;</code> and <code>&lt;&lt;&lt;14,128&gt;&gt;&gt;</code> make 56 warps. Can the 7-block launch keep all 14 SMs working? Does the 14-block launch guarantee one block per SM? Prove each answer without assuming how the hardware places blocks.</p>
+<details><summary>CHECK</summary>
+<pre>7 blocks: no. A block executes on one SM, so 7 blocks occupy at most 7 SMs at any moment.
+14 blocks: no guarantee. The hardware chooses placement; if an SM has room for two of these blocks,
+it may take two while another SM takes none. Only a measurement (or a profiler's per-SM activity)
+shows the actual spread.</pre>
+</details>
+</div>
+
+<nav><a href="13-the-864-cliff.html">prev: 13 the 864 cliff</a><a href="15-trusting-a-number.html">next: 15 trusting a number</a></nav>
+</main>
+</body>
+</html>

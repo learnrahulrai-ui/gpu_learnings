@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Combining Speedups</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>16. Lab 2: do speedups multiply?</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>Lab 2 ends by combining everything: several independent sets of work inside each thread, many cores or SMs, and many threads per core or scheduler. Its last question asks whether the speedups of the separate techniques carry over when they are combined.</p>
+<p>The obvious approach is to multiply: if one technique gave 2 times and another 5 times, expect 10 times together. A more careful-looking approach is to multiply the step-by-step speedups along the way from the baseline to the final version and check that the product equals the total. That second check feels rigorous. The learner warned about exactly this kind of step: knowing a definition is different from deriving whether the step means anything.</p>
+<p>Does the step-by-step product test anything at all? And if not, which two measurements actually say whether a technique still helps once the others are in place?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>On your GTX 1650, going from 1 to 2 independent chains halved the cycles per multiply-add. Going from 2 to 4 chains: does it halve them again? Yes or no.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "What will make a student fail in each of the parts of the assignment due to memorization? Let's say there is somebody who has memorized all the things but still cannot reason it out."</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> Name five versions of the Lab 2 GPU program: B = one 32-thread unit, no extra independent sets; I = B plus independent sets in each thread; C = many SMs; T = many SMs and more threads per SM; F = T plus independent sets. Illustrative times from the tutor file (not measured): B = 120, I = 60, C = 24, T = 12, F = 10 ms. <span class="from">from: Lab 2 tutor file (illustrative numbers)</span></p>
+<p class="ln do"><b>L02</b> <b class="x">DO</b> B / I = ____ , B / C = ____ , C / T = ____ , T / F = ____ , B / F = ____ . <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>B/I = 2, B/C = 5, C/T = 2, T/F = 1.2, B/F = 12</pre>
+</details>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> Step-by-step product (B / C) x (C / T) x (T / F) = ____ . Compare with B / F = ____ . Now replace the times with any other numbers, for example B = 97, C = 41, T = 13, F = 7: product = ____ , B / F = ____ . Write the product as one fraction and cancel: ____ . <span class="from">from: L02</span></p>
+<details><summary>CHECK</summary>
+<pre>5 * 2 * 1.2 = 12 = B/F
+97/41 * 41/13 * 13/7 = 97/7 = 13.86 = B/F
+(B * C * T) / (C * T * F) = B / F: C and T cancel for ANY times, so the product always matches.
+The check can never fail, so it tests nothing.</pre>
+</details>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> If the independent sets kept their full gain of B / I after T was in place, F would be T / (B / I) = ____ ms. Illustrative F = 10. Gain the sets kept on top of T = T / F = ____ , against ____ alone. <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>predicted F = 12 / 2 = 6 ms; observed (illustrative) 10 ms
+the sets kept 1.2 times on top of T, against 2 times on their own</pre>
+</details>
+<p class="ln"><b>L05</b> Real measurements on your GTX 1650 (Lab 2 prelab, by subtraction of two lengths of each kernel): one chain of multiply-adds, 4 cycles per multiply-add (4.03 from 1055 - 281 over 192); two chains, 2 cycles (551 - 295 = 256 over 128); four chains, 2 cycles (1031 - 519 = 512 over 256). <span class="from">from: your output</span></p>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> Gain from 1 to 2 chains = 4 / 2 = ____ . Gain from 2 to 4 chains = 2 / 2 = ____ . The waiting between dependent multiply-adds is 4 cycles, and a 32-thread multiply-add takes 2 cycles to begin. Cycles of waiting left to fill with 2 chains = ____ . <span class="from">from: L05</span></p>
+<details><summary>CHECK</summary>
+<pre>1 to 2 chains: 2 times; 2 to 4 chains: 1 time (no gain)
+with 2 chains, two multiply-adds of 2 cycles each fill the 4-cycle wait: 0 cycles left</pre>
+</details>
+<p class="ln"><b>L07</b> Turing facts: an SM has 65,536 registers of 32 bits and holds at most 32 units of 32 threads (1,024 threads). Each independent set kept inside a thread needs its own carried values, so it raises the registers each thread uses. <span class="from">from: NVIDIA Turing Tuning Guide</span></p>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> Registers per thread if all 1,024 threads are held = 65,536 / 1,024 = ____ . A version using 72 per thread needs 72 x 1,024 = ____ , ____ more than exist. Does that prove the 72-register version is slower? ____ . <span class="from">from: L07</span></p>
+<details><summary>CHECK</summary>
+<pre>64 per thread; 72 * 1,024 = 73,728, which is 8,192 more than 65,536
+No: fewer threads fit at once, but if the remaining ones (with their extra independent sets)
+already fill every wait, the time may not change. Only a measurement decides.</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> Collect L03 (the product always equals B / F), L04 (2 alone, 1.2 on top of T), L06 (2 times, then nothing), L08 (more sets, fewer threads fit). Write one sentence on why techniques that each help alone can stop helping together, and which pair of measurements tests it. <span class="from">from: L03, L04, L06, L08</span></p>
+<details><summary>CHECK</summary>
+<pre>Independent sets inside a thread and more threads per scheduler fill the SAME waiting cycles;
+once one has filled them (L06: 2 chains already leave 0 cycles), the other has nothing left to
+fill, and extra sets also cost registers that reduce how many threads fit (L08). The test is
+B / I (the sets alone) against T / F (the sets on top of everything else), never the
+step-by-step product, which matches B / F for any numbers (L03).
+
+Tempting answer that fails: "the step-by-step speedups multiply to the total, so the techniques
+combine independently". L03 shows that product can never come out different.</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>Improvements that each work alone often work less together, because both are fixing the same problem: hardware waiting for results. Once the waiting is gone, the second fix has nothing to fix. A popular way of "checking" that improvements combine is actually guaranteed to agree, so it proves nothing.</p>
+<p>For a manager: when two optimizations are each worth 2 times, do not budget for 4. Ask for a measurement of each one with the other already in place.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>No. Measured on your GTX 1650: 4 cycles with one chain, 2 with two, still 2 with four.</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>With B = 120, I = 60, T = 12, F = 10 ms, someone says: "(B / T) x (T / F) = B / F, so the two techniques combine with no interference." What is wrong with the argument, and which ratios would you compare instead?</p>
+<details><summary>CHECK</summary>
+<pre>(B/T) * (T/F) = B/F for any numbers, so it carries no information about interference.
+Compare B/I = 2 (independent sets alone) with T/F = 1.2 (independent sets after T): the gain
+shrank from 2 to 1.2, so the techniques do interfere. Then look for the cause with register counts
+(-Xptxas -v) and a sweep, not with the ratios alone.</pre>
+</details>
+</div>
+
+<nav><a href="15-trusting-a-number.html">prev: 15 trusting a number</a><a href="failures.html">next: the failure list</a></nav>
+</main>
+</body>
+</html>

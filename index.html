@@ -54,7 +54,10 @@
   09 clock read trap --&gt; 10 cycles per FFMA --&gt; 11 program counter --&gt; 12 the 48
                                                                                   |
                                                                                   v
-                                                                          13 the 864 cliff</pre>
+                                                                          13 the 864 cliff
+                                                                                  |
+                                                                                  v
+                          14 ownership --&gt; 15 trusting a number --&gt; 16 combining speedups</pre>
 
 <ol class="topics" start="0">
 <li><a href="00-what-a-gpu-is.html">What a GPU is, measured on one laptop</a>: 896 arithmetic circuits against 48, four timings, and why the fastest result does not prove what it seems to.</li>
@@ -71,8 +74,11 @@
 <li><a href="11-program-counter.html">A program counter for every thread</a>: your "then the 32-thread unit is useless?" answered with counts.</li>
 <li><a href="12-the-48-trap.html">The 48 in warp_scheduler.cu</a>: the course machine's SM count written into a file that executes on your 14 SMs.</li>
 <li><a href="13-the-864-cliff.html">12.5 percent more work, 87 percent more time</a>: the course GPU at 768 and 864 sets of 32 threads, a second round of blocks, and the same reasoning for your laptop: 112 sets, not 224.</li>
+<li><a href="14-ownership.html">Who writes which place, and who finishes last</a>: the real Lab 2 picture split 6 ways, 4.72 times in bands against 5.98 in turns, and 1792 GPU threads that can use only 7 of 14 SMs.</li>
+<li><a href="15-trusting-a-number.html">What the two printed numbers can hide</a>: one wrong place prints 0.000000000477, and a version missing 1024 places prints 169 times less than a harmless rounding change.</li>
+<li><a href="16-combining-speedups.html">Do speedups multiply?</a>: a check that can never fail, and your own 4, 2, 2 cycles showing where the second technique stops helping.</li>
 </ol>
-<p>And: <a href="failures.html">the failure list</a>, 22 ways a clean-looking result goes wrong, each pointing to the page that works it out.</p>
+<p>And: <a href="failures.html">the failure list</a>, 30 ways a clean-looking result goes wrong, each pointing to the page that works it out.</p>
 </main>
 </body>
 </html>

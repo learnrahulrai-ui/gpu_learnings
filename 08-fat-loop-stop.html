@@ -136,6 +136,17 @@ the waste and the cycles separately, and the cycles win.</pre>
 
 </div>
 
+<div class="connect">
+<p class="label">Lab 2 changes line B</p>
+<p class="ln"><b>L20</b> The Lab 2 starter writes line B as <code>float y = w - (x2 + y2) + cy;</code>, where Lab 1 had <code>w - x2 - y2 + cy</code>. The chain is still 5 ops long, so L13's 20 cycles per repetition still hold under the same model. <span class="from">from: Lab 2 starter code</span></p>
+<p class="ln"><b>L21</b> The real Lab 2 picture is 1024 by 1024 with <code>max_iters = 2000</code>, inside a window 0.0001 wide. Computed in 32-bit fractions with the Lab 2 line, every place needs between 69 and 2000 repetitions, and 795 places reach 2000. L06's i = 40 data came from the Lab 1 picture, not this one. <span class="from">from: float32 computation on the Lab 2 starter's constants</span></p>
+<p class="ln do"><b>L22</b> <b class="x">DO</b> In this Lab 2 picture no place leaves the loop before repetition 69. Pair two sets of 8 there whose largest counts are 69 and 2000. Thin = (69 + 2000) x 20 = ____ cycles, fat = ____ x 20 = ____ . Saving = ____ percent. <span class="from">from: L13, L21</span></p>
+<details><summary>CHECK</summary>
+<pre>thin 41380, fat 40000, saving 1380 / 41380 = 3.3 percent
+the same lesson as L15: pair sets with similar counts, which in a zoomed picture means neighbours.</pre>
+</details>
+</div>
+
 <div class="plain">
 <p class="label">In plain words</p>
 <p>Combining two jobs into one loop means the loop ends when the slower job ends, so the faster job's share of the loop is wasted. It still pays when the hardware was otherwise idle, and it pays most when the two jobs are about the same size. Choosing which jobs to combine is part of the design.</p>

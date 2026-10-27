@@ -82,6 +82,26 @@ Prefer the learner's own invented words: image paper, graph paper, middleman pai
 - Every code block gets a "Read the code in English, line by line" panel under it.
 - Every technical word goes into `words.html`. Every new page gets a line in `symptoms.html`.
 
+## The method behind every page ("derive the need")
+
+From the owner's Lab 2 tutor file. For every technique or new word, in this order:
+
+1. Point to the current code and name the concrete failure or unused opportunity it shows.
+2. Describe the smallest change that removes that failure or uses that opportunity.
+3. Show which constraints remain and which new ones the change brings.
+4. Work a numerical example and a counterexample; find what cannot be shared or reordered.
+5. Predict speed and correctness before building, including the observation that would refute the prediction.
+6. Check the compiled machine instructions to confirm the change survived optimization.
+7. Check every output place before reading any timing.
+8. Measure fairly (same work, same timing method, same trial counts) and keep the raw numbers.
+9. Conclude only what the evidence allows; name competing explanations when unsure.
+
+A definition only names something already derived. When acting as a tutor, ask one hard question at a time and keep a ledger per step: KNOWN, PREDICTED, TESTED, STILL UNKNOWN.
+
+## Facts checked against the course repository
+
+Read from https://github.com/accelerated-computing-class/lab2: `warp_scheduler.cu` (the literal 48, block_size = 32 x 64, tile size argument unused, FLOPS = N x 5260 x 2 / time), `fma_latency.cu` (only `clock_cycle()`, no input-taking clock read), `mandelbrot_cpu_2.cpp` and `mandelbrot_gpu_2.cu` (1024 by 1024, max 2000, zoomed window, line B written as `w - (x2 + y2) + cy`, fastest-of-N timing with different trial counts per GPU call site). Use these files, not summaries, when a page states a fact about the lab.
+
 ## Checking
 
 `tools/check_banned.py` checks banned words, count-first sentences, forward-reference phrases, praise, common analogy phrases, and "think/imagine/understand" inside DO lines, on every `.html` page, skipping learner quotes. It cannot check the axiom rule, the honesty of numbers, or repetition; check those by reading every line yourself.

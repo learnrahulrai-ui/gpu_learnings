@@ -43,6 +43,14 @@
 <li><b>F20. More threads expected to fix a job limited by memory.</b> Adding two arrays moves 12 bytes per add. Fails because the time is set by bytes, not by arithmetic. Worked out: <a href="t1-add-two-arrays.html">T1</a>.</li>
 <li><b>F21. The plain-loop sum trusted as the exact answer.</b> Summed in order, 20 million ones give 16,777,216. Worked out: <a href="t2-sum-an-array.html">T2</a>.</li>
 <li><b>F22. A course file executed unchanged on different hardware.</b> Fails because hardware numbers written into the file describe the course machine. Worked out: <a href="12-the-48-trap.html">page 12</a>.</li>
+<li><b>F23. Equal bands of the picture given to equal workers.</b> On the real Lab 2 picture, 6 equal bands give 4.72 times; handing out lines in turns gives 5.98. Worked out: <a href="14-ownership.html">page 14</a>, L05 and L06.</li>
+<li><b>F24. A single shared argument block for every thread.</b> Workers read each other's descriptions, so some lines get two owners and some none. Worked out: <a href="14-ownership.html">page 14</a>, L08.</li>
+<li><b>F25. Equal thread counts taken as equal use of the GPU.</b> Launching 7 blocks of 256 threads makes the same 1792 threads as 14 blocks of 128, but can use only 7 of 14 SMs. Worked out: <a href="14-ownership.html">page 14</a>, L11.</li>
+<li><b>F26. A tiny average difference taken as correct.</b> A version missing 1024 places prints 0.0000448, less than a harmless rounding change. Worked out: <a href="15-trusting-a-number.html">page 15</a>, L05.</li>
+<li><b>F27. Fastest times from different numbers of trials compared directly.</b> The starter's GPU baseline is timed once, later versions three times. Worked out: <a href="15-trusting-a-number.html">page 15</a>, L06 and L07.</li>
+<li><b>F28. The step-by-step speedup product used as a test.</b> It equals the total speedup for any numbers. Worked out: <a href="16-combining-speedups.html">page 16</a>, L03.</li>
+<li><b>F29. A register budget overshoot taken as proof of a slowdown.</b> Fewer threads fit, but they may still fill every wait. Worked out: <a href="16-combining-speedups.html">page 16</a>, L08.</li>
+<li><b>F30. Lab 1's line B reused in Lab 2.</b> Same in exact arithmetic, different counts at 23.8 percent of the Lab 2 picture. Worked out: <a href="07-waiting-chain.html">page 07</a>, L21 and L22.</li>
 </ol>
 
 <nav><a href="index.html">index</a><a href="symptoms.html">start from your symptom</a></nav>

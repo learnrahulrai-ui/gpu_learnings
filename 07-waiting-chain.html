@@ -148,6 +148,32 @@ your measured begin rate, and the copies of L14 still cost registers.</pre>
 
 </div>
 
+<div class="connect">
+<p class="label">Lab 2 changes line B</p>
+<p class="ln"><b>L19</b> The Lab 2 starter file <code>mandelbrot_cpu_2.cpp</code>, read from the course repository, writes line B as shown here, where L01 had <code>w - x2 - y2 + cy</code>: <span class="from">from: Lab 2 starter code</span></p>
+<pre>float y = w - (x2 + y2) + cy;</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>float y = w - (x2 + y2) + cy;</code><span>First add x2 and y2, then subtract that sum from w, then add cy, and keep the result in y.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L20</b> <b class="x">DO</b> Split the new line B into ops as in L02: s = x2 + y2, t2 = w - s, y = t2 + cy. Depth of s = ____ , of t2 = ____ , of y = ____ . The while check before each repetition computes x2 + y2 too. If the compiler reuses that sum for s, ops per repetition = ____ . Longest chain = ____ . <span class="from">from: L02, L06, L07, L19</span></p>
+<details><summary>CHECK</summary>
+<pre>s depth 1, t2 depth 2, y depth 3: the same depths as op 3, op 4, op 5 had
+reusing the check's sum: 9 - 1 = 8 ops per repetition (a count, not read from a listing)
+longest chain still 5: w -&gt; t2 -&gt; y -&gt; z -&gt; w</pre>
+</details>
+<p class="ln"><b>L21</b> Computed in 32-bit fractions on the real Lab 2 picture (1024 by 1024, <code>max_iters = 2000</code>, the starter's window): the Lab 1 form and the Lab 2 form of line B give different iters at 249,479 of the 1,048,576 places. <span class="from">from: float32 computation on the Lab 2 starter's constants</span></p>
+<p class="ln do"><b>L22</b> <b class="x">DO</b> Share of places that changed = 249,479 / 1,048,576 = ____ percent. Both forms are the same in exact arithmetic. Write a sentence on what that means for comparing a Lab 2 result against a reference built with the Lab 1 line. <span class="from">from: L19, L21</span></p>
+<details><summary>CHECK</summary>
+<pre>23.8 percent of places changed
+In this deeply zoomed window, a one-step difference in rounding grows over hundreds of repetitions
+into a different count. A version using the Lab 1 line would fail the Lab 2 comparison at a quarter of
+the picture without any logic error. The starter's own line is the reference; copy it exactly.</pre>
+</details>
+</div>
+
 <div class="plain">
 <p class="label">In plain words</p>
 <p>Hardware can sit idle even when a program looks busy, because each step waits for the step before it. The fix is to give the hardware independent work to do during the wait. How much that fix is worth cannot be guessed from the code alone; it depends on how long the wait is compared with how fast the hardware can begin new work, and both have to be measured on the actual machine.</p>

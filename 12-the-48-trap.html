@@ -102,6 +102,29 @@ your laptop's curve than on the course machine's, so the two tables cannot be co
 </details>
 </div>
 
+<div class="connect">
+<p class="label">Read from the starter file itself</p>
+<p class="ln"><b>L15</b> The lines that build the launch in <code>warp_scheduler.cu</code>, copied from the course repository: <span class="from">from: Lab 2 starter code</span></p>
+<pre>uint32_t block_size = default_tile_size * num_threads_per_block;
+dim3 grid(N / block_size);
+tail_latency_fma&lt;default_num_ops, default_tile_size&gt;&lt;&lt;&lt;grid, block&gt;&gt;&gt;(in, out, N);
+int N = block_size * 48 * multiplier;
+double flops = ((double)N * default_num_ops * 2) / time_in_seconds;
+uint32_t warps = (N / block_size) * (num_threads_per_block / 32);</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>uint32_t block_size = default_tile_size * num_threads_per_block;</code><span>Numbers handled per block: the default tile size (32) times the threads per block (64 by default), 2048.</span></li>
+<li><code>dim3 grid(N / block_size);</code><span>Blocks to launch: N divided by 2048, in whole-number division.</span></li>
+<li><code>tail_latency_fma&lt;default_num_ops, default_tile_size&gt;&lt;&lt;&lt;grid, block&gt;&gt;&gt;(in, out, N);</code><span>Launch the kernel with the default tile size and number of updates fixed in; the tile size handed to this launcher is never used.</span></li>
+<li><code>int N = block_size * 48 * multiplier;</code><span>Total numbers for one setting of the sweep: 2048 times 48 times the multiplier. The 48 is typed in.</span></li>
+<li><code>double flops = ((double)N * default_num_ops * 2) / time_in_seconds;</code><span>Operations per second: every number gets 5260 multiply-adds, each counted as 2 operations, divided by the measured time.</span></li>
+<li><code>uint32_t warps = (N / block_size) * (num_threads_per_block / 32);</code><span>The printed warps: blocks times warps per block.</span></li>
+</ol>
+</div>
+<p class="ln"><b>L16</b> Every claim of L03 and L12 matches these lines. The file also times each setting 3 times, 10 launches each, and keeps the fastest. <span>So the 48 is now read from the file, not from a report.</span> <span class="from">from: L15, Lab 2 starter code</span></p>
+</div>
+
 <div class="plain">
 <p class="label">In plain words</p>
 <p>Lab files written for one machine carry that machine's numbers inside them. Executed on another machine they still produce a table that looks fine, and every line of it can be wrong in a way the table itself does not show. Before trusting a sweep, find every hardware number written into the program and replace it with yours.</p>

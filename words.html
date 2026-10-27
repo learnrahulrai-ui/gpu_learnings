@@ -45,9 +45,13 @@
 <dt>profiler</dt><dd>A tool (here NVIDIA Nsight Compute) that counts what the GPU did, such as memory requests and sectors.</dd>
 <dt>operations per byte</dt><dd>How many arithmetic operations a program does for each byte it moves to or from memory. Below what the hardware needs to stay busy, memory sets the time.</dd>
 <dt>operations per second (FLOP/s)</dt><dd>Arithmetic operations completed per second. A multiply-add counts as 2: one multiply and one add.</dd>
+<dt>owner</dt><dd>On this site: the worker (CPU thread or GPU thread) responsible for writing a given place of the output. A correct split gives every place exactly one owner.</dd>
+<dt>median</dt><dd>The middle value of a list once it is sorted. Of 10, 10, 11, 14, 30 it is 11.</dd>
 <dt>program counter</dt><dd>The address of the next instruction a thread will execute.</dd>
+<dt>pthread_create, pthread_join</dt><dd>CPU library calls: the first starts a new thread executing a given function; the second waits until that thread has finished.</dd>
 <dt>reduction</dt><dd>Turning many numbers into one, such as adding up an array. The work is easy to split; the dependence between partial results is the hard part.</dd>
 <dt>register</dt><dd>A small storage cell inside the processor chip. Arithmetic reads its inputs only from registers.</dd>
+<dt>register budget</dt><dd>On a Turing SM, 65,536 registers shared by every thread it holds; at 1,024 threads that is 64 per thread. The compiler reports a kernel's use with <code>-Xptxas -v</code>.</dd>
 <dt>repetition</dt><dd>A single trip through the lines inside a loop.</dd>
 <dt>scoreboard</dt><dd>A record inside the GPU of registers still waiting for a value; an instruction that needs one of them is held until it arrives.</dd>
 <dt>shared memory</dt><dd>Storage inside each SM that all threads of one block can read and write, much faster than the graphics card's memory chips. At most 64 KB per SM on Turing.</dd>

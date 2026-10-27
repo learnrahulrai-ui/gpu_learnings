@@ -182,6 +182,11 @@ It is small because it leaves out part of the chain.</pre>
 
 </div>
 
+<div class="connect">
+<p class="label">Checked against the course repository</p>
+<p class="ln"><b>L18</b> The Lab 2 starter <code>fma_latency.cu</code>, read from the course repository, defines only <code>clock_cycle()</code> exactly as in L01. It has no clock read that takes inputs. So any version like L11's <code>clock_cycle_dep2</code> is the learner's own addition, and the version written on this page is one possible form of it. <span class="from">from: Lab 2 starter code</span></p>
+</div>
+
 <div class="plain">
 <p class="label">In plain words</p>
 <p>A timer measures whatever the compiled program puts between its two readings, not what the source code appears to say. Compilers move instructions when nothing forbids it. The only way to know what was timed is to read the compiled instructions, and the way to control it is to make the readings depend on the values you care about.</p>
