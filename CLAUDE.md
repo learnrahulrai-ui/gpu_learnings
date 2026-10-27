@@ -11,7 +11,7 @@ The site turns long Claude/ChatGPT chats into exercise pages. Pages are plain HT
 - A reply in chat is at most one paragraph.
 
 ## Banned words and forms
-- spot, slot, run (runs, running, runtime), pass (passes), lane, group, row, column, pixel, coordinate (pixel and coordinate must never be used as if they mean the same thing), threshold, width, drop, starting cx / "starting" anything, calculated pair, bounded, escape (say "leave the while loop"), horizontal, vertical (say left, right, up, down), positions, shared instruction, link(s), warp, latency, throughput, pipelining, coalescing, and other bookish words.
+- spot, slot, run (runs, running, runtime), pass (passes), lane, group, row, column, pixel, coordinate (pixel and coordinate must never be used as if they mean the same thing), threshold, width, drop, starting cx / "starting" anything, calculated pair, bounded, escape (say "leave the while loop"), horizontal, vertical (say left, right, up, down), positions, shared instruction, link(s), warp (allowed only after a line defines it as NVIDIA's 32-thread unit, since `warp_scheduler.cu` uses it), latency, throughput, pipelining, coalescing, and other bookish words.
 - No sentence may begin with a count ("Two papers ...", "Three things ...", "8 lanes ...").
 - Prefer the learner's own words: image paper, graph paper, middleman pair/number, repetition, iters, index 0..7, fat while loop, nearby, chain. Code identifiers are always allowed.
 - Make up new names only when there is no other way, and define them in a line before using them (for example "index-repetition").

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cycles Per FFMA</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>10. Lab 2 prelab: cycles per FFMA from your own measurements</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
+
+<p class="you">Your words: "Write down your predicted cycle count for 64 multiply-adds per chain before you write any code ... explain this" / "you are introducing new ideas without deriving them"</p>
+
+<p class="ln"><b>L01</b> The timed loop of your <code>fma_latency</code> kernel, copied without change: <span class="from">from: your code</span></p>
+<pre>#pragma unroll
+for (int i = 0; i &lt; 64; ++i)
+    x = x * 1.0000001f + 0.00000001f;</pre>
+<p class="ln"><b>L02</b> Each line of the loop multiplies and adds in one instruction, named FFMA in the listing. Each FFMA reads the x that the FFMA before it wrote. So FFMA k cannot begin until FFMA k - 1 has its value. Call such a list of FFMAs a chain. <span class="from">from: L01, listing</span></p>
+<p class="ln"><b>L03</b> A cycle is one tick of the GPU clock. The kernel prints e - s, the cycles between the start clock read and the end clock read. <span class="from">from: code</span></p>
+<p class="ln"><b>L04</b> Your GTX 1650 printed, for L01 with 64 FFMAs in the chain: <code>Latency of fma_latency code snippet = 281 cycles</code>. <span class="from">from: your output</span></p>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> 281 / 64 = ____ . Write what else, besides the 64 FFMAs, sits between the reads: ____ . <span class="from">from: L03, L04</span></p>
+<details><summary>CHECK</summary>
+<pre>281 / 64 = 4.39
+also inside: the clock reads themselves, and the wait for the last FFMA if counted.
+4.39 spreads that fixed part over 64 FFMAs. It is not the cycles per FFMA.
+Dividing one measurement by a count is the interviewer's trap.</pre>
+</details>
+
+<p class="ln"><b>L06</b> Your copy-paste bug: <code>fma_latency_no_interleave</code> had both loops of 128 updating y, so it became one chain of 256 FFMAs. Your GTX 1650 printed <code>1055 cycles</code> for it. <span class="from">from: your output</span></p>
+<p class="ln"><b>L07</b> L04 and L06 have the same fixed part (same clock reads, same kind of chain). Subtracting them removes it. <span class="from">from: L04, L05, L06</span></p>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> Cycle difference = 1055 - 281 = ____ . FFMA difference = 256 - 64 = ____ . Cycles per FFMA in a chain = ____ . <span class="from">from: L07</span></p>
+<details><summary>CHECK</summary>
+<pre>1055 - 281 = 774
+256 - 64   = 192
+774 / 192  = 4.03  -&gt; 4 cycles from one FFMA beginning to the next in a chain</pre>
+</details>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> With 4 cycles per FFMA, the 64th FFMA of L01 begins ____ x 4 = ____ cycles after the 1st. The part of 281 outside the chain = 281 - ____ = ____ . <span class="from">from: L04, L08</span></p>
+<details><summary>CHECK</summary>
+<pre>63 * 4 = 252   (64 FFMAs have 63 gaps)
+281 - 252 = 29 cycles outside the chain</pre>
+</details>
+
+<p class="ln"><b>L10</b> Your interleaved kernel: two chains, x and y, each FFMA of x followed by an FFMA of y. No FFMA of y reads x, and no FFMA of x reads y. <span class="from">from: your code</span></p>
+<p class="ln"><b>L11</b> Your GTX 1650 printed: 64 FFMAs per chain (128 in all) = <code>295 cycles</code>; 128 per chain (256 in all) = <code>551 cycles</code>. <span class="from">from: your output</span></p>
+<p class="ln do"><b>L12</b> <b class="x">DO</b> Same subtraction as L07. Cycle difference = ____ . FFMA difference = ____ . Cycles per FFMA = ____ . Cycles per step of both chains (an x FFMA plus a y FFMA) = ____ . <span class="from">from: L07, L11</span></p>
+<details><summary>CHECK</summary>
+<pre>551 - 295 = 256
+256 - 128 = 128
+256 / 128 = 2 cycles per FFMA
+4 cycles per x-and-y step: two FFMAs in the 4 cycles where one chain alone had one</pre>
+</details>
+
+<p class="ln"><b>L13</b> L12 has competing explanations. Guess A: one FFMA can begin every cycle, so k chains give 4 / k cycles per FFMA, never below 1. Guess B: each FFMA keeps the multiply units busy for 2 cycles, so never below 2. <span class="from">from: L08, L12</span></p>
+<p class="ln do"><b>L14</b> <b class="x">DO</b> With 2 chains, guess A predicts ____ and guess B predicts ____ . Can L12 tell them apart? ____ . With 4 chains, guess A predicts ____ and guess B predicts ____ . <span class="from">from: L13</span></p>
+<details><summary>CHECK</summary>
+<pre>2 chains: A gives 4/2 = 2, B gives 2  -&gt; same, L12 cannot decide
+4 chains: A gives 4/4 = 1, B gives 2  -&gt; different, a 4-chain measurement decides</pre>
+</details>
+<p class="ln do"><b>L15</b> <b class="x">DO</b> Your GTX 1650 printed, 4 chains: 64 per chain = <code>519 cycles</code>, 128 per chain = <code>1031 cycles</code>. Cycle difference = ____ . FFMA difference = 4 x 128 - 4 x 64 = ____ . Cycles per FFMA = ____ . Which guess survives? ____ . <span class="from">from: L07, L14, your output</span></p>
+<details><summary>CHECK</summary>
+<pre>1031 - 519 = 512
+512 - 256  = 256
+512 / 256  = 2  -&gt; guess A is wrong, guess B survives</pre>
+</details>
+<p class="ln do"><b>L16</b> <b class="x">DO</b> Published Turing layout: the chip is built from units NVIDIA calls SMs (your GTX 1650 has 14). Each SM has 64 FP32 units (circuits that do one float multiply-add for one thread) and 4 schedulers (circuits that pick which instruction begins). Each scheduler gets 64 / 4 of the FP32 units. FP32 units per scheduler = ____ . An FFMA instruction is for 32 threads. Cycles to feed 32 threads through those units = ____ . Matches L15? ____ . <span class="from">from: NVIDIA Turing documentation, L15</span></p>
+<details><summary>CHECK</summary>
+<pre>64 / 4 = 16 FP32 units per scheduler
+32 / 16 = 2 cycles
+matches the measured 2. The layout is published; only the 2 is your measurement.</pre>
+</details>
+
+<p class="ln"><b>L17</b> A float stores 1.0 plus multiples of 2 to the power -23 = 0.00000011920929 between 1 and 2. A typed constant becomes the nearest such value. <span class="from">from: IEEE 754 float32</span></p>
+<p class="ln do"><b>L18</b> <b class="x">DO</b> Half of 0.00000011920929 = ____ . Which constant becomes exactly 1.0: 1.00000001f, 1.0000001f, or 1.0000002f? ____ . 1.0000001f becomes 1 + ____ x 0.00000011920929. Your listing showed <code>MOV R2, 0x3f800001</code> and <code>MOV R0, 0x3f800002</code>; 1.0 is 0x3f800000. Which constants are those? ____ . <span class="from">from: L17, your listing</span></p>
+<details><summary>CHECK</summary>
+<pre>half = 0.0000000596
+1.00000001f: 0.00000001 is less than half -&gt; becomes exactly 1.0 (0x3f800000)
+1.0000001f  -&gt; 1 + 1 * 0.00000011920929 = 1.00000011920929 = 0x3f800001
+1.0000002f  -&gt; 1 + 2 * 0.00000011920929 = 1.00000023841858 = 0x3f800002
+A chain multiplying by exactly 1.0 may be simplified by the compiler.</pre>
+</details>
+<p class="ln do"><b>L19</b> <b class="x">DO</b> x and y both begin as <code>*n</code>. If both chains use the same two constants, after every step y equals ____ . What may the compiler then compute instead of two chains? ____ . <span class="from">from: L10</span></p>
+<details><summary>CHECK</summary>
+<pre>y equals x at every step
+the compiler may compute one chain and copy it -&gt; you measure 1 chain, not 2.
+So the y chain uses 1.0000002f and 0.00000002f.</pre>
+</details>
+<p class="ln do"><b>L20</b> <b class="x">DO</b> After the bug fix, <code>fma_latency_no_interleave</code> had all 128 x FFMAs, then all 128 y FFMAs in the source. Your GTX 1650 printed <code>551 cycles</code>, and its listing alternated R3, R5, R3, R5. The chip begins instructions in listing order. Who put x and y side by side? ____ . <span class="from">from: L11, your output, your listing</span></p>
+<details><summary>CHECK</summary>
+<pre>the compiler: it reordered the two loops into one alternating stream.
+same listing, same 551 as the interleaved kernel.</pre>
+</details>
+
+<nav><a href="09-clock-read-trap.html">prev: 09 clock read trap</a><a href="11-program-counter.html">next: 11 a program counter for every thread</a></nav>
+</main>
+</body>
+</html>

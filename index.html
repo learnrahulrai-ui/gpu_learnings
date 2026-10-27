@@ -9,7 +9,7 @@
 <body>
 <main>
 <h1>GPU Learnings: do it, don't read it</h1>
-<p class="sub">Made from one real chat working through MIT 6.S894 Lab 1 (Mandelbrot on CPU, CPU SIMD, GPU) and Lab 2, on a Ryzen 5 4600H and a GTX 1650.</p>
+<p class="sub">Made from real chats working through MIT 6.S894 Lab 1 (Mandelbrot on CPU, CPU SIMD, GPU) and the Lab 2 prelab (fma_latency, warp_scheduler), on a Ryzen 5 4600H and a GTX 1650.</p>
 
 <p>Each page begins from zero. Each line uses only what the lines above it made, and a grey note names the line it takes from. Each page quotes the exact place the learner got stuck, then hands you real numbers to calculate. The 65536 iters values used here add up to 16274722, the same "CPU total" the machine printed. Pencil and paper. Fill every ____ before you open CHECK.</p>
 
@@ -19,7 +19,10 @@
   04 eight cx values  ---------&gt; 05 SIMD while loop  --&gt; 06 GPU threads
                                       |
                                       v
-                          07 which line waits --&gt; 08 fat loop stop</pre>
+                          07 which line waits --&gt; 08 fat loop stop
+                                      |
+                                      v
+  09 clock read trap --&gt; 10 cycles per FFMA --&gt; 11 program counter --&gt; 12 the 48</pre>
 
 <ol class="topics">
 <li><a href="01-image-to-middleman.html">From (i, j) to the middleman pair (cx, cy)</a>: where 2.5 and -2.0 come from, and why (9, 7) gives different (cx, cy) for different img_size.</li>
@@ -30,6 +33,10 @@
 <li><a href="06-gpu-threads.html">GPU: one changed line, and the proof of "nearby"</a>: the profiler's 2,048 and 8,192 derived by hand, and 22.06 predicted against 22.75 measured.</li>
 <li><a href="07-waiting-chain.html">Lab 2: which line waits for which line</a>: a chain of 5 inside 9 ops, and 11 cycles with nothing beginning.</li>
 <li><a href="08-fat-loop-stop.html">Lab 2: when does the fat while loop stop?</a>: wrong stopping tests, the right one, and more useless work for fewer cycles.</li>
+<li><a href="09-clock-read-trap.html">Lab 2 prelab: what sits between the clock reads</a>: the add that the compiler moved inside the timer, read off your own listing.</li>
+<li><a href="10-cycles-per-ffma.html">Lab 2 prelab: cycles per FFMA</a>: 281, 1055, 295, 551, 519, 1031 cycles from your GPU, subtracted into 4 and 2, and the constant that silently became 1.0.</li>
+<li><a href="11-program-counter.html">A program counter for every thread</a>: your "then the 32-thread unit is useless?" answered with counts.</li>
+<li><a href="12-the-48-trap.html">The 48 in warp_scheduler.cu</a>: the course machine's SM count written into a file that executes on your 14 SMs.</li>
 </ol>
 </main>
 </body>

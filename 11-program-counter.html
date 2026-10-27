@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Program Counter</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>11. A program counter for every thread: is the 32-thread unit useless?</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
+
+<p class="you">Your words: "People say warp run in lockstep that is impossible to select a warp and a real instructions there is no way to know which of the 32 is waiting on which line" / "that will require two program counters, right? ... The program counter never goes back" / "So program counter are distinct, right, per thread? Then the concept of warp is useless, right?"</p>
+
+<p class="ln"><b>L01</b> A program counter is the address of the next instruction a thread will execute. After an instruction, it moves to the next address, or to a branch target. <span class="from">from: definition</span></p>
+<p class="ln"><b>L02</b> NVIDIA fact: a launch <code>&lt;&lt;&lt;B, T&gt;&gt;&gt;</code> makes B blocks of T threads each. Your GTX 1650 chip is built from 14 units NVIDIA calls SMs; each block executes on one SM. An SM handles a block's threads in units of 32 consecutive threads. NVIDIA names such a unit a warp; your lab file <code>warp_scheduler.cu</code> is named after it. Threads 0 to 31 of a block form warp 0. <span class="from">from: CUDA programming guide, SIMT architecture</span></p>
+<p class="ln"><b>L03</b> NVIDIA fact: a warp executes one common instruction at a time. Each instruction that begins is for the threads of the warp whose program counter is at that instruction. <span class="from">from: CUDA programming guide, SIMT architecture</span></p>
+<p class="ln"><b>L04</b> NVIDIA fact: from Volta onward, which includes your Turing GTX 1650 (sm_75), every thread keeps its own program counter. NVIDIA calls this Independent Thread Scheduling. <span class="from">from: CUDA programming guide, Volta Independent Thread Scheduling</span></p>
+<p class="ln"><b>L05</b> Take this code in warp 0, with a and b in registers: <span class="from">from: example</span></p>
+<pre>0x100:  if (threadIdx.x &lt; 16)  a = a + 1;     // ADD
+0x200:  else                   b = b * 2;     // MUL
+0x300:  /* both sides continue here */</pre>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> After the <code>if</code>, the program counter of threads 0 to 15 = ____ , of threads 16 to 31 = ____ . From L03, can ADD and MUL begin as one instruction? ____ . <span class="from">from: L01, L03, L04, L05</span></p>
+<details><summary>CHECK</summary>
+<pre>threads 0..15  -&gt; 0x100 (ADD)
+threads 16..31 -&gt; 0x200 (MUL)
+no: one instruction at a time. ADD begins for 0..15, then MUL begins for 16..31 (or MUL first).</pre>
+</details>
+<p class="ln do"><b>L07</b> <b class="x">DO</b> Fill the program counters after each instruction begins. <span class="from">from: L03, L04, L06</span></p>
+<pre>moment               | PC of threads 0..15 | PC of threads 16..31
+---------------------+---------------------+---------------------
+after the if         | 0x100               | 0x200
+after ADD begins     | ______              | ______
+after MUL begins     | ______              | ______</pre>
+<details><summary>CHECK</summary>
+<pre>after ADD begins | 0x300 | 0x200   (16..31 wait; their PC stays at 0x200)
+after MUL begins | 0x300 | 0x300   (all 32 back at one address)
+No PC went backward. Two PCs held two different values for a while: that is L04.</pre>
+</details>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> Each instruction that begins has room for 32 threads. L07 began ____ instructions, room = ____ x 32 = ____ thread-instructions. Thread-instructions that did work = ____ . Percent = ____ . <span class="from">from: L03, L07</span></p>
+<details><summary>CHECK</summary>
+<pre>2 instructions, room 64, work 16 + 16 = 32, 50 percent</pre>
+</details>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> Your question: if PCs are per thread, why keep the 32-thread unit? Case 1: all 32 PCs equal at every instruction, 100 instructions of work each. Instructions that begin = ____ . Case 2: all 32 PCs different at every instruction, 100 instructions each. Instructions that begin = ____ . <span class="from">from: L03, L08</span></p>
+<details><summary>CHECK</summary>
+<pre>case 1: 100 instructions begin, each for 32 threads
+case 2: 32 * 100 = 3200 instructions begin, each for 1 thread
+Per-thread PCs make case 2 legal. The 32-thread unit makes case 1 32 times cheaper.
+Not useless: equal PCs are what the speed comes from; per-thread PCs only make unequal ones correct.</pre>
+</details>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> Real data from Lab 1, GPU, <code>&lt;&lt;&lt;1, 32&gt;&gt;&gt;</code>, i = 40, j = 160 to 191: each of the 32 threads executes the Mandelbrot while loop; their iters are different, largest 1000, sum 1334. The while loop's instructions begin until the last thread leaves: ____ repetitions for 32 threads each. Room = ____ thread-repetitions. Work = ____ . Percent = ____ . <span class="from">from: L03, L08, Lab 1 data</span></p>
+<details><summary>CHECK</summary>
+<pre>1000 repetitions, room 32 * 1000 = 32000, work 1334, 4.2 percent
+Same mechanism as L07, stretched over 1000 repetitions.</pre>
+</details>
+
+<nav><a href="10-cycles-per-ffma.html">prev: 10 cycles per FFMA</a><a href="12-the-48-trap.html">next: 12 the 48 in warp_scheduler.cu</a></nav>
+</main>
+</body>
+</html>
