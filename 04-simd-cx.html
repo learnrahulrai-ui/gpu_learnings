@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIMD cx Values</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>04. SIMD: eight cx values from one number</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
+
+<p class="you">Your words: "Zero to seven makes no sense, right? They are alien to me. This program never specified this floating point numbers." / "CX itself is just one number, not eight numbers. DX is just one number. Only offsets are eight numbers, right?" / "Why is the calculation of CY vector so easy?"</p>
+
+<p class="ln"><b>L01</b> The scalar lab code makes the middleman pair for one (i, j), copied without change: <span class="from">from: code</span></p>
+<pre>float cx = (float(j) / float(img_size)) * 2.5f - 2.0f;
+float cy = (float(i) / float(img_size)) * 2.5f - 1.25f;</pre>
+<p class="ln"><b>L02</b> Your machine gave <code>img_size = 256</code>. Your CPU is a Ryzen 5 4600H, which has AVX2. <span class="from">from: your output</span></p>
+<p class="ln"><b>L03</b> An AVX2 variable of type <code>__m256</code> holds 256 bits. A <code>float</code> holds 32 bits. 256 / 32 = 8, so one <code>__m256</code> holds 8 floats, at index 0 to index 7. <span class="from">from: L02</span></p>
+<p class="ln"><b>L04</b> An instruction named <code>_mm256_..._ps</code> does one operation on all 8 floats: index 0 with index 0, index 1 with index 1, up to index 7 with index 7. <span class="from">from: L03</span></p>
+<p class="ln"><b>L05</b> The vector code puts 8 neighbours into one <code>__m256</code>: same i, and j, j+1, ..., j+7 at index 0, 1, ..., 7. So its j for loop steps by 8. <span class="from">from: L03, L04</span></p>
+<p class="ln"><b>L06</b> Your vector code, copied without change: <span class="from">from: your code</span></p>
+<pre>__m256 offsets = _mm256_set_ps(7, 6, 5, 4, 3, 2, 1, 0);
+float  dx      = 2.5f / float(img_size);
+for (uint64_t i = 0; i &lt; img_size; ++i) {
+    float  cy     = (float(i) / float(img_size)) * 2.5f - 1.25f;
+    __m256 cy_vec = _mm256_set1_ps(cy);
+    for (uint64_t j = 0; j &lt; img_size; j += 8) {
+        float  cx     = (float(j) / float(img_size)) * 2.5f - 2.0f;
+        __m256 cx_vec = _mm256_fmadd_ps(offsets, _mm256_set1_ps(dx), _mm256_set1_ps(cx));
+        /* the while loop works on cx_vec, cy_vec here */
+    }
+}</pre>
+
+<p class="ln"><b>L07</b> From L01, cy reads only i. From L05, all 8 indexes have the same i. So all 8 indexes need the same cy. <span class="from">from: L01, L05</span></p>
+<p class="ln"><b>L08</b> <code>_mm256_set1_ps(v)</code> writes the one float v into all 8 indexes. <span class="from">from: intrinsic definition</span></p>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> Take i = 40. cy = 40/256 x 2.5 - 1.25 = ____ . Write cy_vec, index 0 to 7: ____ . How many times does L06 compute cy for the whole image? ____ . <span class="from">from: L06, L07, L08</span></p>
+<details><summary>CHECK</summary>
+<pre>40/256 = 0.15625    * 2.5 = 0.390625    - 1.25 = -0.859375
+cy_vec = -0.859375 at index 0, 1, 2, 3, 4, 5, 6, 7
+cy is computed once per i: 256 times.
+It sits above the j for loop because nothing in it changes when j changes.
+That is why cy_vec is "easy": L07 makes it one number copied 8 times.</pre>
+</details>
+
+<p class="ln"><b>L10</b> From L01, cx reads j. From L05, the 8 indexes have 8 different j. So cx_vec needs 8 different values. <span class="from">from: L01, L05</span></p>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> Take j = 208. Use L01 long-hand for each index. <span class="from">from: L01, L05, L10</span></p>
+<pre>index | j   | j / 256      | times 2.5     | minus 2.0 = cx
+------+-----+--------------+---------------+---------------
+  0   | 208 | 0.8125       | 2.03125       | 0.03125
+  1   | 209 | __________   | ___________   | ___________
+  3   | 211 | __________   | ___________   | ___________
+  7   | 215 | __________   | ___________   | ___________</pre>
+<details><summary>CHECK</summary>
+<pre>index 1: 209/256 = 0.81640625   * 2.5 = 2.041015625   cx = 0.041015625
+index 3: 211/256 = 0.82421875   * 2.5 = 2.060546875   cx = 0.060546875
+index 7: 215/256 = 0.83984375   * 2.5 = 2.099609375   cx = 0.099609375</pre>
+</details>
+<p class="ln do"><b>L12</b> <b class="x">DO</b> Subtract index 0's cx from L11: index 1 minus index 0 = ____ . Index 3 minus index 0 = ____ . Index 7 minus index 0 = ____ . Divide each by 2.5 / 256 = ____ : ____ , ____ , ____ . <span class="from">from: L11</span></p>
+<details><summary>CHECK</summary>
+<pre>0.009765625 , 0.029296875 , 0.068359375
+2.5 / 256 = 0.009765625
+divided: 1 , 3 , 7     = the index itself
+cx at index k = (cx at index 0) + k * 0.009765625</pre>
+</details>
+<p class="ln"><b>L13</b> From L06, <code>dx = 2.5f / float(img_size)</code> = 2.5 / 256 = 0.009765625, the number found in L12. <span class="from">from: L06, L12</span></p>
+<p class="ln"><b>L14</b> From L12 and L13, each index k needs k times dx plus cx of index 0. The numbers k = 0 to 7 are the offsets. The problem never typed them; L12 forces them out of L01. <span class="from">from: L12, L13</span></p>
+<p class="ln"><b>L15</b> <code>_mm256_fmadd_ps(a, b, c)</code> computes a times b plus c at each index. <span class="from">from: intrinsic definition</span></p>
+<p class="ln do"><b>L16</b> <b class="x">DO</b> Fill the last line with L15, using a = offsets, b = set1(dx), c = set1(cx) from L06. <span class="from">from: L06, L08, L13, L14, L15</span></p>
+<pre>index            :  0          1          2          ...   7
+a = offsets      :  0          1          2          ...   7
+b = set1(dx)     :  0.009765625 (all 8)
+c = set1(cx)     :  0.03125     (all 8, cx of j = 208)
+a*b + c          :  ________   ________   ________   ...   ________</pre>
+<details><summary>CHECK</summary>
+<pre>index 0: 0 * 0.009765625 + 0.03125 = 0.03125
+index 1: 1 * 0.009765625 + 0.03125 = 0.041015625
+index 2: 2 * 0.009765625 + 0.03125 = 0.05078125
+index 7: 7 * 0.009765625 + 0.03125 = 0.099609375    same as L11
+(exact here because 256 is a power of 2; your machine reported 0 mismatches)</pre>
+</details>
+
+<p class="ln"><b>L17</b> <code>_mm256_set_ps</code> takes its first argument into index 7 and its last argument into index 0. So <code>_mm256_set_ps(7, 6, 5, 4, 3, 2, 1, 0)</code> gives index k the value k. <span class="from">from: intrinsic definition</span></p>
+<p class="ln do"><b>L18</b> <b class="x">DO</b> Suppose you typed <code>_mm256_set_ps(0, 1, 2, 3, 4, 5, 6, 7)</code>. Index 0 now holds ____ . Index 0 stores into j = 208, but its cx = ____ , which L11 gives to j = ____ . <span class="from">from: L11, L16, L17</span></p>
+<details><summary>CHECK</summary>
+<pre>index 0 holds 7
+cx = 7 * 0.009765625 + 0.03125 = 0.099609375  -&gt; the cx of j = 215
+Each block of 8 comes out mirror-reversed: j = 208 gets the iters of 215,
+209 gets 214, ..., 215 gets 208. Every iters value is right, stored in the wrong place.
+A compare against the scalar output catches it; looking at the image may not.</pre>
+</details>
+
+<nav><a href="03-the-w-line.html">prev: 03 the w line</a><a href="05-simd-while-loop.html">next: 05 SIMD and the while loop</a></nav>
+</main>
+</body>
+</html>

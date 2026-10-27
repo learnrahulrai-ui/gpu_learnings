@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIMD While Loop</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>05. SIMD and the while loop: eight iters, one loop</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
+
+<p class="you">Your words: "SIMD does not even understand while loop. So where is the connection between this while loop and SIMD?" / "How can I tell SIMD that don't update 8, 9 but only update 10, 11, 12?" / "Suppose one square finishes after two repetitions, but another needs five. There is no way to know." / "It just happens that the mask contains negative numbers, right?"</p>
+
+<p class="ln"><b>L01</b> The scalar while loop, for one (i, j), copied with lines A to F shortened to a comment: <span class="from">from: code</span></p>
+<pre>while (x2 + y2 &lt;= 4.0f &amp;&amp; iters &lt; max_iters) {
+    /* lines A to F: x, y, x2, y2, z, w */
+    ++iters;
+}
+out[i * img_size + j] = iters;</pre>
+<p class="ln"><b>L02</b> Each (i, j) leaves this loop after its own number of repetitions, so each (i, j) gets its own iters. <span class="from">from: L01</span></p>
+<p class="ln"><b>L03</b> Your vector code holds 8 neighbours in one <code>__m256</code>: same i, j to j+7 at index 0 to 7. One <code>_mm256_..._ps</code> instruction does one operation at all 8 indexes. <span class="from">from: your code, AVX2</span></p>
+<p class="ln"><b>L04</b> From L02 and L03, the 8 indexes need different numbers of repetitions, but L03 makes every instruction act on all 8. That is the conflict. <span class="from">from: L02, L03</span></p>
+<p class="ln"><b>L05</b> Your vector while loop, with the two lines above it that set <code>four</code> and <code>iters_vec</code>: <span class="from">from: your code</span></p>
+<pre>__m256  four      = _mm256_set1_ps(4.0f);
+__m256i iters_vec = _mm256_setzero_si256();
+uint32_t iter = 0;
+while (iter &lt; max_iters) {
+    __m256 mask = _mm256_cmp_ps(_mm256_add_ps(x2_vec, y2_vec), four, _CMP_LE_OQ);
+    if (_mm256_testz_ps(mask, mask)) break;
+    iters_vec = _mm256_sub_epi32(iters_vec, _mm256_castps_si256(mask));
+    /* lines A to F, each one an _mm256_..._ps instruction */
+    ++iter;
+}</pre>
+<p class="ln"><b>L06</b> L05 holds two counters. <code>iter</code> is one number: how many times the while loop repeated. <code>iters_vec</code> holds 8 numbers: one iters per index. <span class="from">from: L05</span></p>
+<p class="ln"><b>L07</b> <code>_mm256_cmp_ps(..., _CMP_LE_OQ)</code> checks x2 + y2 &lt;= 4 at each index. True writes 32 bits all 1 at that index. False writes 32 bits all 0. That is <code>mask</code>. <span class="from">from: L05, intrinsic definition</span></p>
+<p class="ln"><b>L08</b> <code>_mm256_testz_ps(mask, mask)</code> returns 1 when all 256 bits of mask are 0. Then <code>break</code> leaves the while loop. <span class="from">from: L05, intrinsic definition</span></p>
+
+<p class="ln"><b>L09</b> Real data. The scalar code of L01 gives these iters for i = 40, j = 208 to 215 (<code>img_size = 256</code>, <code>max_iters = 1000</code>). Adding the scalar iters of all 65536 (i, j) gives 16274722, which is the "CPU total" your machine printed. <span class="from">from: L01, your output</span></p>
+<pre>index      :   0    1    2    3    4    5    6    7
+j          : 208  209  210  211  212  213  214  215
+scalar iters:  12    8    7    6    6    6    5    5</pre>
+<p class="ln"><b>L10</b> From L01, an index with scalar iters c has x2 + y2 &lt;= 4 true before repetitions 1, 2, ..., c, and false before repetition c + 1. <span class="from">from: L01, L09</span></p>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> Fill mask with T (all 1) or F (all 0) before each repetition, using L10. <span class="from">from: L07, L08, L09, L10</span></p>
+<pre>before repetition | index 0  1  2  3  4  5  6  7 | testz returns 1 ?
+------------------+------------------------------+------------------
+        1         |       T  T  T  T  T  T  T  T | no
+        6         |       _  _  _  _  _  _  _  _ | ___
+        7         |       _  _  _  _  _  _  _  _ | ___
+        9         |       _  _  _  _  _  _  _  _ | ___
+       13         |       _  _  _  _  _  _  _  _ | ___</pre>
+<details><summary>CHECK</summary>
+<pre>before repetition | index 0  1  2  3  4  5  6  7 | testz
+        1         |       T  T  T  T  T  T  T  T | no
+        6         |       T  T  T  T  T  T  F  F | no
+        7         |       T  T  T  F  F  F  F  F | no
+        9         |       T  F  F  F  F  F  F  F | no
+       13         |       F  F  F  F  F  F  F  F | yes -&gt; break
+T before repetition p exactly when p &lt;= scalar iters</pre>
+</details>
+
+<p class="ln do"><b>L12</b> <b class="x">DO</b> Take 32 bits all 1 as an integer and add 1 in binary. Each 1 + 1 gives 0 and carries 1, all the way up. The carry out of bit 31 does not fit in 32 bits. The 32 bits left are ____ . So the integer with all 32 bits 1 is ____ . <span class="from">from: L07</span></p>
+<details><summary>CHECK</summary>
+<pre>  11111111 11111111 11111111 11111111
++                                   1
+= 1 00000000 00000000 00000000 00000000   (the leading 1 does not fit in 32 bits)
+32 bits left: all 0, which is 0
+the number that becomes 0 when 1 is added is -1
+all 32 bits 1, read as a signed 32-bit integer = -1</pre>
+</details>
+<p class="ln"><b>L13</b> <code>_mm256_castps_si256(mask)</code> changes no bit. It only lets the next instruction read the 8 values as 32-bit integers: T reads as -1, F reads as 0. <span class="from">from: L07, L12</span></p>
+<p class="ln"><b>L14</b> <code>_mm256_sub_epi32(iters_vec, m)</code> does iters minus m at each index. T index: iters - (-1) = iters + 1. F index: iters - 0 = iters. <span class="from">from: L05, L13</span></p>
+<p class="ln do"><b>L15</b> <b class="x">DO</b> Fill iters_vec after each repetition, using L11 and L14. <span class="from">from: L11, L14</span></p>
+<pre>after repetition | index 0  1  2  3  4  5  6  7
+-----------------+------------------------------
+        1        |       1  1  1  1  1  1  1  1
+        5        |       _  _  _  _  _  _  _  _
+        6        |       _  _  _  _  _  _  _  _
+        7        |       _  _  _  _  _  _  _  _
+       12        |       _  _  _  _  _  _  _  _</pre>
+<details><summary>CHECK</summary>
+<pre>after repetition | index 0  1  2  3  4  5  6  7
+        1        |       1  1  1  1  1  1  1  1
+        5        |       5  5  5  5  5  5  5  5
+        6        |       6  6  6  6  6  6  5  5
+        7        |       7  7  7  6  6  6  5  5
+       12        |      12  8  7  6  6  6  5  5   == scalar iters of L09
+No index was ever asked "did you finish". Its own mask value stopped its own count.</pre>
+</details>
+
+<p class="ln"><b>L16</b> After index 6 gets F, lines A to F still compute at index 6, because L03 makes every instruction act on all 8. Only its iters stays the same. Can index 6 get T again later? <span class="from">from: L03, L14</span></p>
+<p class="ln do"><b>L17</b> <b class="x">DO</b> Use real values: the scalar loop for i = 128, j = 255 has cx = 0.490234, cy = 0, and after repetition 5 has x2 = 8.167644, y2 = 0 (check false). Do one more repetition anyway: x = 8.167644 - 0 + 0.490234 = ____ , x2 = ____ . Check x2 + y2 &lt;= 4: ____ . <span class="from">from: L01, L16</span></p>
+<details><summary>CHECK</summary>
+<pre>x = 8.657878    x2 = 74.958850    74.958850 &lt;= 4 is false
+Once farther than 2 from (0, 0), squaring makes it farther again.
+Far enough, the float becomes inf, then NaN; _CMP_LE_OQ gives F for NaN.
+F stays F.</pre>
+</details>
+
+<p class="ln"><b>L18</b> A repetition of L05 does lines A to F at 8 indexes. Name one index doing one repetition an index-repetition. A repetition of L05 always costs 8 index-repetitions. <span class="from">from: L03, L05</span></p>
+<p class="ln"><b>L19</b> The index-repetitions that change some iters are useful. Their count is the sum of the scalar iters. <span class="from">from: L14, L18</span></p>
+<p class="ln do"><b>L20</b> <b class="x">DO</b> For L09: repetitions of L05 = ____ . Index-repetitions = ____ x 8 = ____ . Useful = 12+8+7+6+6+6+5+5 = ____ . Useless = ____ . <span class="from">from: L11, L18, L19</span></p>
+<details><summary>CHECK</summary>
+<pre>repetitions = 12 (break before repetition 13)
+index-repetitions = 12 * 8 = 96
+useful = 55     useless = 41</pre>
+</details>
+<p class="ln do"><b>L21</b> <b class="x">DO</b> Real data for i = 22, j = 184 to 191, scalar iters: 7, 8, 10, 15, 154, 1000, 13, 10. Index 5 is T forever, so which ends the loop, testz or <code>iter &lt; max_iters</code>? ____ . Repetitions = ____ . Index-repetitions = ____ . Useful = ____ . Useful percent = ____ . <span class="from">from: L05, L08, L18, L19</span></p>
+<details><summary>CHECK</summary>
+<pre>testz never returns 1; iter &lt; 1000 ends it
+repetitions = 1000      index-repetitions = 8000
+useful = 7+8+10+15+154+1000+13+10 = 1217
+1217 / 8000 = 15.2 percent</pre>
+</details>
+<p class="ln do"><b>L22</b> <b class="x">DO</b> L20 done for all 256 x 32 = 8192 blocks of 8 gives: useful 16274722, index-repetitions 18321656. Speedup over scalar, if only index-repetitions cost time, = 8 x useful / index-repetitions = ____ . Your machine: CPU scalar 61.6 ms, CPU vector 8.71 ms, ratio = ____ . <span class="from">from: L18, L19, L20, your output</span></p>
+<details><summary>CHECK</summary>
+<pre>16274722 / 18321656 = 0.8883
+8 * 0.8883 = 7.11
+61.6 / 8.71 = 7.07
+The useless index-repetitions alone explain why 8 indexes gave about 7x, not 8x.</pre>
+</details>
+
+<nav><a href="04-simd-cx.html">prev: 04 eight cx values</a><a href="06-gpu-threads.html">next: 06 GPU threads</a></nav>
+</main>
+</body>
+</html>

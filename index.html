@@ -9,33 +9,27 @@
 <body>
 <main>
 <h1>GPU Learnings: do it, don't read it</h1>
-<p class="sub">Built from one real chat that worked through MIT 6.S894 Lab 1 (Mandelbrot: CPU scalar, CPU SIMD, GPU scalar, GPU vector) and Lab 2 (filling idle cycles), on a Ryzen 5 4600H and a GTX 1650.</p>
+<p class="sub">Made from one real chat working through MIT 6.S894 Lab 1 (Mandelbrot on CPU, CPU SIMD, GPU) and Lab 2, on a Ryzen 5 4600H and a GTX 1650.</p>
 
-<p>No definitions here: every blog has those. Each page starts from zero, quotes the exact place the learner got stuck, and then makes you calculate with the real numbers from the real run. Every number checks out against the machine's output: the 65536 counts used here sum to 16274722, the same total the CPU printed. Pencil and paper. Fill every ____ before you open CHECK.</p>
+<p>Each page begins from zero. Each line uses only what the lines above it made, and a grey note names the line it takes from. Each page quotes the exact place the learner got stuck, then hands you real numbers to calculate. The 65536 iters values used here add up to 16274722, the same "CPU total" the machine printed. Pencil and paper. Fill every ____ before you open CHECK.</p>
 
-<pre>   page 01          page 02          page 03
- grid square --&gt;  square and  --&gt;  the w line
- to plane spot    add, by hand     (2*x*y hidden)
-       |
-       v
-   page 04          page 05          page 06
- 8 SIMD lanes,    8 cx values  --&gt; 32 GPU threads,
- 1 while loop --&gt; from 1 number    where is "nearby"?
-       |
-       v
-   page 07          page 08
- waiting chain --&gt; two groups,
- (Lab 2)           when to stop</pre>
+<pre>  01 (i, j) to (cx, cy) --&gt; 02 the while loop by hand --&gt; 03 the w line
+                                      |
+                                      v
+  04 eight cx values  ---------&gt; 05 SIMD while loop  --&gt; 06 GPU threads
+                                      |
+                                      v
+                          07 which line waits --&gt; 08 fat loop stop</pre>
 
 <ol class="topics">
-<li><a href="01-two-papers.html">Two papers: the grid square and the plane spot</a>: where 2.5 and -2.0 come from, and why the same "row 9, col 7" gives count 1 or count 3.</li>
-<li><a href="02-square-and-add.html">Square and add: the counting loop by hand</a>: why you start at (0, 0), and a distance that goes down before it escapes.</li>
-<li><a href="03-the-w-line.html">The w line</a>: the lab code never writes 2*x*y. Find it.</li>
-<li><a href="04-simd-while-loop.html">SIMD and the while loop</a>: 8 counts, 1 loop, a mask that is -1, and a speedup predicted from the counts (7.11 predicted, 7.07 measured).</li>
-<li><a href="05-simd-cx.html">SIMD cx and cy</a>: the "alien" offsets 0..7, fmadd's three inputs, and the argument-order trap.</li>
-<li><a href="06-gpu-threads.html">GPU threads and memory</a>: one changed line, the profiler's 2,048 requests and 8,192 sectors derived by hand, and 22.06 predicted against 22.75 measured.</li>
-<li><a href="07-waiting-chain.html">Lab 2: the waiting chain</a>: 9 ops, a path of 5, 11 idle slots per pass.</li>
-<li><a href="08-two-groups-stop.html">Lab 2: two groups, when to stop</a>: two wrong stopping rules, one right one, and more waste for fewer cycles.</li>
+<li><a href="01-image-to-middleman.html">From (i, j) to the middleman pair (cx, cy)</a>: where 2.5 and -2.0 come from, and why (9, 7) gives different (cx, cy) for different img_size.</li>
+<li><a href="02-square-and-add.html">The while loop by hand</a>: why x2, y2, w begin at 0, an x2 + y2 that goes down before the loop is left, and iters 1 versus iters 3 for the same (9, 7).</li>
+<li><a href="03-the-w-line.html">The w line</a>: the lab code never writes 2*x*y; derive it, and connect it to your I times I = -1.</li>
+<li><a href="04-simd-cx.html">SIMD: eight cx values from one number</a>: the offsets 0 to 7 forced out of the cx line, the inputs of fmadd, and the argument-order trap.</li>
+<li><a href="05-simd-while-loop.html">SIMD and the while loop</a>: eight iters in one loop, a mask that reads as -1, and 7.11 predicted against 7.07 measured.</li>
+<li><a href="06-gpu-threads.html">GPU: one changed line, and the proof of "nearby"</a>: the profiler's 2,048 and 8,192 derived by hand, and 22.06 predicted against 22.75 measured.</li>
+<li><a href="07-waiting-chain.html">Lab 2: which line waits for which line</a>: a chain of 5 inside 9 ops, and 11 cycles with nothing beginning.</li>
+<li><a href="08-fat-loop-stop.html">Lab 2: when does the fat while loop stop?</a>: wrong stopping tests, the right one, and more useless work for fewer cycles.</li>
 </ol>
 </main>
 </body>

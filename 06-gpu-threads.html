@@ -3,87 +3,99 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>06 GPU Threads</title>
+<title>GPU Threads</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <main>
-<h1>06. GPU: 32 threads, 1 line changed, where is the proof?</h1>
-<p class="sub">Pencil. Paper. Every blank ____ is yours. Open CHECK only after you wrote a number.</p>
+<h1>06. GPU: one changed line, and the proof of "nearby"</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
 
-<h2>Start from zero</h2>
-<p>Pages 01 to 03: 65536 squares, each one converted to a spot and counted with lines A to F. Page 04: on the CPU, 8 lanes shared one loop and frozen lanes wasted work. Now the GPU in your machine (GTX 1650, Turing, sm_75). The lab's <code>mandelbrot_gpu_scalar</code> runs the scalar double loop in 1 GPU thread (<code>&lt;&lt;&lt;1, 1&gt;&gt;&gt;</code>). <code>mandelbrot_gpu_vector</code> runs it in 32 threads (<code>&lt;&lt;&lt;1, 32&gt;&gt;&gt;</code>) with one changed line. Your machine printed these numbers (256 x 256, max_iters 1000):</p>
-<pre>CPU scalar, 1 core            61.6   ms
-GPU, &lt;&lt;&lt;1, 1&gt;&gt;&gt;   1 thread    403.435 ms
-GPU, &lt;&lt;&lt;1, 32&gt;&gt;&gt;  32 threads   17.732 ms     mismatches 0, total 16274722
+<p class="you">Your words: "no proof this how can 7 and 39 and all be nearby stuff" / "On one hand you are saying nearby, and on one hand you are saying spacing. You cannot space out and do nearby at the same time" / "Threads don't talk to each other. A thread doesn't know about other threads, right?"</p>
 
-the one changed line:
-    for (uint64_t j = threadIdx.x; j &lt; img_size; j += blockDim.x) {</pre>
-
-<h2>Where you got stuck</h2>
-<p class="you">"no proof this how can 7 and 39 and all be nearby stuff" / "On one hand you are saying nearby, and on one hand you are saying spacing. You cannot space out and do nearby at the same time" / "Threads don't talk to each other. A thread doesn't know about other threads, right?"</p>
-
-<h2>Step 1: one thread's columns</h2>
-<p>Every thread runs the whole function. threadIdx.x is 0 to 31, blockDim.x is 32, i runs 0 to 255 in every thread.</p>
-<div class="do"><b>DO:</b> Thread 7, row i = 0: write every j it visits: ____ . How many columns per thread per row: ____ . Which thread writes column 103: ____ .</div>
+<p class="ln"><b>L01</b> Your GPU function, copied from your file, with the scalar while loop shortened: <span class="from">from: your code</span></p>
+<pre>__global__ void mandelbrot_gpu_vector(uint32_t img_size, uint32_t max_iters, uint32_t *out) {
+    for (uint64_t i = 0; i &lt; img_size; ++i) {
+        for (uint64_t j = threadIdx.x; j &lt; img_size; j += blockDim.x) {
+            /* cx, cy, and the scalar while loop that makes iters */
+            out[i * img_size + j] = iters;
+        }
+    }
+}
+mandelbrot_gpu_vector&lt;&lt;&lt;1, 32&gt;&gt;&gt;(img_size, max_iters, out);</pre>
+<p class="ln"><b>L02</b> Your machine printed, for <code>img_size = 256</code>, <code>max_iters = 1000</code>, GTX 1650: <span class="from">from: your output</span></p>
+<pre>CPU scalar, 1 core                61.6   ms
+GPU &lt;&lt;&lt;1, 1&gt;&gt;&gt;  (scalar function)  403.435 ms
+GPU &lt;&lt;&lt;1, 32&gt;&gt;&gt; (L01)             17.732 ms     mismatches 0
+profiler, L01: l1tex__t_requests_pipe_lsu_mem_global_op_st.sum = 2,048
+               l1tex__t_sectors_pipe_lsu_mem_global_op_st.sum  = 8,192</pre>
+<p class="ln"><b>L03</b> <code>&lt;&lt;&lt;1, 32&gt;&gt;&gt;</code> makes 32 threads. Each thread executes the whole function of L01. In thread t, <code>threadIdx.x = t</code> (0 to 31) and <code>blockDim.x = 32</code>. <span class="from">from: L01, CUDA definition</span></p>
+<p class="ln"><b>L04</b> From L01 and L03, in thread t, j takes t, then t + 32, then t + 64, and so on while j &lt; 256. Name k the number of times thread t already went round the j for loop. Then j = t + 32 x k, with k from 0 to 7. <span class="from">from: L01, L03</span></p>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> Thread 7, i = 0: every j it takes = ____ . Thread and k that store j = 103: t = ____ , k = ____ . <span class="from">from: L04</span></p>
 <details><summary>CHECK</summary>
-<pre>thread 7: 7, 39, 71, 103, 135, 167, 199, 231     (8 columns = 256 / 32)
-column 103 = 3*32 + 7 -> thread 7</pre>
+<pre>thread 7: 7, 39, 71, 103, 135, 167, 199, 231      (k = 0 to 7)
+103 = 7 + 32 * 3  -&gt; t = 7, k = 3</pre>
+</details>
+<p class="ln"><b>L06</b> From L05, within thread 7 the j values 7 and 39 are 32 apart. Your words are right for one thread. <span class="from">from: L05</span></p>
+
+<p class="ln"><b>L07</b> Hardware fact: the GTX 1650 executes threads 0 to 31 of this launch together, one instruction at a time for all 32, each thread with its own values of i, j, iters. A thread that has nothing to do at that instruction waits. <span class="from">from: CUDA programming guide (SIMT)</span></p>
+<p class="ln"><b>L08</b> From L07, the line <code>out[i * img_size + j] = iters</code> executes once for all 32 threads together, with the same i and the same k, and t from 0 to 31. <span class="from">from: L04, L07</span></p>
+<p class="ln"><b>L09</b> From L04 and L08, at that moment the 32 threads store at index i x 256 + t + 32 x k of out. Each out value is a <code>uint32_t</code> = 4 bytes, so the byte number is 4 x that index. <span class="from">from: L04, L08</span></p>
+<pre>              k = 0         k = 1        ...    k = 7
+thread  0 --&gt; j =   0       j =  32             j = 224
+thread  1 --&gt; j =   1       j =  33             j = 225
+thread  2 --&gt; j =   2       j =  34             j = 226
+  ...            ...           ...                 ...
+thread 31 --&gt; j =  31       j =  63             j = 255
+              \_______/
+         one store instruction (L08) = one up-down strip of this table
+         one thread (L06)            = one left-right line of this table</pre>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> i = 0, k = 0. Byte number of thread 0 = ____ . Thread 31 = ____ . The 32 stores cover bytes 0 to ____ , which is ____ bytes. <span class="from">from: L09</span></p>
+<details><summary>CHECK</summary>
+<pre>thread 0  -&gt; byte 0
+thread 31 -&gt; byte 124   (its 4 bytes are 124, 125, 126, 127)
+covered: bytes 0 to 127 = 128 bytes, no gap
+L06 (far apart) is one left-right line. "Nearby" is one up-down strip. Both hold.</pre>
 </details>
 
-<h2>Step 2: "nearby" is across threads, at the same moment</h2>
-<p>The hardware does not run 32 threads separately. It runs them as one warp: 32 threads execute the same instruction together, each with its own registers. So when the store <code>out[i*256 + j] = iters</code> executes for visit k, it executes for all 32 threads at once, and the 32 addresses go to memory as one request. Within one thread, 7 and 39 are far apart (128 bytes). Across threads, at visit k, the addresses are side by side. Both statements are true; they describe different axes of the drawing.</p>
-<pre>             visit k=0     visit k=1     ...   visit k=7
-thread  0 -> col   0       col  32             col 224
-thread  1 -> col   1       col  33             col 225
-thread  2 -> col   2       col  34             col 226
-  ...          ...           ...                 ...
-thread 31 -> col  31       col  63             col 255
-             \_______/
-             ONE store instruction, 32 addresses
-             one THREAD   = one row of this table, left to right: 0, 32, 64 ... (far)
-             one REQUEST  = one column of this table, top to bottom: 0..31  (near)</pre>
-<p>Each <code>out</code> element is a uint32_t = 4 bytes. Memory moves data in 32-byte sectors.</p>
-<div class="do"><b>DO:</b> Row 0, visit k = 0. Byte offset of thread t's write = 4 x (0 x 256 + t). Thread 0: ____ , thread 31: ____ . Bytes spanned = ____ . Sectors touched = ____ .</div>
+<p class="ln"><b>L11</b> Hardware fact: memory moves bytes in blocks of 32 bytes that begin at a multiple of 32. The profiler of L02 names such a block a sector, and names one store instruction for the 32 threads a request. <span class="from">from: Nsight Compute metric names</span></p>
+<p class="ln do"><b>L12</b> <b class="x">DO</b> Bytes 0 to 127 of L10 touch how many 32-byte blocks? ____ . Store instructions for the 32 threads = (values of i) x (values of k) = ____ x ____ = ____ . Blocks touched = ____ x 4 = ____ . Compare with L02. <span class="from">from: L04, L10, L11, L02</span></p>
 <details><summary>CHECK</summary>
-<pre>thread 0  -> byte 0
-thread 31 -> byte 124   (writes bytes 124..127)
-span = 128 bytes = 4 sectors of 32 bytes</pre>
+<pre>bytes 0..127 = blocks 0..31, 32..63, 64..95, 96..127 = 4 blocks
+store instructions = 256 * 8 = 2048       profiler requests: 2,048
+blocks touched     = 2048 * 4 = 8192      profiler sectors : 8,192</pre>
 </details>
 
-<h2>Step 3: check the profiler numbers you got</h2>
-<p>Your Nsight Compute run on <code>mandelbrot_gpu_vector</code> printed: global store requests = 2,048, global store sectors = 8,192. Derive both from the code without the profiler.</p>
-<div class="do"><b>DO:</b> Store instructions executed by the warp = rows x visits per row = ____ x ____ = ____ . Sectors = requests x sectors per request = ____ .</div>
+<p class="ln"><b>L13</b> Compare another way to share the j values: thread t takes j = 8t, 8t + 1, ..., 8t + 7, one after another. Each thread still gets 8 values of j, and every (i, j) is still done once. <span class="from">from: L04</span></p>
+<p class="ln do"><b>L14</b> <b class="x">DO</b> With L13, i = 0, first store: thread t stores j = ____ , byte ____ . Thread 0: byte ____ , thread 1: byte ____ , thread 31: byte ____ . 32-byte blocks touched by this one store instruction = ____ . For the whole image = 2048 x ____ = ____ . Ratio to L12 = ____ . <span class="from">from: L09, L11, L12, L13</span></p>
 <details><summary>CHECK</summary>
-<pre>requests = 256 rows * 8 visits = 2048        profiler: 2,048
-sectors  = 2048 * 4             = 8192        profiler: 8,192</pre>
+<pre>thread t stores j = 8t, byte 32t
+thread 0 -&gt; 0, thread 1 -&gt; 32, thread 31 -&gt; 992
+each byte number is in a different 32-byte block: 32 blocks per store instruction
+whole image: 2048 * 32 = 65536 blocks
+65536 / 8192 = 8 times more blocks moved for the same out.
+"j begins at threadIdx.x and adds blockDim.x" is the choice that makes the
+32 stores of one instruction land in 4 blocks.</pre>
 </details>
 
-<h2>Step 4: the mapping you did not choose</h2>
-<p>The other obvious split: thread t owns a block of 8 neighbouring columns, 8t to 8t+7, and walks them one by one (<code>for j = 8*t; j &lt; 8*t + 8; ++j</code>). Same work per thread, same correctness.</p>
-<div class="do"><b>DO:</b> Row 0, first store. Thread t writes column ____ , byte ____ . Thread 0: byte ____ , thread 1: byte ____ , thread 31: byte ____ . Sectors per request = ____ . Total sectors for the image = ____ . Ratio to step 3: ____ .</div>
+<p class="ln do"><b>L15</b> <b class="x">DO</b> From L02: 1 GPU thread versus 1 CPU core = 403.435 / 61.6 = ____ times slower. Then for 32 GPU threads versus 1 GPU thread: 403.435 / 17.732 = ____ times faster. <span class="from">from: L02</span></p>
 <details><summary>CHECK</summary>
-<pre>thread t writes column 8t, byte 32t
-thread 0 -> 0, thread 1 -> 32, thread 31 -> 992
-each address in a different 32-byte sector: 32 sectors per request
-requests still 2048; sectors = 2048 * 32 = 65536
-65536 / 8192 = 8 times more sectors for the same output.
-"j starts at threadIdx.x, steps by blockDim.x" is the choice that makes
-the 32 addresses of ONE instruction land in 4 sectors.</pre>
+<pre>403.435 / 61.6   = 6.55 times slower
+403.435 / 17.732 = 22.75 times faster   (not 32)</pre>
+</details>
+<p class="ln"><b>L16</b> From L07, the scalar while loop inside L01 executes for all 32 threads together, so it continues until the last of the 32 threads is done; the done threads wait. Name one thread doing one repetition a thread-repetition. Each repetition of that while loop costs 32 thread-repetitions. <span class="from">from: L01, L07</span></p>
+<p class="ln do"><b>L17</b> <b class="x">DO</b> Real data: i = 40, k = 5 (j = 160 to 191). The largest scalar iters among the 32 threads is 1000; their sum is 1334. Thread-repetitions = 32 x ____ = ____ . Useful = ____ . Useful percent = ____ . <span class="from">from: L16</span></p>
+<details><summary>CHECK</summary>
+<pre>32 * 1000 = 32000 thread-repetitions, 1334 useful, 4.2 percent</pre>
+</details>
+<p class="ln do"><b>L18</b> <b class="x">DO</b> L17 done for all 256 x 8 = 2048 store instructions gives: useful 16274722, thread-repetitions 23609216. Speedup of 32 threads over 1 thread, if only thread-repetitions cost time, = 32 x useful / thread-repetitions = ____ . L15 measured ____ . <span class="from">from: L15, L16, L17</span></p>
+<details><summary>CHECK</summary>
+<pre>16274722 / 23609216 = 0.6893
+32 * 0.6893 = 22.06
+measured 22.75; the waiting threads of L16 explain why 32 threads gave about 22x.</pre>
 </details>
 
-<h2>Step 5: why 22.75x and not 32x</h2>
-<p>A warp executes one instruction for all 32 threads, so the while loop of one visit runs until the slowest of the 32 threads is done; the finished threads wait masked off. This is page 04's frozen lanes again, with 32 lanes. Row 40, visit k = 5 (columns 160 to 191), real counts: slowest = 1000, sum of the 32 counts = 1334.</p>
-<div class="do"><b>DO:</b> Lane-passes executed by that visit = 32 x ____ = ____ . Useful = ____ . Useful percent = ____ . Whole image, from the real counts: useful 16274722, executed 23609216. Predicted speedup of 32 threads over 1 thread = 32 x useful / executed = ____ . Measured = 403.435 / 17.732 = ____ .</div>
-<details><summary>CHECK</summary>
-<pre>row 40 visit 5: 32 * 1000 = 32000 lane-passes, 1334 useful = 4.2 percent
-whole image: 16274722 / 23609216 = 0.6893
-predicted = 32 * 0.6893 = 22.06
-measured  = 403.435 / 17.732 = 22.75
-The counts alone predict the measured speedup within 0.7.</pre>
-</details>
-
-<nav><a href="05-simd-cx.html">prev: 05 SIMD cx and cy</a><a href="07-waiting-chain.html">next: 07 the waiting chain (Lab 2)</a></nav>
+<nav><a href="05-simd-while-loop.html">prev: 05 SIMD and the while loop</a><a href="07-waiting-chain.html">next: 07 the waiting chain</a></nav>
 </main>
 </body>
 </html>

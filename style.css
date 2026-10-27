@@ -50,3 +50,8 @@ details pre { margin-top: 8px; }
 nav { display: flex; justify-content: space-between; gap: 12px; margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); }
 .sub { color: var(--dim); margin-bottom: 24px; }
 ol.topics li { margin-bottom: 10px; }
+.ln { margin: 0 0 10px; padding-left: 52px; text-indent: -52px; }
+.ln > b:first-child { display: inline-block; width: 46px; text-indent: 0; font: bold 14px "DejaVu Sans Mono", Menlo, Consolas, monospace; color: var(--dim); }
+.from { color: var(--dim); font-size: 13px; font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; white-space: nowrap; }
+.ln.do { padding: 6px 0 6px 64px; }
+.do .x { color: var(--mark); }

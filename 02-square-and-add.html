@@ -3,115 +3,131 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>02 Square and Add</title>
+<title>While Loop</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <main>
-<h1>02. Square and add: the counting loop by hand</h1>
-<p class="sub">Pencil. Paper. Every blank ____ is yours. Open CHECK only after you wrote a number.</p>
+<h1>02. The while loop by hand</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
 
-<h2>Start from zero</h2>
-<p>From page 01: one grid square (i, j) of the 256 x 256 output becomes one spot (cx, cy) through <code>cx = j/256*2.5 - 2.0</code> and <code>cy = i/256*2.5 - 1.25</code>. Now the count for that spot. A moving pair (x, y) starts at (0, 0). One pass = square the moving pair, then add (cx, cy) to it. Before every pass, test x*x + y*y. If it is above 4, stop. The count is the number of passes done. The cap is 1000 passes.</p>
-<pre>squaring a pair (a, b):
+<p class="you">Your words: "if i start at 00 squaring means nothing there shall be no change at all ever" / "whyy would i start form 00 when i alreadyyy started with 1 0" / "You have not defined escape from what ... A point 9 7 is going to be at 9 7."</p>
 
-        new first  = a*a - b*b
-        new second = 2*a*b
+<p class="ln"><b>L01</b> The lab file <code>mandelbrot_cpu.cpp</code>, for one (i, j), has these lines, copied without change: <span class="from">from: code</span></p>
+<pre>float cx = (float(j) / float(img_size)) * 2.5f - 2.0f;
+float cy = (float(i) / float(img_size)) * 2.5f - 1.25f;
+float x2 = 0.0f;
+float y2 = 0.0f;
+float w = 0.0f;
+uint32_t iters = 0;
+while (x2 + y2 &lt;= 4.0f &amp;&amp; iters &lt; max_iters) {
+    float x = x2 - y2 + cx;        // line A
+    float y = w - x2 - y2 + cy;    // line B
+    x2 = x * x;                    // line C
+    y2 = y * y;                    // line D
+    float z = x + y;               // line E
+    w = z * z;                     // line F
+    ++iters;
+}
+out[i * img_size + j] = iters;</pre>
+<p class="ln"><b>L02</b> Your machine gave <code>img_size = 256</code> and <code>max_iters = 1000</code>. <span class="from">from: your output</span></p>
+<p class="ln"><b>L03</b> The pair (cx, cy) is the middleman pair. Nothing inside the while loop writes cx or cy, so it stays fixed for this (i, j). <span class="from">from: L01</span></p>
+<p class="ln"><b>L04</b> The values x2, y2, w begin at 0.0 and iters begins at 0. Lines C, D, F write new x2, y2, w every time. <span class="from">from: L01</span></p>
+<p class="ln"><b>L05</b> A repetition = lines A to F, then <code>++iters</code>, executed once in that order. <span class="from">from: L01</span></p>
+<p class="ln"><b>L06</b> Before every repetition the while loop checks <code>x2 + y2 &lt;= 4.0f</code> and <code>iters &lt; 1000</code>. Both true: do one repetition. Either false: leave the loop. <span class="from">from: L01, L02, L05</span></p>
+<p class="ln"><b>L07</b> After leaving, <code>out[i*256 + j]</code> receives iters, which equals the number of repetitions done. <span class="from">from: L01, L05, L06</span></p>
 
-one pass:   (x, y)  -->  (x*x - y*y + cx ,  2*x*y + cy)
-test before each pass:   x*x + y*y &lt;= 4 ?   yes -> do the pass, count + 1
-                                            no  -> stop, write count</pre>
-
-<h2>Where you got stuck</h2>
-<p class="you">"if i start at 00 squaring means nothing there shall be no change at all ever" / "whyy would i start form 00 when i alreadyyy started with 1 0" / "you are asking for square and then doing substractioon" / "A point 9 7 is going to be at 9 7. There is no escaping."</p>
-
-<h2>Step 1: the spot never moves, the moving pair does</h2>
-<p>Two pairs exist. (cx, cy) is fixed for the whole loop: it is the spot from page 01. (x, y) is a second pair that starts at (0, 0) and changes every pass. Squaring (0, 0) gives (0, 0), and then adding (cx, cy) gives (cx, cy). So pass 1 always lands on the spot itself. Pass 2 is where squaring starts to do work.</p>
-<pre>            fixed                       moving
-         +----------+              +------------------+
-         | (cx, cy) | --- added -->| (x, y)           |
-         +----------+  every pass  | start (0, 0)     |
-                                   | pass 1 -> (cx,cy)|
-                                   | pass 2 -> ?      |
-                                   +------------------+</pre>
-<div class="do"><b>DO:</b> Square (2, 1) with the rule. New first = ____ . New second = ____ .</div>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> Repetition 1 begins with x2 = y2 = w = 0 (L04). Line A gives x = 0 - 0 + cx = ____ . Line B gives y = ____ . <span class="from">from: L01, L04</span></p>
 <details><summary>CHECK</summary>
-<pre>2*2 - 1*1 = 3
-2*2*1     = 4
-(2, 1) squared = (3, 4)</pre>
+<pre>x = 0 - 0 + cx     = cx
+y = 0 - 0 - 0 + cy = cy
+The 0.0 in L01 is why repetition 1 lands exactly on the middleman pair.
+Beginning at 0 does change things: it adds cx and cy.</pre>
 </details>
 
-<h2>Step 2: a spot with second number 0</h2>
-<p>Grid square i = 128, j = 255 gave the spot (0.490234375, 0.0) on page 01. With second number 0, every 2*x*y is 0 and every y*y is 0, so only x moves. Use 6 decimals.</p>
-<pre>pass | x before | test x*x &lt;= 4 ? | x after = x*x + 0.490234
------+----------+-----------------+--------------------------
-  1  | 0.000000 | 0.000000  yes   | 0.490234
-  2  | 0.490234 | ________  yes   | ________
-  3  | ________ | ________  yes   | ________
-  4  | ________ | ________  yes   | ________
-  5  | ________ | ________  yes   | ________
-  6  | ________ | ________  ___   | (stop)</pre>
-<div class="do"><b>DO:</b> Fill every blank. Write the count: ____ .</div>
+<p class="ln"><b>L09</b> Take i = 128, j = 255. From L01: cx = 255/256 x 2.5 - 2.0 = 0.490234 (6 decimals), cy = 128/256 x 2.5 - 1.25 = 0.0. <span class="from">from: L01</span></p>
+<p class="ln"><b>L10</b> With cy = 0.0, line B gives y = 0 every time and line D gives y2 = 0, so w = (x + 0) x (x + 0) = x2. Only x and x2 change. <span class="from">from: L01, L09</span></p>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> Fill the table using line A (x = x2 - 0 + 0.490234) and line C (x2 = x * x). <span class="from">from: L06, L10</span></p>
+<pre>repetition | check x2 + y2 &lt;= 4 ? | line A: x    | line C: x2  | iters
+-----------+-----------------------+--------------+-------------+------
+     1     | 0.000000        true  | 0.490234     | 0.240330    |  1
+     2     | 0.240330        true  | ________     | ________    |  2
+     3     | ________        ____  | ________     | ________    |  _
+     4     | ________        ____  | ________     | ________    |  _
+     5     | ________        ____  | ________     | ________    |  _
+     6     | ________        ____  | (not done)   |             |</pre>
 <details><summary>CHECK</summary>
-<pre>pass | x before | x*x       | x after
-  1  | 0.000000 | 0.000000  | 0.490234
-  2  | 0.490234 | 0.240330  | 0.730564
-  3  | 0.730564 | 0.533724  | 1.023958
-  4  | 1.023958 | 1.048491  | 1.538725
-  5  | 1.538725 | 2.367675  | 2.857909
-  6  | 2.857909 | 8.167644  | 8.167644 > 4  -> stop
-count = 5    (out[128*256 + 255] = out[33023] = 5)</pre>
+<pre>repetition | check            | x          | x2         | iters
+     1     | 0.000000  true   | 0.490234   | 0.240330   | 1
+     2     | 0.240330  true   | 0.730564   | 0.533724   | 2
+     3     | 0.533724  true   | 1.023958   | 1.048491   | 3
+     4     | 1.048491  true   | 1.538725   | 2.367675   | 4
+     5     | 2.367675  true   | 2.857909   | 8.167644   | 5
+     6     | 8.167644  false  -&gt; leave the loop
+out[128*256 + 255] = out[33023] = 5</pre>
 </details>
 
-<h2>Step 3: a spot with both numbers non-zero</h2>
-<p>Grid square i = 64, j = 64 gave the spot (-1.375, -0.625). Now both rules work. Write every product on paper. Do not skip the sign of 2*x*y.</p>
-<pre>pass | x, y before          | x*x + y*y | x*x - y*y + cx      | 2*x*y + cy
------+----------------------+-----------+---------------------+-------------------
-  1  | 0, 0                 | 0         | -1.375              | -0.625
-  2  | -1.375, -0.625       | ________  | ________            | ________
-  3  | ________, ________   | ________  | ________            | ________
-  4  | ________, ________   | ________  | stop?</pre>
-<div class="do"><b>DO:</b> Fill the table to 6 decimals. Write the count: ____ . Then write the three test values in a row: ____ , ____ , ____ .</div>
+<p class="ln"><b>L12</b> Take i = 64, j = 64. From L01: cx = 64/256 x 2.5 - 2.0 = -1.375, cy = 64/256 x 2.5 - 1.25 = -0.625. Now cy is not 0, so line B and w matter. <span class="from">from: L01</span></p>
+<p class="ln do"><b>L13</b> <b class="x">DO</b> Fill every value with lines A to F, 6 decimals. Write each subtraction on paper. <span class="from">from: L01, L05, L06, L12</span></p>
+<pre>rep | check x2+y2 | A: x = x2-y2+cx | B: y = w-x2-y2+cy | C: x2  | D: y2  | E: z  | F: w   | iters
+----+-------------+-----------------+-------------------+--------+--------+-------+--------+------
+ 1  | 0      true | -1.375          | -0.625            | ______ | ______ | _____ | ______ |  1
+ 2  | ______ ____ | _______         | _______           | ______ | ______ | _____ | ______ |  _
+ 3  | ______ ____ | _______         | _______           | ______ | ______ |       |        |  _
+ 4  | ______ ____ | (not done)</pre>
 <details><summary>CHECK</summary>
-<pre>pass 2: x*x = 1.890625  y*y = 0.390625   test 2.281250 yes
-        x = 1.890625 - 0.390625 - 1.375 = 0.125
-        y = 2*(-1.375)*(-0.625) - 0.625 = 1.71875 - 0.625 = 1.09375
-pass 3: x*x = 0.015625  y*y = 1.196289   test 1.211914 yes
-        x = 0.015625 - 1.196289 - 1.375 = -2.555664
-        y = 2*(0.125)*(1.09375) - 0.625 = 0.273438 - 0.625 = -0.351562
-pass 4: x*x = 6.531419  y*y = 0.123596   test 6.655015 > 4  -> stop
-count = 3
-
-test values: 2.281250 , 1.211914 , 6.655015
-                      ^
-                      went DOWN. "It grows every pass" is false.
-                      Only "above 4" is final.</pre>
+<pre>rep 1: x2 = 1.890625  y2 = 0.390625  z = -2.0  w = 4.0             iters 1
+rep 2: check 1.890625 + 0.390625 = 2.281250  true
+       x = 1.890625 - 0.390625 - 1.375           = 0.125
+       y = 4.0 - 1.890625 - 0.390625 - 0.625     = 1.09375
+       x2 = 0.015625  y2 = 1.196289  z = 1.21875  w = 1.485352     iters 2
+rep 3: check 0.015625 + 1.196289 = 1.211914  true
+       x = 0.015625 - 1.196289 - 1.375           = -2.555664
+       y = 1.485352 - 0.015625 - 1.196289 - 0.625 = -0.351562
+       x2 = 6.531419  y2 = 0.123596                                iters 3
+rep 4: check 6.531419 + 0.123596 = 6.655015  false -&gt; leave
+out[64*256 + 64] = 3</pre>
 </details>
 
-<h2>Step 4: finish page 01, step 3</h2>
-<p>On page 01 the 32 x 32 grid turned row 9, column 7 into the spot (-1.453125, -0.546875), and the CHECK claimed count 3. Prove it by hand. Same table, same rules.</p>
-<div class="do"><b>DO:</b> Pass 2 x = ____ , y = ____ . Pass 3 x = ____ , y = ____ . Test before pass 4 = ____ . Count = ____ .</div>
+<p class="ln do"><b>L14</b> <b class="x">DO</b> Copy the checks of L13 in order: ____ , ____ , ____ . Did the check value go down at any repetition? ____ . <span class="from">from: L13</span></p>
 <details><summary>CHECK</summary>
-<pre>pass 1: (x,y) = (-1.453125, -0.546875)
-pass 2: x*x = 2.111572  y*y = 0.299072  test 2.410645 yes
-        x = 2.111572 - 0.299072 - 1.453125 = 0.359375
-        y = 2*(-1.453125)*(-0.546875) - 0.546875 = 1.589355 - 0.546875 = 1.042480
-pass 3: x*x = 0.129150  y*y = 1.086766  test 1.215916 yes
-        x = 0.129150 - 1.086766 - 1.453125 = -2.410740
-        y = 2*(0.359375)*(1.042480) - 0.546875 = 0.749283 - 0.546875 = 0.202408
-before pass 4: x*x = 5.811668  y*y = 0.040969  test 5.852637 > 4 -> stop
-count = 3</pre>
+<pre>2.281250 , 1.211914 , 6.655015
+Yes: 2.281250 went down to 1.211914, then up to 6.655015.
+Only the check "x2 + y2 &lt;= 4" decides when to leave. Size going up is not guaranteed.</pre>
 </details>
 
-<h2>Step 5: why 4 and not 2</h2>
-<p>The test compares x*x + y*y with 4. The distance of (x, y) from (0, 0) is the square root of x*x + y*y. Distance above 2 means x*x + y*y above 2*2 = 4. Comparing with 4 avoids the square root on every pass.</p>
-<div class="do"><b>DO:</b> Pass-4 pair from step 3 is (-2.555664, -0.351562). Distance = square root of ____ = ____ . Above 2? ____ .</div>
+<p class="ln"><b>L15</b> Line C gives x2 = x times x and line D gives y2 = y times y. So the check x2 + y2 is x times x plus y times y of the current (x, y). <span class="from">from: L01</span></p>
+<p class="ln do"><b>L16</b> <b class="x">DO</b> The distance of (x, y) from (0, 0) on the graph paper is the square root of x times x plus y times y. L13 left with x2 + y2 = 6.655015. Distance = ____ . The 4.0 in L06 compares against distance 2 because 2 x 2 = ____ . <span class="from">from: L06, L13, L15</span></p>
 <details><summary>CHECK</summary>
-<pre>x*x + y*y = 6.655015
-square root = 2.5797...  > 2   same verdict as 6.655015 > 4</pre>
+<pre>square root of 6.655015 = 2.5797
+2 x 2 = 4
+"x2 + y2 &lt;= 4" says "distance from (0, 0) at most 2", without computing a square root.
+Leaving the while loop = (x, y) got farther than 2 from (0, 0).</pre>
 </details>
 
-<nav><a href="01-two-papers.html">prev: 01 two papers</a><a href="03-the-w-line.html">next: 03 the w line</a></nav>
+<p class="ln"><b>L17</b> Your question about (i = 9, j = 7). With <code>img_size = 256</code>, L01 gives cx = 7/256 x 2.5 - 2.0 = -1.931640625 and cy = 9/256 x 2.5 - 1.25 = -1.162109375. <span class="from">from: L01</span></p>
+<p class="ln do"><b>L18</b> <b class="x">DO</b> Repetition 1 gives x = cx, y = cy (L08). Then x2 = 1.931640625 x 1.931640625 = ____ , y2 = 1.162109375 x 1.162109375 = ____ . Check before repetition 2: ____ . iters = ____ . <span class="from">from: L08, L17</span></p>
+<details><summary>CHECK</summary>
+<pre>x2 = 3.731236   y2 = 1.350498   check 5.081734 &gt; 4 -&gt; false -&gt; leave
+iters = 1</pre>
+</details>
+<p class="ln"><b>L19</b> Same (i = 9, j = 7) with <code>img_size = 32</code>: L01 gives cx = 7/32 x 2.5 - 2.0 = -1.453125 and cy = 9/32 x 2.5 - 1.25 = -0.546875. <span class="from">from: L01</span></p>
+<p class="ln do"><b>L20</b> <b class="x">DO</b> Use the L13 table again with these cx, cy. iters = ____ . <span class="from">from: L13, L19</span></p>
+<details><summary>CHECK</summary>
+<pre>rep 1: x = -1.453125  y = -0.546875  x2 = 2.111572  y2 = 0.299072  z = -2.0  w = 4.0
+rep 2: check 2.410645 true
+       x = 2.111572 - 0.299072 - 1.453125           = 0.359375
+       y = 4.0 - 2.111572 - 0.299072 - 0.546875     = 1.042480
+       x2 = 0.129150  y2 = 1.086766  z = 1.401855  w = 1.965199
+rep 3: check 1.215916 true
+       x = 0.129150 - 1.086766 - 1.453125           = -2.410740
+       y = 1.965199 - 0.129150 - 1.086766 - 0.546875 = 0.202408
+       x2 = 5.811668  y2 = 0.040969
+rep 4: check 5.852637 false -&gt; leave         iters = 3</pre>
+</details>
+<p class="ln"><b>L21</b> From L18 and L20: same (9, 7) on the image paper, iters 1 with <code>img_size = 256</code> and iters 3 with <code>img_size = 32</code>. iters belongs to (cx, cy), never to (i, j). <span class="from">from: L18, L20</span></p>
+
+<nav><a href="01-image-to-middleman.html">prev: 01 middleman pair</a><a href="03-the-w-line.html">next: 03 the w line</a></nav>
 </main>
 </body>
 </html>

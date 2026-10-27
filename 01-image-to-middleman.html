@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Middleman Pair</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>01. From (i, j) to the middleman pair (cx, cy)</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
+
+<p class="you">Your words: "Row 2 column 2 will always mean row 2 column 2, right?" / "Basically, I have two different papers, right?" / "What is the guarantee that ... with this middleman number, that number of iterations can change, right?"</p>
+
+<p class="ln"><b>L01</b> Your machine printed: <code>Testing with image size 256x256 and 1000 max iterations.</code> <span class="from">from: your output</span></p>
+<p class="ln"><b>L02</b> So the lab file receives <code>img_size = 256</code> and <code>max_iters = 1000</code>. <span class="from">from: L01</span></p>
+<p class="ln"><b>L03</b> The lab file <code>mandelbrot_cpu.cpp</code> has these lines, copied with the while loop shortened to a comment: <span class="from">from: code</span></p>
+<pre>for (uint64_t i = 0; i &lt; img_size; ++i) {
+    for (uint64_t j = 0; j &lt; img_size; ++j) {
+        float cx = (float(j) / float(img_size)) * 2.5f - 2.0f;
+        float cy = (float(i) / float(img_size)) * 2.5f - 1.25f;
+        /* ... a while loop here makes iters from cx, cy ... */
+        out[i * img_size + j] = iters;
+    }
+}</pre>
+<p class="ln"><b>L04</b> From L02 and L03, i takes 0, 1, ..., 255 and j takes 0, 1, ..., 255. <span class="from">from: L02, L03</span></p>
+<p class="ln"><b>L05</b> From L03, the value for (i, j) is stored at <code>out[i*256 + j]</code>, so <code>out</code> holds 256 x 256 = 65536 whole numbers. <span class="from">from: L03, L04</span></p>
+<p class="ln"><b>L06</b> Draw <code>out</code> as a sheet: i counts down from the top, j counts right from the left. This sheet is your image paper. <span class="from">from: L04, L05</span></p>
+<p class="ln"><b>L07</b> From L03, the line for cx reads only j, and the line for cy reads only i. <span class="from">from: L03</span></p>
+<p class="ln"><b>L08</b> The pair (cx, cy) holds fractions. Call it the middleman pair, your word. <span class="from">from: L07</span></p>
+<p class="ln"><b>L09</b> Draw every middleman pair as a point on a second sheet with (0, 0) at its center. This sheet is your graph paper. <span class="from">from: L08</span></p>
+<pre>  image paper (out)                        graph paper
+  j = 0   1   2  ...  255
+     +---+---+---+   +---+                        |
+ i=0 |   |   |   |...|   |                        |   * (cx, cy)
+     +---+---+---+   +---+     L03 cx, cy         |
+ i=1 |   |   |   |...|   |   ===============&gt; ----+---------- (0,0) at center
+     +---+---+---+   +---+                        |
+ ... |   |   |   |...|   |                        |
+i=255|   |   |   |...|   |                        |
+     +---+---+---+   +---+
+ out[i*256 + j] = iters  &lt;===== the while loop reads only cx, cy</pre>
+
+<p class="ln do"><b>L10</b> <b class="x">DO</b> Take i = 64, j = 64 and use L03 long-hand. 64 / 256 = ____ . Times 2.5 = ____ . Minus 2.0 gives cx = ____ . Minus 1.25 instead gives cy = ____ . <span class="from">from: L03</span></p>
+<details><summary>CHECK</summary>
+<pre>64 / 256      = 0.25
+0.25 * 2.5    = 0.625
+cx = 0.625 - 2.0  = -1.375
+cy = 0.625 - 1.25 = -0.625
+(i=64, j=64) on the image paper --&gt; (-1.375, -0.625) on the graph paper</pre>
+</details>
+
+<p class="ln do"><b>L11</b> <b class="x">DO</b> Smallest j from L04 is 0. Put j = 0 into L03: cx = ____ . Put i = 0: cy = ____ . <span class="from">from: L03, L04</span></p>
+<details><summary>CHECK</summary>
+<pre>j = 0: 0/256 * 2.5 - 2.0  = -2.0
+i = 0: 0/256 * 2.5 - 1.25 = -1.25
+So -2.0 and -1.25 are where the graph paper begins. They are typed into the code.</pre>
+</details>
+
+<p class="ln do"><b>L12</b> <b class="x">DO</b> Largest j from L04 is 255. 255 / 256 = ____ . Times 2.5 = ____ . Minus 2.0 gives cx = ____ . For i = 128: 128 / 256 = ____ , times 2.5 = ____ , minus 1.25 gives cy = ____ . <span class="from">from: L03, L04</span></p>
+<details><summary>CHECK</summary>
+<pre>255 / 256          = 0.99609375
+0.99609375 * 2.5   = 2.490234375
+cx                 = 0.490234375
+128 / 256 = 0.5    0.5 * 2.5 = 1.25    cy = 1.25 - 1.25 = 0.0
+(i=128, j=255) --&gt; (0.490234375, 0.0)</pre>
+</details>
+
+<p class="ln do"><b>L13</b> <b class="x">DO</b> From L11 and L12, cx goes from -2.0 up to 0.490234375. Next j adds 2.5 / 256 = ____ to cx. The value j/256 never reaches 1, so cx never reaches -2.0 + 2.5 = ____ . <span class="from">from: L11, L12</span></p>
+<details><summary>CHECK</summary>
+<pre>2.5 / 256 = 0.009765625      (0.490234375 + 0.009765625 = 0.5)
+-2.0 + 2.5 = 0.5
+The number 2.5 = 0.5 - (-2.0) is the distance the code covers on the graph paper.
+2.5, 2.0 and 1.25 are typed by the lab author into L03.</pre>
+</details>
+
+<p class="ln"><b>L14</b> Your question: (i = 9, j = 7) is the same on any image paper. Is its middleman pair the same? Change only <code>img_size</code> in L03 and calculate. <span class="from">from: L03</span></p>
+<p class="ln do"><b>L15</b> <b class="x">DO</b> With <code>img_size = 32</code>: cx = 7/32 x 2.5 - 2.0 = ____ , cy = 9/32 x 2.5 - 1.25 = ____ . With <code>img_size = 256</code>: cx = 7/256 x 2.5 - 2.0 = ____ , cy = 9/256 x 2.5 - 1.25 = ____ . <span class="from">from: L14</span></p>
+<details><summary>CHECK</summary>
+<pre>img_size 32 : 7/32  = 0.21875     * 2.5 = 0.546875     cx = -1.453125
+              9/32  = 0.28125     * 2.5 = 0.703125     cy = -0.546875
+img_size 256: 7/256 = 0.02734375  * 2.5 = 0.068359375  cx = -1.931640625
+              9/256 = 0.03515625  * 2.5 = 0.087890625  cy = -1.162109375
+Same (9, 7) on the image paper. Different points on the graph paper.</pre>
+</details>
+
+<nav><a href="index.html">index</a><a href="02-square-and-add.html">next: 02 the while loop by hand</a></nav>
+</main>
+</body>
+</html>

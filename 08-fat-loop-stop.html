@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fat Loop Stop</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>08. Lab 2: when does the fat while loop stop?</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
+
+<p class="you">Your words: "My while loop becomes longer and fatter. Then what is a pass? A pass is a collection of a fat while loop or a thin while loop?" / "It was already difficult to do for 8. Now I have to do for 16." / "My brain refuses to see that I actually solved the problem in lab 1."</p>
+
+<p class="ln"><b>L01</b> In the AVX2 vector code of Lab 1, one <code>__m256</code> holds 8 floats, at index 0 to 7: the middleman pairs of the same i and j to j + 7. <span class="from">from: your code</span></p>
+<p class="ln"><b>L02</b> The Lab 1 vector while loop, copied from your code: <span class="from">from: your code</span></p>
+<pre>while (iter &lt; max_iters) {
+    __m256 mask = _mm256_cmp_ps(_mm256_add_ps(x2_vec, y2_vec), four, _CMP_LE_OQ);
+    if (_mm256_testz_ps(mask, mask)) break;
+    iters_vec = _mm256_sub_epi32(iters_vec, _mm256_castps_si256(mask));
+    /* lines A to F at all 8 indexes */
+    ++iter;
+}</pre>
+<p class="ln"><b>L03</b> In L02, mask holds T (all bits 1, read as -1) at each index where x2 + y2 &lt;= 4, else F (all bits 0, read as 0). Subtracting it adds 1 to iters at T indexes and 0 at F indexes. testz returns 1 when all 8 are F, and then the loop is left. <span class="from">from: L02, intrinsic definitions</span></p>
+<p class="ln"><b>L04</b> Lab 2 puts a second set of 8 middleman pairs into the same while loop. Call the Lab 1 set A and the new set B. Each has its own x2, y2, w, iters_vec, and so its own mask. Your fat while loop: <span class="from">from: L02, L03, Lab 2</span></p>
+<pre>while (iter &lt; max_iters) {
+    maskA = (x2A + y2A &lt;= 4)        maskB = (x2B + y2B &lt;= 4)
+    /* stopping test: ____ (not decided yet) */
+    itersA = itersA - maskA         itersB = itersB - maskB
+    lines A..F on set A             lines A..F on set B
+    ++iter;
+}</pre>
+<p class="ln"><b>L05</b> A repetition of L04 = everything inside its braces once: lines A to F for set A and lines A to F for set B. <span class="from">from: L04</span></p>
+<p class="ln"><b>L06</b> Real data from the scalar code (<code>img_size = 256</code>, <code>max_iters = 1000</code>), i = 40: <span class="from">from: scalar code</span></p>
+<pre>set A, j = 208..215, scalar iters:  12   8   7   6   6   6   5   5
+set B, j = 216..223, scalar iters:   5   5   5   5   5   5   5   5</pre>
+
+<p class="ln do"><b>L07</b> <b class="x">DO</b> Wrong stopping test 1: leave when maskB is all F. Repetitions = ____ . Set A's iters come out as ____ . Wrong values in set A = ____ . <span class="from">from: L03, L06</span></p>
+<details><summary>CHECK</summary>
+<pre>maskB is all F before repetition 6 -&gt; 5 repetitions
+set A gets the smaller of 5 and its scalar iters: 5 5 5 5 5 5 5 5
+wrong where scalar iters &gt; 5: 12, 8, 7, 6, 6, 6 -&gt; 6 wrong</pre>
+</details>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> Wrong stopping test 2: leave when maskA is all F, and update set B with itersB = itersB + 1 (no maskB). Repetitions = ____ . Set B's iters come out as ____ . <span class="from">from: L03, L06</span></p>
+<details><summary>CHECK</summary>
+<pre>maskA is all F before repetition 13 -&gt; 12 repetitions
+set B: 12 12 12 12 12 12 12 12   (all 8 wrong; scalar says 5)</pre>
+</details>
+<p class="ln"><b>L09</b> From L07 and L08, "when is the loop left" and "when does one index stop counting" are separate questions. L03 already answers the second: each mask stops its own indexes. <span class="from">from: L03, L07, L08</span></p>
+<p class="ln"><b>L10</b> So the stopping test only needs: leave when maskA and maskB are both all F. In code: <code>if (_mm256_testz_ps(maskA, maskA) &amp;&amp; _mm256_testz_ps(maskB, maskB)) break;</code> <span class="from">from: L03, L09</span></p>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> With L10: repetitions = ____ . itersB after repetition 5 = ____ , after 6 = ____ , after 12 = ____ . itersA after 12 = ____ . <span class="from">from: L03, L06, L10</span></p>
+<details><summary>CHECK</summary>
+<pre>left before repetition 13 (index 0 of A is the last T) -&gt; 12 repetitions
+itersB: after 5 -&gt; 5 (all 8); after 6 -&gt; 5 (maskB all F); after 12 -&gt; 5
+itersA after 12 -&gt; 12 8 7 6 6 6 5 5
+all 16 values match L06. Nothing new for the counting: the Lab 1 mask, written twice.</pre>
+</details>
+
+<p class="ln"><b>L12</b> Name one index doing one repetition an index-repetition. A repetition of L04 costs 16 index-repetitions; a repetition of L02 costs 8. <span class="from">from: L01, L04, L05</span></p>
+<p class="ln"><b>L13</b> Model from the Lab 2 chain count: one set alone needs 20 cycles per repetition (a chain of 5 ops, 4 cycles each); sets A and B in one loop also need 20 cycles per repetition, because their 18 ops fit in 20 cycles at one op per cycle. <span class="from">from: model</span></p>
+<p class="ln do"><b>L14</b> <b class="x">DO</b> Thin loops (set A alone with L02, then set B alone with L02): repetitions = 12 + ____ , index-repetitions = ____ , cycles = ____ . Fat loop L04: repetitions = ____ , index-repetitions = 16 x ____ = ____ , cycles = ____ . Index-repetitions that change some iters, both cases = ____ . <span class="from">from: L06, L11, L12, L13</span></p>
+<details><summary>CHECK</summary>
+<pre>thin: 12 + 5 = 17 repetitions   8*12 + 8*5 = 136 index-repetitions   17 * 20 = 340 cycles
+fat : 12 repetitions            16*12      = 192 index-repetitions   12 * 20 = 240 cycles
+useful: (12+8+7+6+6+6+5+5) + (8*5) = 55 + 40 = 95
+The fat loop does 56 more useless index-repetitions and finishes 100 cycles sooner.</pre>
+</details>
+<p class="ln do"><b>L15</b> <b class="x">DO</b> Real data, i = 22, j = 184..191 as set A: scalar iters 7, 8, 10, 15, 154, 1000, 13, 10. Set B as in L06 (all 5). Thin: (1000 + 5) x 20 = ____ . Fat: ____ x 20 = ____ . Saving in percent = ____ . Now set B also needs 1000 repetitions: thin = ____ , fat = ____ , saving = ____ percent. <span class="from">from: L13, L14</span></p>
+<details><summary>CHECK</summary>
+<pre>A 1000, B 5    : thin 20100, fat 20000, saving 100 / 20100 = 0.5 percent
+A 1000, B 1000 : thin 40000, fat 20000, saving 50 percent
+The fat loop gains when its sets need similar numbers of repetitions.
+Which sets go into one fat loop is part of the design.</pre>
+</details>
+
+<nav><a href="07-waiting-chain.html">prev: 07 the waiting chain</a><a href="index.html">index</a></nav>
+</main>
+</body>
+</html>
