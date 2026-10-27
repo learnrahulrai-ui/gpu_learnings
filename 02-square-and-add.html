@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>02 Square and Add</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>02. Square and add: the counting loop by hand</h1>
+<p class="sub">Pencil. Paper. Every blank ____ is yours. Open CHECK only after you wrote a number.</p>
+
+<h2>Start from zero</h2>
+<p>From page 01: one grid square (i, j) of the 256 x 256 output becomes one spot (cx, cy) through <code>cx = j/256*2.5 - 2.0</code> and <code>cy = i/256*2.5 - 1.25</code>. Now the count for that spot. A moving pair (x, y) starts at (0, 0). One pass = square the moving pair, then add (cx, cy) to it. Before every pass, test x*x + y*y. If it is above 4, stop. The count is the number of passes done. The cap is 1000 passes.</p>
+<pre>squaring a pair (a, b):
+
+        new first  = a*a - b*b
+        new second = 2*a*b
+
+one pass:   (x, y)  -->  (x*x - y*y + cx ,  2*x*y + cy)
+test before each pass:   x*x + y*y &lt;= 4 ?   yes -> do the pass, count + 1
+                                            no  -> stop, write count</pre>
+
+<h2>Where you got stuck</h2>
+<p class="you">"if i start at 00 squaring means nothing there shall be no change at all ever" / "whyy would i start form 00 when i alreadyyy started with 1 0" / "you are asking for square and then doing substractioon" / "A point 9 7 is going to be at 9 7. There is no escaping."</p>
+
+<h2>Step 1: the spot never moves, the moving pair does</h2>
+<p>Two pairs exist. (cx, cy) is fixed for the whole loop: it is the spot from page 01. (x, y) is a second pair that starts at (0, 0) and changes every pass. Squaring (0, 0) gives (0, 0), and then adding (cx, cy) gives (cx, cy). So pass 1 always lands on the spot itself. Pass 2 is where squaring starts to do work.</p>
+<pre>            fixed                       moving
+         +----------+              +------------------+
+         | (cx, cy) | --- added -->| (x, y)           |
+         +----------+  every pass  | start (0, 0)     |
+                                   | pass 1 -> (cx,cy)|
+                                   | pass 2 -> ?      |
+                                   +------------------+</pre>
+<div class="do"><b>DO:</b> Square (2, 1) with the rule. New first = ____ . New second = ____ .</div>
+<details><summary>CHECK</summary>
+<pre>2*2 - 1*1 = 3
+2*2*1     = 4
+(2, 1) squared = (3, 4)</pre>
+</details>
+
+<h2>Step 2: a spot with second number 0</h2>
+<p>Grid square i = 128, j = 255 gave the spot (0.490234375, 0.0) on page 01. With second number 0, every 2*x*y is 0 and every y*y is 0, so only x moves. Use 6 decimals.</p>
+<pre>pass | x before | test x*x &lt;= 4 ? | x after = x*x + 0.490234
+-----+----------+-----------------+--------------------------
+  1  | 0.000000 | 0.000000  yes   | 0.490234
+  2  | 0.490234 | ________  yes   | ________
+  3  | ________ | ________  yes   | ________
+  4  | ________ | ________  yes   | ________
+  5  | ________ | ________  yes   | ________
+  6  | ________ | ________  ___   | (stop)</pre>
+<div class="do"><b>DO:</b> Fill every blank. Write the count: ____ .</div>
+<details><summary>CHECK</summary>
+<pre>pass | x before | x*x       | x after
+  1  | 0.000000 | 0.000000  | 0.490234
+  2  | 0.490234 | 0.240330  | 0.730564
+  3  | 0.730564 | 0.533724  | 1.023958
+  4  | 1.023958 | 1.048491  | 1.538725
+  5  | 1.538725 | 2.367675  | 2.857909
+  6  | 2.857909 | 8.167644  | 8.167644 > 4  -> stop
+count = 5    (out[128*256 + 255] = out[33023] = 5)</pre>
+</details>
+
+<h2>Step 3: a spot with both numbers non-zero</h2>
+<p>Grid square i = 64, j = 64 gave the spot (-1.375, -0.625). Now both rules work. Write every product on paper. Do not skip the sign of 2*x*y.</p>
+<pre>pass | x, y before          | x*x + y*y | x*x - y*y + cx      | 2*x*y + cy
+-----+----------------------+-----------+---------------------+-------------------
+  1  | 0, 0                 | 0         | -1.375              | -0.625
+  2  | -1.375, -0.625       | ________  | ________            | ________
+  3  | ________, ________   | ________  | ________            | ________
+  4  | ________, ________   | ________  | stop?</pre>
+<div class="do"><b>DO:</b> Fill the table to 6 decimals. Write the count: ____ . Then write the three test values in a row: ____ , ____ , ____ .</div>
+<details><summary>CHECK</summary>
+<pre>pass 2: x*x = 1.890625  y*y = 0.390625   test 2.281250 yes
+        x = 1.890625 - 0.390625 - 1.375 = 0.125
+        y = 2*(-1.375)*(-0.625) - 0.625 = 1.71875 - 0.625 = 1.09375
+pass 3: x*x = 0.015625  y*y = 1.196289   test 1.211914 yes
+        x = 0.015625 - 1.196289 - 1.375 = -2.555664
+        y = 2*(0.125)*(1.09375) - 0.625 = 0.273438 - 0.625 = -0.351562
+pass 4: x*x = 6.531419  y*y = 0.123596   test 6.655015 > 4  -> stop
+count = 3
+
+test values: 2.281250 , 1.211914 , 6.655015
+                      ^
+                      went DOWN. "It grows every pass" is false.
+                      Only "above 4" is final.</pre>
+</details>
+
+<h2>Step 4: finish page 01, step 3</h2>
+<p>On page 01 the 32 x 32 grid turned row 9, column 7 into the spot (-1.453125, -0.546875), and the CHECK claimed count 3. Prove it by hand. Same table, same rules.</p>
+<div class="do"><b>DO:</b> Pass 2 x = ____ , y = ____ . Pass 3 x = ____ , y = ____ . Test before pass 4 = ____ . Count = ____ .</div>
+<details><summary>CHECK</summary>
+<pre>pass 1: (x,y) = (-1.453125, -0.546875)
+pass 2: x*x = 2.111572  y*y = 0.299072  test 2.410645 yes
+        x = 2.111572 - 0.299072 - 1.453125 = 0.359375
+        y = 2*(-1.453125)*(-0.546875) - 0.546875 = 1.589355 - 0.546875 = 1.042480
+pass 3: x*x = 0.129150  y*y = 1.086766  test 1.215916 yes
+        x = 0.129150 - 1.086766 - 1.453125 = -2.410740
+        y = 2*(0.359375)*(1.042480) - 0.546875 = 0.749283 - 0.546875 = 0.202408
+before pass 4: x*x = 5.811668  y*y = 0.040969  test 5.852637 > 4 -> stop
+count = 3</pre>
+</details>
+
+<h2>Step 5: why 4 and not 2</h2>
+<p>The test compares x*x + y*y with 4. The distance of (x, y) from (0, 0) is the square root of x*x + y*y. Distance above 2 means x*x + y*y above 2*2 = 4. Comparing with 4 avoids the square root on every pass.</p>
+<div class="do"><b>DO:</b> Pass-4 pair from step 3 is (-2.555664, -0.351562). Distance = square root of ____ = ____ . Above 2? ____ .</div>
+<details><summary>CHECK</summary>
+<pre>x*x + y*y = 6.655015
+square root = 2.5797...  > 2   same verdict as 6.655015 > 4</pre>
+</details>
+
+<nav><a href="01-two-papers.html">prev: 01 two papers</a><a href="03-the-w-line.html">next: 03 the w line</a></nav>
+</main>
+</body>
+</html>

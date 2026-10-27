@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>01 Two Papers</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>01. Two papers: the grid square and the plane spot</h1>
+<p class="sub">Pencil. Paper. Every blank ____ is yours. Open CHECK only after you wrote a number.</p>
+
+<h2>Start from zero</h2>
+<p>The lab (MIT 6.S894 Lab 1, file <code>mandelbrot_cpu.cpp</code>) fills an output array <code>out</code> of 256 x 256 = 65536 whole numbers, run with <code>img_size = 256</code> and <code>max_iters = 1000</code>. Each whole number is a count. To get the count for one grid square, the code first converts the square's two whole numbers <code>(i, j)</code> into two fractional numbers <code>(cx, cy)</code>, and only <code>(cx, cy)</code> enter the counting loop. These are the two lines that do it, copied from the lab file:</p>
+<pre>float cx = (float(j) / float(img_size)) * 2.5f - 2.0f;
+float cy = (float(i) / float(img_size)) * 2.5f - 1.25f;</pre>
+
+<h2>Where you got stuck</h2>
+<p class="you">"Row 2 column 2 will always mean row 2 column 2, right? ... From where you are inventing 4 columns?" / "Basically, I have two different papers, right?" / "What is the guarantee that ... with this middleman number, that number of iterations can change, right?"</p>
+
+<h2>Step 1: draw the two papers</h2>
+<p>Paper A holds whole numbers only: row i from 0 to 255 going down, column j from 0 to 255 going right. Paper B holds fractions: x from -2.0 to +0.5, y from -1.25 to +1.25. The two lines above are the only bridge between them. Nothing in the counting loop ever sees i or j.</p>
+<pre>  PAPER A (out array)                     PAPER B (plane)
+  j = 0   1   2  ...  255                 x = -2.0 ............ +0.5
+     +---+---+---+   +---+                   +---------------------+ y=-1.25
+ i=0 |   |   |   |...|   |                   |                     |
+     +---+---+---+   +---+                   |          *          |
+ i=1 |   |   |   |...|   |   cx,cy lines     |     (cx,cy) spot    |
+     +---+---+---+   +---+  ============>    |                     |
+ ... |   |   |   |...|   |                   |                     |
+     +---+---+---+   +---+                   +---------------------+ y=+1.25
+i=255|   |   |   |...|   |
+     +---+---+---+   +---+                   counting loop reads cx,cy
+  out[i*256+j] = count  <================== and returns one count</pre>
+<div class="do"><b>DO:</b> Grid square i = 64, j = 64. Calculate long-hand. 64 / 256 = ____ . Times 2.5 = ____ . Minus 2.0 gives cx = ____ . Same for i: times 2.5 = ____ . Minus 1.25 gives cy = ____ .</div>
+<details><summary>CHECK</summary>
+<pre>64 / 256 = 0.25
+0.25 * 2.5 = 0.625
+cx = 0.625 - 2.0  = -1.375
+cy = 0.625 - 1.25 = -0.625
+
+square (i=64, j=64)  -->  spot (-1.375, -0.625)</pre>
+</details>
+
+<h2>Step 2: the far edge</h2>
+<p>j never reaches 256, so j / 256 never reaches 1.0, so cx never reaches +0.5. Calculate the last column to see by how much it falls short.</p>
+<div class="do"><b>DO:</b> i = 128, j = 255. 255 / 256 = ____ . Times 2.5 = ____ . Minus 2.0: cx = ____ . For i = 128: 128 / 256 = ____ , times 2.5 = ____ , minus 1.25: cy = ____ . Gap between cx and +0.5 = ____ .</div>
+<details><summary>CHECK</summary>
+<pre>255 / 256       = 0.99609375
+0.99609375*2.5  = 2.490234375
+cx              = 0.490234375
+128 / 256       = 0.5
+0.5 * 2.5       = 1.25
+cy              = 1.25 - 1.25 = 0.0
+gap = 0.5 - 0.490234375 = 0.009765625  (= 2.5 / 256, one column step)</pre>
+</details>
+
+<h2>Step 3: your "guarantee" question, with real numbers</h2>
+<p>You asked: if I first counted at (9, 7) directly, and now count at the converted spot, can the count change? Answer it by calculating, not by arguing. Take the same grid square, row i = 9, column j = 7, in two different grids: one 32 x 32 (the size used earlier in your chat) and one 256 x 256 (the size the lab ran).</p>
+<pre>  same words "row 9, col 7"
+          |
+          +--> 32 x 32 grid  : cx = 7/32  * 2.5 - 2.0  = ____   cy = 9/32  * 2.5 - 1.25 = ____
+          |
+          +--> 256 x 256 grid: cx = 7/256 * 2.5 - 2.0  = ____   cy = 9/256 * 2.5 - 1.25 = ____</pre>
+<div class="do"><b>DO:</b> Fill the four blanks. Then, for the 256 grid spot only, calculate cx*cx + cy*cy and write whether it is above 4: ____ .</div>
+<details><summary>CHECK</summary>
+<pre>32 grid : 7/32  = 0.21875     *2.5 = 0.546875    -2.0  -> cx = -1.453125
+          9/32  = 0.28125     *2.5 = 0.703125    -1.25 -> cy = -0.546875
+256 grid: 7/256 = 0.02734375  *2.5 = 0.068359375 -2.0  -> cx = -1.931640625
+          9/256 = 0.03515625  *2.5 = 0.087890625 -1.25 -> cy = -1.162109375
+
+256 spot: 1.931640625^2 = 3.73123...   1.162109375^2 = 1.35049...
+          sum = 5.0817... > 4   --> count = 1 (stops after the first pass)
+32 spot : count = 3 (you will calculate this one on page 02)
+
+same "row 9, col 7", two grids, two spots, counts 1 and 3.
+The count belongs to the SPOT on paper B, never to the square on paper A.</pre>
+</details>
+
+<h2>Step 4: where 2.5 and -2.0 come from</h2>
+<p>The lab author chose the window of paper B: x from -2.0 to +0.5, y from -1.25 to +1.25. Mandelbrot mathematics did not choose these numbers. The window width is the number multiplied, the window start is the number added.</p>
+<div class="do"><b>DO:</b> Width in x = 0.5 - (-2.0) = ____ . Width in y = 1.25 - (-1.25) = ____ . Now change the window to x from -1.0 to +1.0 and write the new cx line: <code>cx = (j / 256) * ____ - ____</code> . Calculate cx for j = 64 with the new line: ____ .</div>
+<details><summary>CHECK</summary>
+<pre>x width = 2.5      y width = 2.5   (square window, square grid, no stretching)
+new line: cx = (j / 256) * 2.0 - 1.0
+j = 64  : 0.25 * 2.0 - 1.0 = -0.5
+
+The grid square (64, 64) did not change. Its spot did. Its count changes with it.</pre>
+</details>
+
+<nav><a href="index.html">index</a><a href="02-square-and-add.html">next: 02 square and add</a></nav>
+</main>
+</body>
+</html>

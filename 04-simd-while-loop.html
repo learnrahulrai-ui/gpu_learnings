@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>04 SIMD While Loop</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>04. SIMD and the while loop: 8 counts, 1 loop</h1>
+<p class="sub">Pencil. Paper. Every blank ____ is yours. Open CHECK only after you wrote a number.</p>
+
+<h2>Start from zero</h2>
+<p>Pages 01 to 03: each grid square (i, j) of the 256 x 256 output becomes a spot (cx, cy), and the count is how many passes of lines A to F happen before x2 + y2 goes above 4, capped at 1000. Each square has its own count, and the counts differ. The CPU in your machine (Ryzen 5 4600H, AVX2) has 256-bit registers. 256 bits / 32 bits per float = 8 floats per register, so one instruction does the same operation on 8 numbers. The lab asks for <code>mandelbrot_cpu_vector</code>: 8 neighbouring squares of one row in 8 lanes, one loop for all 8. This is the loop you ended with:</p>
+<pre>while (iter &lt; max_iters) {
+    __m256 mask = _mm256_cmp_ps(_mm256_add_ps(x2_vec, y2_vec), four, _CMP_LE_OQ);
+    if (_mm256_testz_ps(mask, mask)) break;
+    iters_vec = _mm256_sub_epi32(iters_vec, _mm256_castps_si256(mask));
+    /* lines A to F, each one an 8-lane instruction */
+    ++iter;
+}</pre>
+
+<h2>Where you got stuck</h2>
+<p class="you">"SIMD does not even understand while loop. So where is the connection between this while loop and SIMD?" / "How can I tell SIMD that don't update 8, 9 but only update 10, 11, 12?" / "Suppose one square finishes after two repetitions, but another needs five. There is no way to know." / "It just happens that the mask contains negative numbers, right?"</p>
+
+<h2>Step 1: the real 8 lanes</h2>
+<p>Row i = 40, columns j = 208 to 215 of the real 256 x 256 run (max_iters = 1000). These are the true scalar counts, computed in float32 exactly like the lab file. The whole-image total of this computation is 16274722, the same number your machine printed as "CPU total". The vector loop must reproduce these 8 counts without knowing them in advance.</p>
+<pre>lane:          0    1    2    3    4    5    6    7
+column j:    208  209  210  211  212  213  214  215
+true count:   12    8    7    6    6    6    5    5</pre>
+<p>A lane with true count c passes the test before passes 1, 2, ..., c and fails it before pass c + 1. <code>_mm256_cmp_ps</code> writes the verdict of all 8 lanes into one register: YES = 32 bits all 1, NO = 32 bits all 0.</p>
+<div class="do"><b>DO:</b> Fill the mask (Y or N) before each pass.</div>
+<pre>before pass | lane 0  1  2  3  4  5  6  7 | testz says all N?
+------------+----------------------------+------------------
+     1      |      Y  Y  Y  Y  Y  Y  Y  Y | no
+     6      |      _  _  _  _  _  _  _  _ | ___
+     7      |      _  _  _  _  _  _  _  _ | ___
+     9      |      _  _  _  _  _  _  _  _ | ___
+    12      |      _  _  _  _  _  _  _  _ | ___
+    13      |      _  _  _  _  _  _  _  _ | ___</pre>
+<details><summary>CHECK</summary>
+<pre>before pass | lane 0  1  2  3  4  5  6  7 | all N?
+     1      |      Y  Y  Y  Y  Y  Y  Y  Y | no
+     6      |      Y  Y  Y  Y  Y  Y  N  N | no
+     7      |      Y  Y  Y  N  N  N  N  N | no
+     9      |      Y  N  N  N  N  N  N  N | no
+    12      |      Y  N  N  N  N  N  N  N | no
+    13      |      N  N  N  N  N  N  N  N | YES -> break
+rule: Y before pass p  exactly when  p &lt;= true count</pre>
+</details>
+
+<h2>Step 2: the minus sign that counts up</h2>
+<p>32 bits all 1, read as a signed 32-bit integer, is -1 (two's complement: 0xFFFFFFFF = -1). <code>_mm256_castps_si256</code> changes nothing in the bits; it only lets the next instruction read them as integers. <code>_mm256_sub_epi32</code> then does lane-by-lane subtraction: count minus mask.</p>
+<pre>lane with Y:   count - (-1) = count + 1
+lane with N:   count -  0   = count</pre>
+<div class="do"><b>DO:</b> Fill <code>iters_vec</code> after the subtraction in each pass.</div>
+<pre>after pass | lane 0  1  2  3  4  5  6  7
+-----------+--------------------------------
+     1     |      1  1  1  1  1  1  1  1
+     5     |      _  _  _  _  _  _  _  _
+     6     |      _  _  _  _  _  _  _  _
+     7     |      _  _  _  _  _  _  _  _
+     8     |      _  _  _  _  _  _  _  _
+    12     |      _  _  _  _  _  _  _  _</pre>
+<details><summary>CHECK</summary>
+<pre>after pass | lane 0  1  2  3  4  5  6  7
+     1     |      1  1  1  1  1  1  1  1
+     5     |      5  5  5  5  5  5  5  5
+     6     |      6  6  6  6  6  6  5  5
+     7     |      7  7  7  6  6  6  5  5
+     8     |      8  8  7  6  6  6  5  5
+    12     |     12  8  7  6  6  6  5  5   == true counts
+The loop never asked "which lane finished". Each lane's own mask bit froze its own count.</pre>
+</details>
+
+<h2>Step 3: the lanes that keep calculating</h2>
+<p>After lane 6 fails the test (before pass 6), lines A to F still run on lane 6, because one instruction runs on all 8 lanes. Only its count is frozen. Check that a finished lane cannot come back to Y. Take the spot from page 02, step 2 (j = 255, cx = 0.490234), which stopped after 5 passes with x = 2.857909, x*x = 8.167644.</p>
+<div class="do"><b>DO:</b> Run one extra pass on that finished lane. New x = 8.167644 + 0.490234 = ____ . New x*x = ____ . Above 4? ____ .</div>
+<details><summary>CHECK</summary>
+<pre>x = 8.657878    x*x = 74.958850   > 4   still N
+Once above 4, the next value is larger again (it overflows to inf, then NaN;
+_CMP_LE_OQ returns N for NaN). A frozen lane stays frozen.</pre>
+</details>
+
+<h2>Step 4: count the waste in real lane-passes</h2>
+<p>One pass of the loop = 8 lane-passes of work, whether a lane is useful or frozen. Useful lane-passes = the sum of the true counts.</p>
+<div class="do"><b>DO:</b> Group from step 1: passes run = ____ , lane-passes = ____ x 8 = ____ , useful = 12+8+7+6+6+6+5+5 = ____ , wasted = ____ .</div>
+<details><summary>CHECK</summary>
+<pre>passes run = 12 (break before pass 13)
+lane-passes = 12 * 8 = 96
+useful      = 55
+wasted      = 41</pre>
+</details>
+<p>Now a group where one lane never escapes. Row 40 was mild. Row 22, columns 184 to 191, real counts:</p>
+<pre>lane:          0    1    2    3    4     5    6    7
+true count:    7    8   10   15  154  1000   13   10</pre>
+<div class="do"><b>DO:</b> Passes run = ____ (who stops the loop: testz or iter &lt; max_iters?). Lane-passes = ____ . Useful = ____ . Useful percent = ____ .</div>
+<details><summary>CHECK</summary>
+<pre>lane 5 is Y forever, so testz never breaks; iter &lt; 1000 ends the loop.
+passes = 1000    lane-passes = 8000
+useful = 7+8+10+15+154+1000+13+10 = 1217
+1217 / 8000 = 15.2 percent</pre>
+</details>
+
+<h2>Step 5: predict your machine's speedup from the counts alone</h2>
+<p>Do step 4 for all 256 x 32 = 8192 groups of the image. The results, computed from the real counts: useful lane-passes = 16274722, lane-passes executed = 18321656. If the vector code cost nothing except passes, speedup over scalar = 8 x useful / executed. Your machine measured CPU scalar 61.6 ms and CPU vector 8.71 ms.</p>
+<div class="do"><b>DO:</b> Predicted = 8 x 16274722 / 18321656 = ____ . Measured = 61.6 / 8.71 = ____ . Difference = ____ .</div>
+<details><summary>CHECK</summary>
+<pre>16274722 / 18321656 = 0.8883
+predicted = 8 * 0.8883 = 7.11
+measured  = 61.6 / 8.71 = 7.07
+difference = 0.04
+Frozen lanes alone explain why 8 lanes gave about 7x, not 8x.</pre>
+</details>
+
+<nav><a href="03-the-w-line.html">prev: 03 the w line</a><a href="05-simd-cx.html">next: 05 SIMD cx and cy</a></nav>
+</main>
+</body>
+</html>

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>07 Waiting Chain</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>07. Lab 2: the waiting chain inside one pass</h1>
+<p class="sub">Pencil. Paper. Every blank ____ is yours. Open CHECK only after you wrote a number.</p>
+
+<h2>Start from zero</h2>
+<p>Lab 1 (pages 01 to 06) counted passes of lines A to F for 65536 spots, and spread the spots over 8 CPU lanes or 32 GPU threads. Lab 2 asks a different question: while one group of lanes runs its passes, how many cycles does the hardware sit idle, and how do you fill them? The loop body, from page 03, split into one operation per line:</p>
+<pre>op 1:  t1 = x2 - y2        op 6:  x2 = x * x
+op 2:  x  = t1 + cx        op 7:  y2 = y * y
+op 3:  t2 = w  - x2        op 8:  z  = x + y
+op 4:  t3 = t2 - y2        op 9:  w  = z * z
+op 5:  y  = t3 + cy
+(x2, y2, w on the right side of ops 1, 3, 4 come from the PREVIOUS pass)</pre>
+<p>Model used on this page, stated once: every add, subtract or multiply delivers its result 4 cycles after it starts (the published Turing FP32 figure from microbenchmarks), and one warp scheduler starts at most 1 instruction per cycle. The compiler fuses some ops into one FFMA, so real counts are smaller; the method does not change.</p>
+
+<h2>Where you got stuck</h2>
+<p class="you">"There is nothing which stops me from adding the original ones before I square the original ones. Everybody knows that." / "So this is something called as longest waiting chain. I don't know what it is." / "I don't even know what a group is."</p>
+
+<h2>Step 1: depth of every op</h2>
+<p>Depth of an op = 1 + the largest depth among the ops in this pass whose results it needs. Values from the previous pass count as depth 0.</p>
+<pre>op | needs (this pass)  | depth
+---+--------------------+------
+ 1 | nothing            |  1
+ 2 | op 1               |  _
+ 3 | nothing            |  _
+ 4 | op 3               |  _
+ 5 | op 4               |  _
+ 6 | op 2               |  _
+ 7 | op 5               |  _
+ 8 | op 2, op 5         |  _
+ 9 | op 8               |  _</pre>
+<div class="do"><b>DO:</b> Fill the depths. Number of ops = ____ . Largest depth = ____ . Write the ops on the longest path in order: ____ .</div>
+<details><summary>CHECK</summary>
+<pre>op: 1 2 3 4 5 6 7 8 9
+d : 1 2 1 2 3 3 4 4 5
+9 ops, largest depth 5, longest path: 3 -> 4 -> 5 -> 8 -> 9
+          w - x2 -> - y2 -> + cy -> x + y -> z * z
+The count of ops (9) and the length of the longest path (5) are two different numbers.</pre>
+</details>
+
+<h2>Step 2: from one pass to the next</h2>
+<p>Op 3 of the next pass needs w, which op 9 of this pass produces. Op 1 of the next pass needs x2 (op 6, depth 3) and y2 (op 7, depth 4). So the next pass cannot start its longest path until this pass's op 9 is done.</p>
+<pre>pass p:    op3 -> op4 -> op5 -> op8 -> op9 --+
+                                             | w
+pass p+1:  op3 -> op4 -> op5 -> op8 -> op9 &lt;-+ ...</pre>
+<div class="do"><b>DO:</b> Cycles per pass, minimum = longest path x 4 = ____ . Instructions the scheduler must start per pass = ____ . Idle start slots per pass = ____ . Busy percent = ____ . The slowest spot (1000 passes) needs at least ____ cycles.</div>
+<details><summary>CHECK</summary>
+<pre>5 * 4 = 20 cycles per pass
+9 instructions started in those 20 cycles
+idle start slots = 20 - 9 = 11
+busy = 9 / 20 = 45 percent
+1000 passes * 20 = 20000 cycles minimum</pre>
+</details>
+
+<h2>Step 3: fill the idle slots with a second group</h2>
+<p>A group = the 8 lanes of one 256-bit register (CPU) or one warp (GPU). Group A and group B are different spots, so no op of B needs a result of A. Put both groups' 9 ops in the same loop body: while A's op 4 waits 4 cycles for op 3, B's ops can start.</p>
+<pre>cycle:  1    2    3    4    5    6    7    8   ...
+A    :  op3  op1  .    .    op4  op2  .    .
+B    :  .    .    op3  op1  .    .    op4  op2
+        (B fills the cycles where A is waiting)</pre>
+<div class="do"><b>DO:</b> Two groups: instructions per pass = ____ , cycles per pass = larger of (20, ____) = ____ , busy = ____ percent. Three groups: instructions = ____ , cycles = larger of (20, ____) = ____ . Cycles per group-pass with 1, 2, 3 groups: ____ , ____ , ____ . Groups at which more groups stop helping: 20 / 9 = ____ .</div>
+<details><summary>CHECK</summary>
+<pre>2 groups: 18 instructions, max(20, 18) = 20 cycles, busy 90 percent
+3 groups: 27 instructions, max(20, 27) = 27 cycles (start slots are now the limit)
+per group-pass: 1 group 20, 2 groups 10, 3 groups 9
+20 / 9 = 2.2 groups. After that, the chain is hidden and the start rate is the wall.</pre>
+</details>
+
+<h2>Step 4: what must be copied for group B</h2>
+<p>Every value that survives from one pass into the next must exist once per group, or B overwrites what A reads in its next pass. Values that live and die inside one pass can be reused. Values that never change can be shared only if both groups have the same value.</p>
+<div class="do"><b>DO:</b> Sort these into three boxes: x2, y2, w, iters, x, y, t1, t2, t3, z, cx, cy, the constant 4.0. Box COPY PER GROUP: ____ . Box DIES INSIDE A PASS: ____ . Box NEVER CHANGES: ____ . If A and B are columns 208..215 and 216..223 of row 40, which of the never-change values differ between A and B? ____ .</div>
+<details><summary>CHECK</summary>
+<pre>COPY PER GROUP      : x2, y2, w, iters      (read next pass)
+DIES INSIDE A PASS  : x, y, t1, t2, t3, z   (rewritten before use every pass)
+NEVER CHANGES       : cx, cy, 4.0
+A vs B on row 40: cy is the same (-0.859375, same row), 4.0 is the same,
+cx differs (A starts at 0.03125, B starts at 0.03125 + 8 * 0.009765625 = 0.109375).
+So cx needs one register per group; cy_vec and 4.0 can be shared.</pre>
+</details>
+
+<nav><a href="06-gpu-threads.html">prev: 06 GPU threads</a><a href="08-two-groups-stop.html">next: 08 when two groups stop</a></nav>
+</main>
+</body>
+</html>

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>03 The w Line</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>03. The w line: where did 2*x*y go?</h1>
+<p class="sub">Pencil. Paper. Every blank ____ is yours. Open CHECK only after you wrote a number.</p>
+
+<h2>Start from zero</h2>
+<p>Page 02 did one pass as (x, y) to (x*x - y*y + cx, 2*x*y + cy), with the test x*x + y*y &lt;= 4 before each pass. The lab file does not write 2*x*y anywhere. This is the real loop body from <code>mandelbrot_cpu.cpp</code>, with x2, y2, w all starting at 0.0:</p>
+<pre>while (x2 + y2 &lt;= 4.0f &amp;&amp; iters &lt; max_iters) {
+    float x = x2 - y2 + cx;        // line A
+    float y = w - x2 - y2 + cy;    // line B
+    x2 = x * x;                    // line C
+    y2 = y * y;                    // line D
+    float z = x + y;               // line E
+    w = z * z;                     // line F
+    ++iters;
+}</pre>
+
+<h2>Where you got stuck</h2>
+<p class="you">"you are asking for square and then doing substractioon" / "Help me recall why am I doing add? I was just doing subtract."</p>
+
+<h2>Step 1: expand one square long-hand</h2>
+<p>Line E makes z = x + y. Line F makes w = z * z = (x + y) * (x + y). Expand it as four products, no shortcut.</p>
+<pre>        (x + y) * (x + y)
+       = x*x  +  x*y  +  y*x  +  y*y
+                 \______  ______/
+                        \/
+                     ____ * x*y</pre>
+<div class="do"><b>DO:</b> Write w as three terms: w = ____ + ____ + ____ . Then subtract x*x and y*y from both sides: w - x*x - y*y = ____ .</div>
+<details><summary>CHECK</summary>
+<pre>w = x*x + 2*x*y + y*y
+w - x*x - y*y = 2*x*y
+
+line B:  y = w - x2 - y2 + cy   is   y = 2*x*y + cy   in disguise.</pre>
+</details>
+
+<h2>Step 2: run both versions on one real spot</h2>
+<p>Grid square i = 0, j = 128: cx = 128/256*2.5 - 2.0 = -0.75, cy = 0/256*2.5 - 1.25 = -1.25. Run the lab's lines A to F and, beside them, the page-02 rule. Both columns must give the same y.</p>
+<pre>pass | x2       | y2       | w        | line B: w - x2 - y2 + cy | page 02: 2*x*y + cy
+-----+----------+----------+----------+--------------------------+--------------------
+  1  | 0.0      | 0.0      | 0.0      | 0 - 0 - 0 - 1.25 = -1.25 | 2*0*0 - 1.25 = -1.25
+     after pass 1:  x = -0.75  y = -1.25   x2 = ____  y2 = ____  z = ____  w = ____
+  2  | ____     | ____     | ____     | ________________ = ____  | 2*(-0.75)*(-1.25) - 1.25 = ____
+     after pass 2:  x = ____   y = ____    x2 = ____  y2 = ____  z = ____  w = ____
+  3  | ____     | ____     | ____     | ________________ = ____  | ________________ = ____</pre>
+<div class="do"><b>DO:</b> Fill every blank. Then write the test x2 + y2 before pass 4 and the count: ____ , ____ .</div>
+<details><summary>CHECK</summary>
+<pre>after pass 1: x2 = 0.5625   y2 = 1.5625   z = -2.0     w = 4.0
+pass 2: line B  = 4.0 - 0.5625 - 1.5625 - 1.25 = 0.625
+        page 02 = 1.875 - 1.25                   = 0.625   same
+        line A  = 0.5625 - 1.5625 - 0.75         = -1.75
+after pass 2: x = -1.75  y = 0.625  x2 = 3.0625  y2 = 0.390625  z = -1.125  w = 1.265625
+pass 3: line B  = 1.265625 - 3.0625 - 0.390625 - 1.25 = -3.4375
+        page 02 = 2*(-1.75)*(0.625) - 1.25 = -2.1875 - 1.25 = -3.4375   same
+        line A  = 3.0625 - 0.390625 - 0.75 = 1.921875
+before pass 4: x2 = 3.693604  y2 = 11.816406  test 15.510010 > 4 -> stop
+count = 3</pre>
+</details>
+
+<h2>Step 3: count the multiplies</h2>
+<p>Here is the version written straight from page 02, with no x2, y2, w variables. Count every <code>*</code> executed in one pass, test included. Then count them in the lab version (lines A to F plus the test).</p>
+<pre>straight version:                              lab version:
+while (x*x + y*y &lt;= 4.0f ...) {                while (x2 + y2 &lt;= 4.0f ...) {
+    float xt = x*x - y*y + cx;                     x  = x2 - y2 + cx;
+    y = 2*x*y + cy;                                y  = w - x2 - y2 + cy;
+    x = xt;                                        x2 = x*x;  y2 = y*y;
+}                                                  z  = x + y;  w = z*z;
+                                               }
+multiplies per pass:  ____                     multiplies per pass:  ____</pre>
+<div class="do"><b>DO:</b> Fill both counts. For a spot that hits the cap of 1000 passes, multiplies saved = ____ .</div>
+<details><summary>CHECK</summary>
+<pre>straight: test x*x, y*y (2) + xt x*x, y*y (2) + 2*x*y (2)  = 6
+lab:      x*x, y*y, z*z                                    = 3
+the test reuses x2 and y2 computed at the end of the previous pass.
+1000 passes: 6000 - 3000 = 3000 multiplies saved for that one spot.
+
+The price: line B has 3 subtractions/additions instead of 1 addition.
+On page 07 this price shows up again as a longer waiting chain.</pre>
+</details>
+
+<nav><a href="02-square-and-add.html">prev: 02 square and add</a><a href="04-simd-while-loop.html">next: 04 SIMD and the while loop</a></nav>
+</main>
+</body>
+</html>

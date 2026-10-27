@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GPU Learnings</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>GPU Learnings: do it, don't read it</h1>
+<p class="sub">Built from one real chat that worked through MIT 6.S894 Lab 1 (Mandelbrot: CPU scalar, CPU SIMD, GPU scalar, GPU vector) and Lab 2 (filling idle cycles), on a Ryzen 5 4600H and a GTX 1650.</p>
+
+<p>No definitions here: every blog has those. Each page starts from zero, quotes the exact place the learner got stuck, and then makes you calculate with the real numbers from the real run. Every number checks out against the machine's output: the 65536 counts used here sum to 16274722, the same total the CPU printed. Pencil and paper. Fill every ____ before you open CHECK.</p>
+
+<pre>   page 01          page 02          page 03
+ grid square --&gt;  square and  --&gt;  the w line
+ to plane spot    add, by hand     (2*x*y hidden)
+       |
+       v
+   page 04          page 05          page 06
+ 8 SIMD lanes,    8 cx values  --&gt; 32 GPU threads,
+ 1 while loop --&gt; from 1 number    where is "nearby"?
+       |
+       v
+   page 07          page 08
+ waiting chain --&gt; two groups,
+ (Lab 2)           when to stop</pre>
+
+<ol class="topics">
+<li><a href="01-two-papers.html">Two papers: the grid square and the plane spot</a>: where 2.5 and -2.0 come from, and why the same "row 9, col 7" gives count 1 or count 3.</li>
+<li><a href="02-square-and-add.html">Square and add: the counting loop by hand</a>: why you start at (0, 0), and a distance that goes down before it escapes.</li>
+<li><a href="03-the-w-line.html">The w line</a>: the lab code never writes 2*x*y. Find it.</li>
+<li><a href="04-simd-while-loop.html">SIMD and the while loop</a>: 8 counts, 1 loop, a mask that is -1, and a speedup predicted from the counts (7.11 predicted, 7.07 measured).</li>
+<li><a href="05-simd-cx.html">SIMD cx and cy</a>: the "alien" offsets 0..7, fmadd's three inputs, and the argument-order trap.</li>
+<li><a href="06-gpu-threads.html">GPU threads and memory</a>: one changed line, the profiler's 2,048 requests and 8,192 sectors derived by hand, and 22.06 predicted against 22.75 measured.</li>
+<li><a href="07-waiting-chain.html">Lab 2: the waiting chain</a>: 9 ops, a path of 5, 11 idle slots per pass.</li>
+<li><a href="08-two-groups-stop.html">Lab 2: two groups, when to stop</a>: two wrong stopping rules, one right one, and more waste for fewer cycles.</li>
+</ol>
+</main>
+</body>
+</html>
