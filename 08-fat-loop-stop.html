@@ -11,8 +11,16 @@
 <h1>08. Lab 2: when does the fat while loop stop?</h1>
 <p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
 
+<p class="label">The story</p>
+<div class="story">
+<p>The previous lab trick, putting two independent sets of 8 places into one loop, raises a practical problem the learner hit straight away. The two sets need different numbers of repetitions. A loop can only end once. When should it end?</p>
+<p>The learner's complaint was honest: the loop is getting fatter, it was already hard with 8 places, now there are 16, and what even counts as one repetition? The answer turns out to be something the learner had already built in Lab 1 without recognising it: each set's own comparison result already stops its own counters. Only the end of the loop is new.</p>
+<p>Once the stopping rule is settled, the cost: the fat loop clearly does more useless arithmetic. Does it finish sooner or later than two thin loops, and by how much on the whole picture?</p>
+</div>
+
 <p class="you">Your words: "My while loop becomes longer and fatter. Then what is a pass? A pass is a collection of a fat while loop or a thin while loop?" / "It was already difficult to do for 8. Now I have to do for 16." / "My brain refuses to see that I actually solved the problem in lab 1."</p>
 
+<p class="label">Work it out</p>
 <p class="ln"><b>L01</b> In the AVX2 vector code of Lab 1, one <code>__m256</code> holds 8 floats, at index 0 to 7: the middleman pairs of the same i and j to j + 7. <span class="from">from: your code</span></p>
 <p class="ln"><b>L02</b> The Lab 1 vector while loop, copied from your code: <span class="from">from: your code</span></p>
 <pre>while (iter &lt; max_iters) {
@@ -73,6 +81,34 @@ A 1000, B 1000 : thin 40000, fat 20000, saving 50 percent
 The fat loop gains when its sets need similar numbers of repetitions.
 Which sets go into one fat loop is part of the design.</pre>
 </details>
+
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln"><b>L16</b> From L14 and L15, under the L13 model (20 cycles per repetition for one set or for two): the i = 40 pair of sets takes 340 cycles thin and 240 fat; a pair with 1000 and 5 saves 0.5 percent; a pair with 1000 and 1000 saves 50 percent. <span class="from">from: L13, L14, L15</span></p>
+<p class="ln"><b>L17</b> New data from the scalar iters of the whole picture: pair every block of 8 neighbours j..j+7 with the next block j+8..j+15. Thin loops need 2290207 repetitions in total (each block's largest iters, added up). Fat loops need 1236522 (each pair's larger block, added up). <span class="from">from: computation on the scalar iters</span></p>
+<p class="ln do"><b>L18</b> <b class="x">DO</b> Cycles under L13: thin = 2290207 x 20 = ____ , fat = 1236522 x 20 = ____ . Ratio thin / fat = ____ . The best possible ratio for a pair is ____ (both blocks equal) and the worst is about ____ (one block 1000, the other tiny). <span class="from">from: L13, L16, L17</span></p>
+<details><summary>CHECK</summary>
+<pre>thin 45804140 cycles, fat 24730440 cycles, ratio 1.85
+best 2.0 (equal blocks, L15's 1000 and 1000), worst about 1.0 (L15's 1000 and 5)</pre>
+</details>
+<p class="ln do"><b>L19</b> <b class="x">DO</b> Collect L06 (A needs 12, B needs 5), L11 (the Lab 1 mask, twice), L14 (more useless work, fewer cycles), L15, L16, L18. The whole-picture ratio is 1.85, close to the best case 2.0, though single pairs can be as bad as 1.005. Write one sentence explaining why. <span class="from">from: L06, L11, L14, L15, L16, L18</span></p>
+<details><summary>CHECK</summary>
+<pre>Neighbouring blocks of 8 usually need similar numbers of repetitions, so most pairs are close
+to the equal case; the 1000-next-to-5 pairs only occur along the edge of the set and are rare.
+The fat loop wins for the same reason the 8-at-once code won in Lab 1: neighbours are alike.
+
+Tempting answer that fails: "the fat loop wastes work, so it must be slower". L14 and L18 count
+the waste and the cycles separately, and the cycles win.</pre>
+</details>
+
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>Combining two jobs into one loop means the loop ends when the slower job ends, so the faster job's share of the loop is wasted. It still pays when the hardware was otherwise idle, and it pays most when the two jobs are about the same size. Choosing which jobs to combine is part of the design.</p>
+<p>For a manager: batching work together is cheapest when the batched items are alike. Batching one huge item with one tiny one buys almost nothing.</p>
+</div>
 
 <nav><a href="07-waiting-chain.html">prev: 07 the waiting chain</a><a href="09-clock-read-trap.html">next: 09 clock read trap</a></nav>
 </main>

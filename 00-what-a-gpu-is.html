@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What a GPU Is</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>00. What a GPU is, measured on one laptop</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>A processor executes instructions: add these two numbers, multiply those, compare, jump. The central processor of a computer, the CPU, is built to finish a single sequence of instructions as fast as possible. A graphics processor, the GPU, is built differently: it has far more arithmetic circuits, each one simpler, and it is fast only when many of them are given the same instruction at the same moment.</p>
+<p>That difference is why GPUs now carry most of the world's AI work, and why they are expensive. A GPU that is not kept busy is money spent on circuits doing nothing. Every page of this site, underneath the details, measures how much of the hardware did useful work and why the rest did not.</p>
+<p>The measurements come from one learner's laptop: an AMD Ryzen 5 4600H CPU and an NVIDIA GeForce GTX 1650 GPU, working through Lab 1 of MIT course 6.S894. The lab computes one picture, the Mandelbrot set, four different ways and times each one. Before any detail, look at the four times and ask a single question: is the GPU fast or slow at this job?</p>
+</div>
+
+<p class="you">Your words: "I know what is GPU and I know what is threadIdx ... But what is the exact intellectual step I have to do?" / "any idiot can say we will put all the things in parallel because they all work on the GPU"</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> Your CPU, Ryzen 5 4600H: 6 cores (circuits that each execute their own sequence of instructions). Each core has AVX2 instructions that act on a 256-bit register. A float is 32 bits. <span class="from">from: your hardware table</span></p>
+<p class="ln do"><b>L02</b> <b class="x">DO</b> Floats per AVX2 instruction = 256 / 32 = ____ . Float operations the 6 cores can begin together with AVX2, one instruction each = 6 x ____ = ____ . <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>256 / 32 = 8 floats per instruction
+6 * 8 = 48 float operations at once</pre>
+</details>
+<p class="ln"><b>L03</b> Your GPU, GTX 1650: 14 SMs (blocks of hardware on the chip), each with 64 FP32 units (circuits that do one float multiply-add each). <span class="from">from: your hardware table, NVIDIA Turing layout</span></p>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> FP32 units on the GPU = 14 x 64 = ____ . Compared with L02's figure for the CPU: ____ / 48 = ____ times more. <span class="from">from: L02, L03</span></p>
+<details><summary>CHECK</summary>
+<pre>14 * 64 = 896 FP32 units  (NVIDIA lists 896 CUDA cores for the GTX 1650)
+896 / 48 = 18.7 times more float circuits than the CPU's AVX2 at full use</pre>
+</details>
+<p class="ln"><b>L05</b> Lab 1 times on your machine, for the 256 by 256 picture: CPU, one core, plain code = 61.6 ms. CPU, one core, AVX2 code = 8.71 ms. GPU, 1 thread = 403.435 ms. GPU, 32 threads = 17.732 ms. <span class="from">from: your output</span></p>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> Each time against the plain CPU time, 61.6 / time: AVX2 = ____ , GPU 1 thread = ____ , GPU 32 threads = ____ . Fastest of the four = ____ . <span class="from">from: L05</span></p>
+<details><summary>CHECK</summary>
+<pre>AVX2         : 61.6 / 8.71    = 7.07 times faster
+GPU 1 thread : 61.6 / 403.435 = 0.153  (6.55 times slower)
+GPU 32 thr.  : 61.6 / 17.732  = 3.47 times faster
+fastest: the CPU with AVX2, 8.71 ms</pre>
+</details>
+<p class="ln do"><b>L07</b> <b class="x">DO</b> The CPU AVX2 time used 1 of the 6 cores (L05). Share of the CPU's cores used = 1 / 6 = ____ percent. The GPU 32-thread time used 32 threads, at most 32 of the 896 FP32 units at once. Share of the GPU's FP32 units used = 32 / 896 = ____ percent. <span class="from">from: L01, L04, L05</span></p>
+<details><summary>CHECK</summary>
+<pre>CPU: 1 / 6    = 16.7 percent of the cores
+GPU: 32 / 896 =  3.6 percent of the FP32 units</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> Collect L02, L04, L06, L07. The fastest result was the CPU, 8.71 ms against the GPU's 17.732 ms. Someone concludes: "the GPU is slower than the CPU for this job." Which number from L07 says the comparison does not support that conclusion? ____ . If every FP32 unit of the GPU did as much as each of the 32 did, the time would be 17.732 x 32 / 896 = ____ ms. <span class="from">from: L02, L04, L06, L07</span></p>
+<details><summary>CHECK</summary>
+<pre>3.6 percent: the GPU result used about 1/28 of its arithmetic circuits; the CPU result used 1/6.
+17.732 * 32 / 896 = 0.633 ms
+
+0.633 ms is a straight-line estimate that ignores everything except unit count; it is not a
+prediction. Its only use is showing how much hardware the 17.732 ms left unused.
+
+Tempting answer that fails: "GPUs are slower than CPUs for this job". Neither result used its
+whole chip, and the GPU result used a far smaller share.</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>A GPU is not fast by itself. It is fast when a program gives most of its circuits the same instruction at the same time. The first GPU version in this lab used one thread and lost to the CPU by more than six times; the second used 32 threads and still left over 96 percent of the arithmetic circuits unused.</p>
+<p>For a manager: the hardware you buy and the hardware your software uses are two different numbers. Ask for the second one.</p>
+</div>
+
+<nav><a href="index.html">index</a><a href="01-image-to-middleman.html">next: 01 middleman pair</a></nav>
+</main>
+</body>
+</html>

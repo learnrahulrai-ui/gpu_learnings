@@ -11,8 +11,16 @@
 <h1>05. SIMD and the while loop: eight iters, one loop</h1>
 <p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
 
+<p class="label">The story</p>
+<div class="story">
+<p>Each place of the picture needs its own number of repetitions, anywhere from 1 to 1000. The AVX2 instructions handle 8 places at once, but an instruction cannot do something to some of its 8 numbers and something else to the others. So how can one loop give 8 places 8 different numbers of repetitions?</p>
+<p>The learner attacked this from every side. SIMD does not understand while loops. SIMD cannot be told to update some numbers and not others. There is no way to know in advance which of the 8 will finish first. All three statements are true, and the solution does not contradict any of them.</p>
+<p>The learner's three statements are the constraints. Any solution has to respect all of them at once and still give every one of the 8 places its correct count. Before reading the code, try to say what such a solution would have to waste.</p>
+</div>
+
 <p class="you">Your words: "SIMD does not even understand while loop. So where is the connection between this while loop and SIMD?" / "How can I tell SIMD that don't update 8, 9 but only update 10, 11, 12?" / "Suppose one square finishes after two repetitions, but another needs five. There is no way to know." / "It just happens that the mask contains negative numbers, right?"</p>
 
+<p class="label">Work it out</p>
 <p class="ln"><b>L01</b> The scalar while loop, for one (i, j), copied with lines A to F shortened to a comment: <span class="from">from: code</span></p>
 <pre>while (x2 + y2 &lt;= 4.0f &amp;&amp; iters &lt; max_iters) {
     /* lines A to F: x, y, x2, y2, z, w */
@@ -120,6 +128,35 @@ useful = 7+8+10+15+154+1000+13+10 = 1217
 61.6 / 8.71 = 7.07
 The useless index-repetitions alone explain why 8 indexes gave about 7x, not 8x.</pre>
 </details>
+
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln"><b>L23</b> From L20, L21 and L22, in index-repetitions: the i = 40 block is 55 useful of 96 (57.3 percent), the i = 22 block is 1217 of 8000 (15.2 percent), and the whole picture is 16274722 of 18321656 (88.8 percent). <span class="from">from: L20, L21, L22</span></p>
+<p class="ln"><b>L24</b> New data: shuffle the 65536 places of the picture randomly, cut them into 8192 blocks of 8 (not neighbours any more), and count the same way. Useful share = 27.9 percent. <span class="from">from: computation on the scalar iters</span></p>
+<p class="ln do"><b>L25</b> <b class="x">DO</b> Speedup over scalar predicted by L22's method with neighbours = 8 x 0.888 = ____ . With random blocks of 8 = 8 x 0.279 = ____ . Same instructions, same machine. What changed between them? ____ . <span class="from">from: L22, L24</span></p>
+<details><summary>CHECK</summary>
+<pre>neighbours: 7.11      random: 2.23
+only the choice of which 8 places share one __m256 changed.</pre>
+</details>
+<p class="ln do"><b>L26</b> <b class="x">DO</b> Collect L09 (neighbours 12 8 7 6 6 6 5 5), L15 (each index counts by itself), L21 (one 1000 among 8 wastes 85 percent), L22 (7.11 predicted, 7.07 measured), L23, L25. Single blocks reach 15.2 percent, yet the whole picture is at 88.8 percent. Write one sentence explaining both numbers at once. <span class="from">from: L09, L15, L21, L22, L23, L25</span></p>
+<details><summary>CHECK</summary>
+<pre>Neighbouring places usually need similar numbers of repetitions, so most blocks of 8 neighbours
+finish together and waste little; only the few blocks on the edge of the set mix 1000 with small
+counts and waste a lot. The 7x speedup comes from that property of the picture, not from the
+instructions: with random blocks the same instructions give 2.23x.
+
+Tempting answer that fails: "SIMD is 8 times faster minus some overhead". L25 keeps the
+instructions and loses two thirds of the speedup.</pre>
+</details>
+
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>Doing 8 things with one instruction only pays when the 8 things need the same amount of work. The vector code here gets about 7 times faster than plain code because neighbouring parts of this picture happen to need similar work. Pick the 8 badly and the same hardware gives barely 2 times.</p>
+<p>For a manager: hardware speedups quoted as "8 times" or "32 times" are maximums. The real number depends on how similar the units of work are, and that is a property of your data, not of the chip.</p>
+</div>
 
 <nav><a href="04-simd-cx.html">prev: 04 eight cx values</a><a href="06-gpu-threads.html">next: 06 GPU threads</a></nav>
 </main>

@@ -11,8 +11,16 @@
 <h1>06. GPU: one changed line, and the proof of "nearby"</h1>
 <p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
 
+<p class="label">The story</p>
+<div class="story">
+<p>The graphics card in this laptop, a GTX 1650, has 896 small arithmetic units arranged in 14 SMs. Lab 1 first computes the whole picture with one GPU thread, which takes 403 milliseconds, more than six times slower than one CPU core. Then it changes one line so that 32 threads share the work, and the time falls to 17.7 milliseconds.</p>
+<p>The changed line makes thread number t take the places j = t, t + 32, t + 64, and so on. The chat claimed this made memory access efficient because neighbouring threads touch nearby memory. The learner refused the claim without proof: inside thread 7 the places 7 and 39 are far apart, threads do not talk to each other, so where is the nearby?</p>
+<p>The only evidence that settles it is a pair of profiler counts the learner's own machine printed: 2,048 and 8,192. And once that is settled, a second question nobody in the chat asked: did the same one-line choice decide anything besides memory?</p>
+</div>
+
 <p class="you">Your words: "no proof this how can 7 and 39 and all be nearby stuff" / "On one hand you are saying nearby, and on one hand you are saying spacing. You cannot space out and do nearby at the same time" / "Threads don't talk to each other. A thread doesn't know about other threads, right?"</p>
 
+<p class="label">Work it out</p>
 <p class="ln"><b>L01</b> Your GPU function, copied from your file, with the scalar while loop shortened: <span class="from">from: your code</span></p>
 <pre>__global__ void mandelbrot_gpu_vector(uint32_t img_size, uint32_t max_iters, uint32_t *out) {
     for (uint64_t i = 0; i &lt; img_size; ++i) {
@@ -94,6 +102,35 @@ whole image: 2048 * 32 = 65536 blocks
 32 * 0.6893 = 22.06
 measured 22.75; the waiting threads of L16 explain why 32 threads gave about 22x.</pre>
 </details>
+
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln"><b>L19</b> From L12, L14 and L18: with <code>j = threadIdx.x; j += blockDim.x</code>, one store instruction touches 4 blocks of 32 bytes, and useful thread-repetitions are 68.9 percent. With the L13 sharing (thread t takes 8t to 8t + 7), one store touches 32 blocks. <span class="from">from: L12, L14, L18</span></p>
+<p class="ln"><b>L20</b> New data for the L13 sharing: at each moment the 32 threads hold j = 8t + c for one c from 0 to 7, so they are spread across the whole 0..255 range instead of being neighbours. Counting thread-repetitions as in L16 to L18 gives a useful share of 35.9 percent. <span class="from">from: computation on the scalar iters</span></p>
+<p class="ln do"><b>L21</b> <b class="x">DO</b> Predicted speedup of 32 threads over 1 thread, L18's method: with the lab's line = 32 x 0.689 = ____ . With the L13 sharing = 32 x 0.359 = ____ . Memory blocks moved, lab's line versus L13 = 8192 versus ____ . <span class="from">from: L12, L14, L18, L20</span></p>
+<details><summary>CHECK</summary>
+<pre>lab's line: 22.06      L13 sharing: 11.49
+memory blocks: 8192 versus 65536</pre>
+</details>
+<p class="ln do"><b>L22</b> <b class="x">DO</b> Collect L10 (128 bytes, no gap), L12 (2,048 and 8,192 measured), L14, L17 (4.2 percent at i = 40), L18 (22.06 predicted, 22.75 measured), L19, L20, L21. The lab's line was presented as a memory decision. Name the second thing it decides, and say why both point to the same choice. <span class="from">from: L10, L12, L14, L17, L18, L19, L20, L21</span></p>
+<details><summary>CHECK</summary>
+<pre>It also decides which 32 places wait for each other inside one while loop.
+With the lab's line, the 32 places at one moment are neighbours: their bytes are side by side
+(4 blocks instead of 32) and their iters are similar (68.9 percent useful instead of 35.9).
+Both benefits come from the same fact: neighbouring threads hold neighbouring places.
+
+Tempting answer that fails: "the line is about combining memory accesses". L21 shows it also halves
+the predicted speedup if chosen the other way, through waiting alone.</pre>
+</details>
+
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>On a GPU, the decision of which thread handles which piece of data is the most important line in the program. Here a single line decided both how much memory traffic there is and how much of the arithmetic is wasted waiting. Getting it wrong does not produce an error; it produces a correct picture, slower.</p>
+<p>For a manager: a GPU program can be correct and still leave most of the card idle. Only measurements like the profiler counts on this page reveal which.</p>
+</div>
 
 <nav><a href="05-simd-while-loop.html">prev: 05 SIMD and the while loop</a><a href="07-waiting-chain.html">next: 07 the waiting chain</a></nav>
 </main>

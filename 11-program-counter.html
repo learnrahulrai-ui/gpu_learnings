@@ -11,8 +11,16 @@
 <h1>11. A program counter for every thread: is the 32-thread unit useless?</h1>
 <p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
 
+<p class="label">The story</p>
+<div class="story">
+<p>Everyone learning CUDA hears that GPU threads move in lockstep, 32 at a time. The learner took that literally and found a contradiction. If 32 threads move together, there is one place in the program for all of them. But when some threads take the if side of a branch and others take the else side, they are at different places. A single place cannot be two places, and a program counter does not move backward to fetch the other side.</p>
+<p>The learner then found the documented answer: on this GPU every thread has its own program counter. And immediately asked the sharper question: if every thread has its own program counter, what is the point of keeping 32 of them together at all?</p>
+<p>That question can be answered with counts instead of opinions: how many instructions begin, and how much of each instruction's room for 32 threads does useful work?</p>
+</div>
+
 <p class="you">Your words: "People say warp run in lockstep that is impossible to select a warp and a real instructions there is no way to know which of the 32 is waiting on which line" / "that will require two program counters, right? ... The program counter never goes back" / "So program counter are distinct, right, per thread? Then the concept of warp is useless, right?"</p>
 
+<p class="label">Work it out</p>
 <p class="ln"><b>L01</b> A program counter is the address of the next instruction a thread will execute. After an instruction, it moves to the next address, or to a branch target. <span class="from">from: definition</span></p>
 <p class="ln"><b>L02</b> NVIDIA fact: a launch <code>&lt;&lt;&lt;B, T&gt;&gt;&gt;</code> makes B blocks of T threads each. Your GTX 1650 chip is built from 14 units NVIDIA calls SMs; each block executes on one SM. An SM handles a block's threads in units of 32 consecutive threads. NVIDIA names such a unit a warp; your lab file <code>warp_scheduler.cu</code> is named after it. Threads 0 to 31 of a block form warp 0. <span class="from">from: CUDA programming guide, SIMT architecture</span></p>
 <p class="ln"><b>L03</b> NVIDIA fact: a warp executes one common instruction at a time. Each instruction that begins is for the threads of the warp whose program counter is at that instruction. <span class="from">from: CUDA programming guide, SIMT architecture</span></p>
@@ -54,6 +62,41 @@ Not useless: equal PCs are what the speed comes from; per-thread PCs only make u
 <pre>1000 repetitions, room 32 * 1000 = 32000, work 1334, 4.2 percent
 Same mechanism as L07, stretched over 1000 repetitions.</pre>
 </details>
+
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln"><b>L11</b> From L08, a branch split 16 and 16 with one instruction on each side used 50 percent of the room. From L09, equal program counters cost 100 instructions and all-different ones cost 3200. <span class="from">from: L08, L09</span></p>
+<p class="ln do"><b>L12</b> <b class="x">DO</b> New branch: the if side has 10 instructions, the else side has 2. Room per instruction = 32 thread-instructions. Fill the table. <span class="from">from: L03, L08, L11</span></p>
+<pre>threads taking if / else | instructions begun | room  | useful            | percent
+-------------------------+--------------------+-------+-------------------+--------
+        32 / 0           |       ____         | ____  | ____              |  ____
+        16 / 16          |       ____         | ____  | ____              |  ____
+        31 / 1           |       ____         | ____  | ____              |  ____
+         1 / 31          |       ____         | ____  | ____              |  ____</pre>
+<details><summary>CHECK</summary>
+<pre>32 / 0 : 10 begun, room 320, useful 32*10         = 320, 100    percent
+16 / 16: 12 begun, room 384, useful 16*10 + 16*2  = 192,  50    percent
+31 / 1 : 12 begun, room 384, useful 31*10 + 1*2   = 312,  81.25 percent
+ 1 / 31: 12 begun, room 384, useful 1*10 + 31*2   =  72,  18.75 percent</pre>
+</details>
+<p class="ln do"><b>L13</b> <b class="x">DO</b> Collect L07 (no counter moves backward), L09, L10 (4.2 percent in Lab 1), L11, L12. In L12, the entries 31 / 1 and 1 / 31 cost the same number of instructions but differ 4 times in useful work. Write one sentence on what sets the cost of a branch and what sets its waste. <span class="from">from: L07, L09, L10, L11, L12</span></p>
+<details><summary>CHECK</summary>
+<pre>The cost is the sum of the lengths of every side that at least one thread takes (12 here,
+whether 1 thread or 31 take the long side). The waste depends on how many threads sit idle
+during each side: one thread on the long side makes 31 others wait through all 10 instructions.
+
+Tempting answer that fails: "per-thread program counters remove the cost of branches".
+They make branches correct; L12 shows the cost is unchanged.</pre>
+</details>
+
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>A GPU is fast when many threads do the same instruction at the same moment. Modern NVIDIA GPUs let threads go separate ways correctly, but when they do, the card does each way one after the other, and threads not on the current way wait. A single thread taking a long, unusual path can hold 31 others idle.</p>
+<p>For a manager: on a GPU, the expensive cases are not the common ones; they are the rare ones that make the common ones wait.</p>
+</div>
 
 <nav><a href="10-cycles-per-ffma.html">prev: 10 cycles per FFMA</a><a href="12-the-48-trap.html">next: 12 the 48 in warp_scheduler.cu</a></nav>
 </main>

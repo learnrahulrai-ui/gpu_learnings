@@ -11,8 +11,16 @@
 <h1>09. Lab 2 prelab: what sits between the clock reads</h1>
 <p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
 
+<p class="label">The story</p>
+<div class="story">
+<p>Lab 2 begins with a small experiment: measure how many cycles one multiply-add takes on the GPU. The starter code reads a clock counter, does 64 multiply-adds, reads the counter again, and subtracts. It looks impossible to get wrong.</p>
+<p>It is easy to get wrong, because the compiler is free to move instructions around the clock reads. The clock read takes no input, so nothing forces the work you meant to exclude to stay outside the timed region, and nothing forces the work you meant to include to finish inside it. The learner's own compiled program is the test case.</p>
+<p>Where exactly did the compiler put each instruction, and what does each possible placement of the clock reads include or leave out? The learner's own machine listing is the evidence.</p>
+</div>
+
 <p class="you">Your words: "Okay, now I am seeing this data type, start and clock time ... I see a thread fence ... What code I should write and what should I think to finish this function?" / "I am confused with all these things, right? So can you clearly tell me what line of code I have to write and why?"</p>
 
+<p class="label">Work it out</p>
 <p class="ln"><b>L01</b> The starter file <code>fma_latency.cu</code> defines the clock read, copied without change: <span class="from">from: code</span></p>
 <pre>#define clock_cycle() \
     ({ \
@@ -79,6 +87,42 @@ Your report showed exactly that: with only x pinned, the add on y moved inside.<
 the wait for the last FFMA's value is not counted.
 So the end read also takes the final x and y: end_time = clock_cycle_dep2(x, y).</pre>
 </details>
+
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln"><b>L15</b> From L10, L13 and L14, a clock read with no input can be placed before work you meant to exclude and before the value of work you meant to include. Pinning the start read to x and y keeps the setup outside; pinning the end read to x and y keeps the last multiply-add's wait inside. <span class="from">from: L10, L13, L14</span></p>
+<p class="ln do"><b>L16</b> <b class="x">DO</b> Fill the table: for each version, write what lies between the reads besides the chain itself. Use the words: DRAM wait, setup FADDs, last FFMA wait. <span class="from">from: L06, L10, L13, L14, L15</span></p>
+<pre>start read pinned? | end read pinned? | inside the window, besides the chain
+-------------------+------------------+--------------------------------------
+        no         |        no        | __________________________________
+        yes        |        no        | __________________________________
+        no         |        yes       | __________________________________
+        yes        |        yes       | __________________________________</pre>
+<details><summary>CHECK</summary>
+<pre>no,  no : DRAM wait + setup FADDs inside; last FFMA wait missing
+yes, no : nothing extra inside; last FFMA wait missing
+no,  yes: DRAM wait + setup FADDs inside; last FFMA wait included
+yes, yes: last FFMA wait included; nothing else</pre>
+</details>
+<p class="ln do"><b>L17</b> <b class="x">DO</b> Collect L07 (the add exists only to pay the DRAM wait early), L09 and L10 (your listing moved it), L12 (the fix in your listing), L13, L14, L16. Which version prints the smallest number? ____ . Which prints the number that matches "the chain from first value to last value"? ____ . Write one sentence on how you know which one your program is. <span class="from">from: L07, L09, L10, L12, L13, L14, L16</span></p>
+<details><summary>CHECK</summary>
+<pre>smallest: pinned start, unpinned end (nothing extra in, and the last wait left out)
+matches the chain: both pinned
+You know only by reading the machine listing (cuobjdump -sass): the source code showed the
+add above the clock read in every version.
+
+Tempting answer that fails: "the smallest measurement is the least polluted, so the best".
+It is small because it leaves out part of the chain.</pre>
+</details>
+
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>A timer measures whatever the compiled program puts between its two readings, not what the source code appears to say. Compilers move instructions when nothing forbids it. The only way to know what was timed is to read the compiled instructions, and the way to control it is to make the readings depend on the values you care about.</p>
+<p>For a manager: a benchmark number without the exact compiled code behind it is a claim, not a measurement.</p>
+</div>
 
 <nav><a href="08-fat-loop-stop.html">prev: 08 fat loop stop</a><a href="10-cycles-per-ffma.html">next: 10 cycles per FFMA</a></nav>
 </main>

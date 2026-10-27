@@ -11,8 +11,16 @@
 <h1>04. SIMD: eight cx values from one number</h1>
 <p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
 
+<p class="label">The story</p>
+<div class="story">
+<p>A processor core normally does one arithmetic operation on one number per instruction. The Ryzen in this laptop also has AVX2 instructions, which do the same operation on 8 numbers at once, held side by side in one 256-bit register. Lab 1 asks for the picture to be computed with these instructions. The idea is easy to say: handle 8 neighbouring places of the picture together. Saying it is not the hard part.</p>
+<p>The first wall is the input. Each of the 8 places needs its own middleman pair, and the 8 values must be built before any arithmetic can begin. The vector code builds them with a line containing the numbers 7, 6, 5, 4, 3, 2, 1, 0, which appear nowhere in the problem. The learner called them alien, and asked why the problem never mentions them.</p>
+<p>Can those numbers be forced out of the original cx line, so they stop being something to remember? And a harder question: the vector code matched the original code exactly on the 256 by 256 picture. Is that proof that the method is exact?</p>
+</div>
+
 <p class="you">Your words: "Zero to seven makes no sense, right? They are alien to me. This program never specified this floating point numbers." / "CX itself is just one number, not eight numbers. DX is just one number. Only offsets are eight numbers, right?" / "Why is the calculation of CY vector so easy?"</p>
 
+<p class="label">Work it out</p>
 <p class="ln"><b>L01</b> The scalar lab code makes the middleman pair for one (i, j), copied without change: <span class="from">from: code</span></p>
 <pre>float cx = (float(j) / float(img_size)) * 2.5f - 2.0f;
 float cy = (float(i) / float(img_size)) * 2.5f - 1.25f;</pre>
@@ -90,6 +98,42 @@ Each block of 8 comes out mirror-reversed: j = 208 gets the iters of 215,
 209 gets 214, ..., 215 gets 208. Every iters value is right, stored in the wrong place.
 A compare against the scalar output catches it; looking at the image may not.</pre>
 </details>
+
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln"><b>L19</b> From L09, cy is computed 256 times. From L06, the scalar cx line inside the j loop executes once per value of j it reaches: 256 values of i times 256 / 8 = 32 values of j, and each is followed by one <code>_mm256_fmadd_ps</code>. <span class="from">from: L06, L09</span></p>
+<p class="ln do"><b>L20</b> <b class="x">DO</b> Scalar code (L01 inside both loops): cx lines executed = 256 x 256 = ____ . Vector code: scalar cx lines = 256 x 32 = ____ , fmadd instructions = ____ . Each scalar cx line is a divide, a multiply and a subtract. Divides in scalar code = ____ , in vector code = ____ . <span class="from">from: L01, L06, L19</span></p>
+<details><summary>CHECK</summary>
+<pre>scalar: 65536 cx lines, 65536 divides
+vector: 8192 cx lines + 8192 fmadd, 8192 divides  (8 times fewer)</pre>
+</details>
+<p class="ln"><b>L21</b> From L13, dx = 2.5 / 256 = 0.009765625 is exact in a float, because 256 is a power of 2. Your machine reported 0 mismatches against the scalar output at <code>img_size = 256</code>. <span class="from">from: L13, your output</span></p>
+<p class="ln"><b>L22</b> New data, computed in float32 with both methods for <code>img_size = 1000</code>: dx = 2.5 / 1000 is stored as the nearest float to 0.0025. Of the 1000 cx values, 572 differ between the L01 line and the fmadd method in the last digit, for example j = 26: L01 gives -1.935, fmadd gives -1.9350001. Of the 1,000,000 places, 3281 get a different iters. <span class="from">from: float32 computation, L01, L06</span></p>
+<p class="ln do"><b>L23</b> <b class="x">DO</b> Percent of places with a different iters at 1000 = 3281 / 1000000 = ____ . Is 1000 a power of 2? ____ . Is 2.5 / 1000 exact in a float? ____ . <span class="from">from: L22</span></p>
+<details><summary>CHECK</summary>
+<pre>0.33 percent
+1000 is not a power of 2 (512 &lt; 1000 &lt; 1024)
+2.5 / 1000 is not exact; each k * dx adds its own rounding</pre>
+</details>
+<p class="ln do"><b>L24</b> <b class="x">DO</b> Collect L12 (cx at index k = cx + k times dx), L16 (exact at 256), L18 (wrong order still gives right values in wrong places), L20, L21, L22, L23. Write one sentence on what the "0 mismatches" test at 256 proved, and one on what it did not prove. <span class="from">from: L12, L16, L18, L20, L21, L22, L23</span></p>
+<details><summary>CHECK</summary>
+<pre>Proved: at img_size = 256 the fmadd method gives exactly the L01 values, so the vector code's
+8-at-once cx is correct there, while doing 8 times fewer divides.
+Not proved: that the method is exact in general. It was exact because 256 is a power of 2, so
+dx and every k * dx are exact floats. At 1000 the same code changes 3281 iters.
+
+Tempting answer that fails: "0 mismatches, so the method is exact". A test succeeds for a reason;
+the reason here was the test size.</pre>
+</details>
+
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>Doing 8 things at once forces you to describe the 8 things with one rule. Here the rule is: neighbour k sits k steps of dx from the first one. Finding that rule is the actual work; typing the intrinsic is not.</p>
+<p>For a manager: a test that succeeds on round numbers can hide a defect that only appears on ordinary numbers. Ask what the test size was and why.</p>
+</div>
 
 <nav><a href="03-the-w-line.html">prev: 03 the w line</a><a href="05-simd-while-loop.html">next: 05 SIMD and the while loop</a></nav>
 </main>

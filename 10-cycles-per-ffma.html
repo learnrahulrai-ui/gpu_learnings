@@ -11,8 +11,16 @@
 <h1>10. Lab 2 prelab: cycles per FFMA from your own measurements</h1>
 <p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
 
+<p class="label">The story</p>
+<div class="story">
+<p>With the timer fixed, the Lab 2 prelab asks for one number: how many cycles does one multiply-add take on this GPU? The obvious method is to divide the measured cycles by the number of multiply-adds. The obvious method is wrong, and an interviewer who wants to separate people who measure from people who recite will check exactly this.</p>
+<p>The learner's machine produced six measurements across three kinds of kernel: one chain of multiply-adds, two chains side by side, and four chains side by side, each at two lengths. Among them is one from a copy-paste bug that accidentally turned two chains into one long chain. That bug turned out to be useful data.</p>
+<p>Each of these numbers is easy to compute with. The question is what they mean together: what does one multiply-add cost when it must wait for the previous one, what does it cost when it does not, and what part of every measurement is not about multiply-adds at all?</p>
+</div>
+
 <p class="you">Your words: "Write down your predicted cycle count for 64 multiply-adds per chain before you write any code ... explain this" / "you are introducing new ideas without deriving them"</p>
 
+<p class="label">Work it out</p>
 <p class="ln"><b>L01</b> The timed loop of your <code>fma_latency</code> kernel, copied without change: <span class="from">from: your code</span></p>
 <pre>#pragma unroll
 for (int i = 0; i &lt; 64; ++i)
@@ -91,6 +99,53 @@ So the y chain uses 1.0000002f and 0.00000002f.</pre>
 <pre>the compiler: it reordered the two loops into one alternating stream.
 same listing, same 551 as the interleaved kernel.</pre>
 </details>
+
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln"><b>L21</b> Your six measurements, restated: one chain of 64 FFMAs = 281 (kernel <code>fma_latency</code>); one chain of 256 (the bug, kernel <code>fma_latency_no_interleave</code>) = 1055; two chains, 128 FFMAs in all = 295, 256 in all = 551; four chains, 256 in all = 519, 512 in all = 1031. From L08, L12 and L15: 4 cycles between FFMAs in one chain, 2 cycles per FFMA with two or four chains. <span class="from">from: L04, L06, L11, L15, L08, L12</span></p>
+<p class="ln"><b>L22</b> Define the outside part of a measurement: the cycles not explained by the FFMAs. With N FFMAs and r cycles per FFMA, the last FFMA begins (N - 1) x r cycles after the first, so outside part = measurement - (N - 1) x r. <span class="from">from: L21</span></p>
+<p class="ln do"><b>L23</b> <b class="x">DO</b> Fill the outside part for all six. <span class="from">from: L21, L22</span></p>
+<pre>kernel                 | N FFMAs | r | measured | (N - 1) x r | outside part
+-----------------------+---------+---+----------+-------------+-------------
+one chain              |    64   | 4 |   281    |   ______    |   ______
+one chain (bug kernel) |   256   | 4 |  1055    |   ______    |   ______
+two chains             |   128   | 2 |   295    |   ______    |   ______
+two chains             |   256   | 2 |   551    |   ______    |   ______
+four chains            |   256   | 2 |   519    |   ______    |   ______
+four chains            |   512   | 2 |  1031    |   ______    |   ______</pre>
+<details><summary>CHECK</summary>
+<pre>one chain        : 63 * 4  = 252   -&gt; 29
+one chain (bug)  : 255 * 4 = 1020  -&gt; 35
+two chains 128   : 127 * 2 = 254   -&gt; 41
+two chains 256   : 255 * 2 = 510   -&gt; 41
+four chains 256  : 255 * 2 = 510   -&gt; 9
+four chains 512  : 511 * 2 = 1022  -&gt; 9</pre>
+</details>
+<p class="ln do"><b>L24</b> <b class="x">DO</b> L08 subtracted 281 from 1055 and got 4.03 cycles per FFMA, not 4. From L23, the two outside parts in that subtraction were ____ and ____ . Their difference divided by 192 = ____ . Compare with 4.03 - 4 = ____ . <span class="from">from: L08, L23</span></p>
+<details><summary>CHECK</summary>
+<pre>outside parts 29 (fma_latency) and 35 (no_interleave kernel)
+(35 - 29) / 192 = 6 / 192 = 0.031
+4.03 - 4 = 0.03   -&gt; the 0.03 is exactly the mismatch of the two outside parts</pre>
+</details>
+<p class="ln do"><b>L25</b> <b class="x">DO</b> Collect L05 (281 / 64 = 4.39), L08, L12, L15, L18 (a constant that became 1.0), L20 (the compiler interleaved for you), L23, L24. Write one sentence: when does subtracting two measurements cancel the part you do not care about, and when does it not? <span class="from">from: L05, L08, L12, L15, L18, L20, L23, L24</span></p>
+<details><summary>CHECK</summary>
+<pre>Subtraction cancels the outside part only between two lengths of the SAME kernel shape
+(41 = 41 for two chains, 9 = 9 for four chains). Between different kernels the outside parts
+differ (29, 35, 41, 9), and the difference leaks into the answer, as the 0.03 in L24 shows.
+Dividing one measurement by a count (L05) is worse: it spreads the whole outside part.
+
+Tempting answer that fails: "the outside part is the cost of the clock reads, the same everywhere".
+L23 measures it at 29, 35, 41 and 9.</pre>
+</details>
+
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>Every measurement contains the thing you want plus things you do not. Dividing by a count hides the unwanted part; subtracting two measurements removes it, but only when both measurements carry the same unwanted part. Here the learner's machine showed that "the same" means the same kernel, not merely the same timer.</p>
+<p>The results themselves: on this GPU, a multiply-add that waits for the previous one costs 4 cycles, and with independent work available the card begins one every 2 cycles for 32 threads. Going from one chain to two doubled the speed; going from two to four did not change it.</p>
+</div>
 
 <nav><a href="09-clock-read-trap.html">prev: 09 clock read trap</a><a href="11-program-counter.html">next: 11 a program counter for every thread</a></nav>
 </main>

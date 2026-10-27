@@ -15,3 +15,11 @@ The site turns long Claude/ChatGPT chats into exercise pages. Pages are plain HT
 - No sentence may begin with a count ("Two papers ...", "Three things ...", "8 lanes ...").
 - Prefer the learner's own words: image paper, graph paper, middleman pair/number, repetition, iters, index 0..7, fat while loop, nearby, chain. Code identifiers are always allowed.
 - Make up new names only when there is no other way, and define them in a line before using them (for example "index-repetition").
+
+## Page structure (keep for every new page)
+1. **The story**: plain English sentences for any reader, from someone who has only just heard of GPUs to a CEO. Say what the problem is, what the learner believed, and where the thinking broke. End on an open question. Never preview a result (that is a forward reference). No analogies.
+2. **Your words**: quotes from the learner's chat at the point of struggle.
+3. **Work it out**: the numbered L-lines with DO blanks and CHECK.
+4. **Connect the numbers**: collect 5 to 10 earlier results (by line number) and ask for the one meaning behind them, often with a twist computed from real data. The CHECK states the meaning, then names the tempting answer that fails and the line that refutes it. The point of the site is this step, not the arithmetic.
+5. **In plain words**: what it means for a non-coder, including one line for a manager.
+- Never delete existing technical content; add around it.

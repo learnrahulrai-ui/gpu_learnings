@@ -56,3 +56,10 @@ ol.topics li { margin-bottom: 10px; }
 p, li { overflow-wrap: anywhere; }
 .ln.do { padding: 6px 0 6px 64px; }
 .do .x { color: var(--mark); }
+.story { font-size: 18px; line-height: 1.7; margin: 8px 0 28px; }
+.story p { margin: 0 0 14px; }
+.label { font: bold 13px "DejaVu Sans Mono", Menlo, Consolas, monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); margin: 36px 0 8px; }
+.connect { border: 2px solid var(--mark); border-radius: 8px; padding: 14px 16px 4px; margin: 36px 0 12px; }
+.plain { background: var(--box); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px 4px; margin: 24px 0 12px; font-size: 18px; line-height: 1.7; }
+.readers { border-left: 4px solid var(--line); padding-left: 12px; }
+.connect > .label, .plain > .label { margin-top: 0; }

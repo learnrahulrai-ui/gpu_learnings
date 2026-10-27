@@ -11,8 +11,16 @@
 <h1>03. The w line: where is the squaring?</h1>
 <p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
 
+<p class="label">The story</p>
+<div class="story">
+<p>The lab code computes the Mandelbrot repetition in a way that does not look like the textbook formula. The textbook squares a pair (a, b) into (a times a minus b times b, 2 times a times b). The lab code never writes 2 times a times b. Instead it keeps an extra number called w and subtracts things from it.</p>
+<p>The learner read this and called it nonsense: the lab says square, and then the code subtracts. The learner was right that the code does not match the words. Where did 2 times a times b go? The only tools needed are multiplying out one square by hand and the learner's own remark that i times i is -1.</p>
+<p>Then the page asks the question a reviewer should ask about any clever rewrite: what did it save, and what did it cost? Is counting multiplications even the right way to answer it?</p>
+</div>
+
 <p class="you">Your words: "you are bullshitting you are asking for square and then doing substractioon" / "so this is complex number i time i is -1" / "Help me recall why am I doing add? I was just doing subtract."</p>
 
+<p class="label">Work it out</p>
 <p class="ln"><b>L01</b> The while loop of <code>mandelbrot_cpu.cpp</code>, copied without change: <span class="from">from: code</span></p>
 <pre>while (x2 + y2 &lt;= 4.0f &amp;&amp; iters &lt; max_iters) {
     float x = x2 - y2 + cx;        // line A
@@ -87,6 +95,47 @@ L01: x*x, y*y, z*z = 3       (the check reuses x2, y2 from lines C, D)
 1000 repetitions: 6000 - 3000 = 3000 multiplications saved
 Price paid: line B has 3 subtractions/additions where L12 has 1 addition.</pre>
 </details>
+
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln"><b>L14</b> Define, for one repetition: a chain is a list of operations in which each one needs the value of the one before it. The length of the longest chain is the number of operations in it. Operations not on that chain can be done alongside it. <span class="from">from: definition</span></p>
+<p class="ln do"><b>L15</b> <b class="x">DO</b> Fill the table for one repetition. Count each multiply, each add or subtract (the check <code>&lt;= 4</code> counts as one add, its compare is not counted), and the longest chain from the values at the top of the repetition to the values the next repetition needs. <span class="from">from: L01, L12, L14</span></p>
+<pre>version | multiplies | adds/subtracts | total | longest chain
+--------+------------+----------------+-------+--------------
+L12     |   ____     |     ____       | ____  |    ____
+L01     |   ____     |     ____       | ____  |    ____</pre>
+<details><summary>CHECK</summary>
+<pre>L12: multiplies x*x, y*y (check) + x*x, y*y (xt) + x*y, *2 (y)      = 6
+     adds: check +, xt -, xt +, y +                                  = 4     total 10
+     longest chain: x -&gt; x*x -&gt; minus y*y -&gt; plus cx                  = 3
+L01: multiplies x*x, y*y, z*z                                       = 3
+     adds: check +, line A -, +, line B -, -, +, line E +            = 7     total 10
+     longest chain: w -&gt; minus x2 -&gt; minus y2 -&gt; plus cy -&gt; x + y -&gt; z * z = 5</pre>
+</details>
+<p class="ln"><b>L16</b> Hardware fact for your GTX 1650: an add, a multiply and a multiply-add each deliver their value 4 cycles after they begin (cycle = one tick of the GPU clock). On many older processors a multiply took longer than an add. <span class="from">from: Jia et al. 2019, Turing microbenchmarks</span></p>
+<p class="ln do"><b>L17</b> <b class="x">DO</b> With L16, cycles spent waiting along the longest chain per repetition: L12 = ____ x 4 = ____ , L01 = ____ x 4 = ____ . Total operations per repetition: L12 = ____ , L01 = ____ . <span class="from">from: L15, L16</span></p>
+<details><summary>CHECK</summary>
+<pre>L12: 3 * 4 = 12 cycles     L01: 5 * 4 = 20 cycles
+both: 10 operations per repetition</pre>
+</details>
+<p class="ln do"><b>L18</b> <b class="x">DO</b> Collect L05 (2*a*b hides in w), L07 (the same as squaring a + b·I), L13 (3 multiplications saved), L15 (equal totals, longer chain), L17. Write one sentence on when the L01 rewrite is a win and when it is not. <span class="from">from: L05, L07, L13, L15, L17</span></p>
+<details><summary>CHECK</summary>
+<pre>The rewrite moves work from multiplications to additions without lowering the total (10 = 10),
+so it wins only where a multiplication costs more than an addition. Where every operation costs
+the same 4 cycles (L16), it lengthens the chain from 3 to 5. Which version is faster on your GPU
+is then a measurement question, not a counting question.
+
+Tempting answer that fails: "fewer multiplications means faster". L15 shows the total did not go down.</pre>
+</details>
+
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>Code that has been tuned often stops looking like the formula it computes. The tuning was done for a reason on some machine at some time, and the reason may not hold on the next machine. Reading such code means recovering the formula first, and then asking which cost the rewrite was trading against.</p>
+<p>For a manager: "we optimized it" is a claim about one cost on one machine. Ask which cost, and on which machine.</p>
+</div>
 
 <nav><a href="02-square-and-add.html">prev: 02 the while loop by hand</a><a href="04-simd-cx.html">next: 04 eight cx values</a></nav>
 </main>

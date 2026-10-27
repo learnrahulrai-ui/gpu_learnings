@@ -11,8 +11,16 @@
 <h1>12. Lab 2 prelab: the 48 in warp_scheduler.cu</h1>
 <p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
 
+<p class="label">The story</p>
+<div class="story">
+<p>The second prelab program, <code>warp_scheduler.cu</code>, measures how fast the GPU gets as more threads are given to it. It sweeps a multiplier from 1 to 48 and prints a table. The file was written for the course's GPU, and a number from that GPU is written inside it.</p>
+<p>The learner first had to separate two facts that are easy to merge: how many SMs the chip has (fixed by the hardware, 14 on this laptop) and how many 32-thread units each SM is given (decided by the program at launch). Asked whether knowing one tells you the other, the learner's answer was no, and that answer is the key to this page.</p>
+<p>The file contains the number 48. Where did it come from, and what happens to every line of the printed table when the program executes on a GPU that has 14 SMs?</p>
+</div>
+
 <p class="you">Your words: "Confirm me this part, okay? I have 14 SMs. Yes or no?" / "just because I have SMs doesn't mean I know how many threads or schedulers you run. That is a different piece of information, yes or no?" / "Okay, so now what exactly I have to do?"</p>
 
+<p class="label">Work it out</p>
 <p class="ln"><b>L01</b> A launch <code>&lt;&lt;&lt;B, T&gt;&gt;&gt;</code> makes B blocks of T threads. Each block executes on one SM, a unit of the GPU chip. Your GTX 1650 has 14 SMs. <span class="from">from: CUDA definition, your hardware table</span></p>
 <p class="ln"><b>L02</b> An SM handles a block's threads in units of 32, called warps. Number of SMs and number of warps per SM are separate facts: the first is fixed by the chip, the second by the launch. <span class="from">from: CUDA programming guide, your words</span></p>
 <p class="ln"><b>L03</b> From the report on your file <code>warp_scheduler.cu</code> (the file itself was not in the chat): T = 64 threads per block; each thread takes 32 numbers; for each number it executes <code>tmp += tmp * 3.0f</code> 263 x 20 times, each step reading the previous step's tmp; the file sets N = 2048 x 48 x multiplier with multiplier from 1 to 48, and launches N / 2048 blocks. <span class="from">from: report on your file</span></p>
@@ -51,6 +59,34 @@ m  = 16 -&gt; m = 16
 above m = 16, the extra blocks wait for an earlier block to finish on that SM.
 Raising m past 16 adds blocks that wait in line; it adds no warps to an SM.</pre>
 </details>
+
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln"><b>L09</b> From L05 to L08: the file launches 48m blocks; on 14 SMs a block count spreads evenly only when it is a multiple of 14; at most 16 blocks are held by one SM at a time. <span class="from">from: L05, L07, L08</span></p>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> For which m from 1 to 48 is 48m a multiple of 14? 48 = 3 x 14 + 6, so 48m leaves remainder 6m on division by 14. 6m is a multiple of 14 when m is a multiple of ____ . Smallest such m = ____ , blocks = ____ , blocks per SM = ____ . Is that within the 16 of L08? ____ . <span class="from">from: L05, L08, L09</span></p>
+<details><summary>CHECK</summary>
+<pre>6m multiple of 14  -&gt;  3m multiple of 7  -&gt;  m multiple of 7
+smallest m = 7: blocks = 336, per SM = 24  -&gt;  over 16, 8 per SM wait</pre>
+</details>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> Collect L04, L05 (8 and 6 warps at m = 1), L06 (96 printed), L07 (the fix with 14), L08, L10. For the original file on your 14 SMs, list the m values that are both evenly spread and fully held: ____ . Write one sentence on what that means for every line of the original table on your machine. <span class="from">from: L04, L05, L06, L07, L08, L10</span></p>
+<details><summary>CHECK</summary>
+<pre>none: even spread needs m = 7, 14, 21, ...; fully held needs 48m / 14 &lt;= 16, i.e. m &lt;= 4.
+Every line of the original table on 14 SMs is either uneven (some SMs have more warps) or partly
+waiting, so its "warps" figure does not describe what any SM held. With 14 in place of 48,
+every m from 1 to 16 is even and fully held.
+
+Tempting answer that fails: "48 is just a scale factor, any number works". L11 shows it decides
+whether any line of the table is a clean measurement.</pre>
+</details>
+
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>Lab files written for one machine carry that machine's numbers inside them. Executed on another machine they still produce a table that looks fine, and every line of it can be wrong in a way the table itself does not show. Before trusting a sweep, find every hardware number written into the program and replace it with yours.</p>
+<p>For a manager: a benchmark copied from a vendor or a course measures their hardware's shape, not yours, until someone checks the constants.</p>
+</div>
 
 <nav><a href="11-program-counter.html">prev: 11 a program counter for every thread</a><a href="index.html">index</a></nav>
 </main>

@@ -11,9 +11,27 @@
 <h1>GPU Learnings: do it, don't read it</h1>
 <p class="sub">Made from real chats working through MIT 6.S894 Lab 1 (Mandelbrot on CPU, CPU SIMD, GPU) and the Lab 2 prelab (fma_latency, warp_scheduler), on a Ryzen 5 4600H and a GTX 1650.</p>
 
+<p class="label">Why this exists</p>
+<div class="story">
+<p>Anyone can now produce unlimited text about GPUs. Definitions of SIMD, threads and memory are a search away, and a person can recite all of them and still be unable to finish a lab. This site is built from the opposite material: the exact places where one learner, working through MIT course 6.S894 on a laptop, got stuck, argued, and was wrong or right, recorded from their own chats with ChatGPT.</p>
+<p>The learner's own diagnosis of the gap was blunt: anyone can say what SIMD is, anyone can say the work is done in parallel; the hard part is connecting the pieces precisely. So every page here has three layers. A story, in plain sentences, says what the problem is and where the learner's thinking broke. A set of numbered lines makes you do the arithmetic yourself, with the real numbers from the learner's machine, each line using only what came before it. And a final puzzle collects five to ten of those results and asks for the one meaning behind them, which no definition supplies.</p>
+<p>The calculations are not the point; any careful person can do them. The point is the step after: putting several results side by side and seeing what they say together. That step is what gets tested in a good interview and what stays after the course is forgotten.</p>
+</div>
+
+<p class="label">How to read it</p>
+<div class="readers">
+<p>If you have only just heard of GPUs, or you lead a team and want to know what matters: read each page's story at the top and its "In plain words" box at the bottom. Begin with page 00.</p>
+<p>If you write code: do every DO line with pencil and paper before opening CHECK. The numbers are real, from a Ryzen 5 4600H and a GTX 1650.</p>
+<p>If you want the reasoning workout: do the "Connect the numbers" box on each page before reading its CHECK. Each CHECK names the tempting answer that fails and the line that refutes it.</p>
+</div>
+
+<p class="label">The pages</p>
 <p>Each page begins from zero. Each line uses only what the lines above it made, and a grey note names the line it takes from. Each page quotes the exact place the learner got stuck, then hands you real numbers to calculate. The 65536 iters values used here add up to 16274722, the same "CPU total" the machine printed. Pencil and paper. Fill every ____ before you open CHECK.</p>
 
-<pre>  01 (i, j) to (cx, cy) --&gt; 02 the while loop by hand --&gt; 03 the w line
+<pre>  00 what a GPU is
+        |
+        v
+  01 (i, j) to (cx, cy) --&gt; 02 the while loop by hand --&gt; 03 the w line
                                       |
                                       v
   04 eight cx values  ---------&gt; 05 SIMD while loop  --&gt; 06 GPU threads
@@ -24,7 +42,8 @@
                                       v
   09 clock read trap --&gt; 10 cycles per FFMA --&gt; 11 program counter --&gt; 12 the 48</pre>
 
-<ol class="topics">
+<ol class="topics" start="0">
+<li><a href="00-what-a-gpu-is.html">What a GPU is, measured on one laptop</a>: 896 arithmetic circuits against 48, four timings, and why the fastest result does not prove what it seems to.</li>
 <li><a href="01-image-to-middleman.html">From (i, j) to the middleman pair (cx, cy)</a>: where 2.5 and -2.0 come from, and why (9, 7) gives different (cx, cy) for different img_size.</li>
 <li><a href="02-square-and-add.html">The while loop by hand</a>: why x2, y2, w begin at 0, an x2 + y2 that goes down before the loop is left, and iters 1 versus iters 3 for the same (9, 7).</li>
 <li><a href="03-the-w-line.html">The w line</a>: the lab code never writes 2*x*y; derive it, and connect it to your I times I = -1.</li>

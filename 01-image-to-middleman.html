@@ -11,8 +11,17 @@
 <h1>01. From (i, j) to the middleman pair (cx, cy)</h1>
 <p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK.</p>
 
+<p class="label">The story</p>
+<div class="story">
+<p>This site follows one learner through the first labs of MIT course 6.S894, Accelerated Computing, done on a laptop instead of the course machines. The laptop has an AMD Ryzen 5 4600H processor and an NVIDIA GeForce GTX 1650 graphics card. Lab 1 asks for the same picture to be computed four ways: on one processor core, on one core using its 8-numbers-at-once instructions, on the graphics card with one thread, and on the graphics card with 32 threads.</p>
+<p>The picture is the Mandelbrot set. You do not need to know anything about it yet. What matters is that the picture is a sheet of 256 by 256 whole numbers, and each of those numbers is the result of a small amount of arithmetic. The lab file computes every one of them and stores it in an array called <code>out</code>.</p>
+<p>The learner got stuck before any graphics card appeared, on the first two lines of arithmetic. The learner believed that the place (i, j) in the picture is the thing being computed. It is not. A pair of code lines turns (i, j) into a different pair of fractions, which the learner named the middleman pair, and only the middleman pair goes into the arithmetic. The learner pushed back hard: if a place is (9, 7), why should it become anything else? Hold that question while you calculate: is (9, 7) the same point on every picture size?</p>
+<p>The reasoning test hidden in this page is simple to state and easy to fail: which numbers belong to the picture, which belong to the mathematics, and which were typed by a person?</p>
+</div>
+
 <p class="you">Your words: "Row 2 column 2 will always mean row 2 column 2, right?" / "Basically, I have two different papers, right?" / "What is the guarantee that ... with this middleman number, that number of iterations can change, right?"</p>
 
+<p class="label">Work it out</p>
 <p class="ln"><b>L01</b> Your machine printed: <code>Testing with image size 256x256 and 1000 max iterations.</code> <span class="from">from: your output</span></p>
 <p class="ln"><b>L02</b> So the lab file receives <code>img_size = 256</code> and <code>max_iters = 1000</code>. <span class="from">from: L01</span></p>
 <p class="ln"><b>L03</b> The lab file <code>mandelbrot_cpu.cpp</code> has these lines, copied with the while loop shortened to a comment: <span class="from">from: code</span></p>
@@ -85,7 +94,42 @@ img_size 256: 7/256 = 0.02734375  * 2.5 = 0.068359375  cx = -1.931640625
 Same (9, 7) on the image paper. Different points on the graph paper.</pre>
 </details>
 
-<nav><a href="index.html">index</a><a href="02-square-and-add.html">next: 02 the while loop by hand</a></nav>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln"><b>L16</b> From L13, the distance between the cx of neighbouring j is 2.5 / img_size. From L11 and L12, cx goes from -2.0 at j = 0 to 0.490234375 at j = 255 when <code>img_size = 256</code>. <span class="from">from: L11, L12, L13</span></p>
+<p class="ln do"><b>L17</b> <b class="x">DO</b> Set <code>img_size = 512</code> in L03. Distance between neighbouring cx = 2.5 / 512 = ____ . cx at j = 0 is ____ . Largest j is ____ , and its cx = ____ . Gap between that cx and 0.5 = ____ . <span class="from">from: L03, L16</span></p>
+<details><summary>CHECK</summary>
+<pre>2.5 / 512 = 0.0048828125
+j = 0   : cx = -2.0            (unchanged)
+j = 511 : 511/512 = 0.998046875, * 2.5 = 2.4951171875, - 2.0 = 0.4951171875
+gap = 0.5 - 0.4951171875 = 0.0048828125   (one neighbour distance, half of before)</pre>
+</details>
+<p class="ln do"><b>L18</b> <b class="x">DO</b> From L10, (i = 64, j = 64) with <code>img_size = 256</code> gives (-1.375, -0.625). With <code>img_size = 512</code>, which (i, j) gives exactly (-1.375, -0.625)? ____ . And what pair does (64, 64) give at 512? ____ . <span class="from">from: L03, L10, L17</span></p>
+<details><summary>CHECK</summary>
+<pre>need j/512 * 2.5 - 2.0 = -1.375  -&gt;  j/512 = 0.25  -&gt;  j = 128; same for i
+(i = 128, j = 128) at 512 gives (-1.375, -0.625)
+(64, 64) at 512: 64/512 = 0.125, * 2.5 = 0.3125 -&gt; cx = -1.6875, cy = -0.9375</pre>
+</details>
+<p class="ln do"><b>L19</b> <b class="x">DO</b> Collect: L11 (-2.0 and -1.25 never change), L13 and L17 (the distance halves), L18 (the same pair moves from (64, 64) to (128, 128)), L15 ((9, 7) gives different pairs). Write one sentence that is true of all of them: img_size changes ____ , and never changes ____ . <span class="from">from: L11, L13, L15, L17, L18</span></p>
+<details><summary>CHECK</summary>
+<pre>img_size changes how many middleman pairs are taken from the graph paper (how fine the sampling is),
+and never changes which part of the graph paper is covered: x from -2.0 up to (not reaching) 0.5,
+y from -1.25 up to (not reaching) 1.25. Those edges come only from 2.5, 2.0, 1.25 typed in L03.
+
+Tempting answer that fails: "a bigger img_size shows a bigger picture".
+L18 refutes it: the same middleman pair just moved to a larger (i, j).</pre>
+</details>
+
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>A computer picture is a list of samples. The programmer decides which region of the mathematical plane to sample and how many samples to take; the arithmetic never sees the sample's number on the sheet, only the point it stands for. Mixing up "which sample" with "which point" is the first mistake in this lab, and it is a mistake people with a correct definition of every word still make.</p>
+<p>For a manager: when two teams report results "for the same input", ask whether they mean the same index or the same underlying value. On this page the same (9, 7) meant two different points.</p>
+</div>
+
+<nav><a href="00-what-a-gpu-is.html">prev: 00 what a GPU is</a><a href="02-square-and-add.html">next: 02 the while loop by hand</a></nav>
 </main>
 </body>
 </html>
