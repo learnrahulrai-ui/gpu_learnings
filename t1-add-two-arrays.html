@@ -111,7 +111,7 @@ bytes per second (model from published specs; measure yours with L09).</pre>
 
 <div class="interview">
 <p class="label">The interviewer's next question</p>
-<p>You must compute d = (a + b + c) times e for arrays of n numbers. Three small kernels (add, add, multiply), or one kernel that does all of it? Give the bytes moved per place for each choice and the expected ratio of times.</p>
+<p>You must compute d = (a + b + c) times e for arrays of n numbers. Should it be three small kernels (add, add, multiply), or one kernel that does all of it? Give the bytes moved per place for each choice and the expected ratio of times.</p>
 <details><summary>CHECK</summary>
 <pre>three kernels: a+b -&gt; t (12 bytes), t+c -&gt; u (12), u*e -&gt; d (12) = 36 bytes per place
 one kernel   : read a, b, c, e and write d                  = 20 bytes per place
