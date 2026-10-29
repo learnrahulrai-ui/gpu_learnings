@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="The profiler&#x27;s 2,048 requests and 8,192 sectors derived by hand, and a split of places that would move 8 times more.">
+<meta name="keywords" content="GPU chip, memory">
+<title>Nearby: 32 stores in 4 blocks of 32 bytes</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+<p class="crumbs"><a href="../index.html">GPU Learnings</a> / <a href="index.html">notes</a> / <a href="MIT-6.S894.html">MIT 6.S894</a></p>
+<h1>Nearby: 32 stores in 4 blocks of 32 bytes</h1>
+<p class="sub">Topics: GPU chip, memory. A single idea, with a few lines to calculate. Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+
+<p class="label">The idea</p>
+<div class="story">
+<p>In Lab 1's GPU version, thread t takes the places j = t, t + 32, t + 64, and so on. Inside one thread those places are 32 apart, which is why the learner refused the claim that the memory access is "nearby". The threads, however, store at the same moment, and memory receives the 32 stores of one instruction together.</p>
+<p>The question here: which counts settle it, and what would a different split of places cost?</p>
+</div>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> Your kernel: for each i, thread t (0 to 31) takes j = t + 32 x k for k = 0 to 7 and stores its iters at <code>out[i * 256 + j]</code>. Each value is a 4-byte whole number, so its byte number is 4 x (i x 256 + j). <span class="from">from: your code</span></p>
+<p class="ln"><b>L02</b> NVIDIA facts: the store executes for all 32 threads together, with the same i and k. Memory moves bytes in blocks of 32 bytes that begin at a multiple of 32. The profiler calls one store instruction for the 32 threads a request, and each 32-byte block it touches a sector. <span class="from">from: CUDA programming guide, Nsight Compute metric names</span></p>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> i = 0, k = 0: thread 0 stores bytes 0 to 3; thread 31 stores bytes ____ to ____ . Blocks of 32 bytes touched = ____ . Store instructions for the whole picture = 256 x 8 = ____ . Blocks touched = ____ . Your profiler printed 2,048 requests and 8,192 sectors. <span class="from">from: L01, L02, your output</span></p>
+<details><summary>CHECK</summary>
+<pre>thread 31: j = 31, bytes 124 to 127
+bytes 0 to 127 = 4 blocks of 32
+2,048 store instructions (requests), 2,048 x 4 = 8,192 blocks (sectors): both match the profiler</pre>
+</details>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> Another split: thread t takes j = 8t to 8t + 7. First store, i = 0: thread t stores at byte ____ . Thread 0 at ____ , thread 1 at ____ , thread 31 at ____ . Blocks of 32 bytes touched by this one store instruction = ____ . For the whole picture = 2,048 x ____ = ____ , which is ____ times L03. <span class="from">from: L01, L02, L03</span></p>
+<details><summary>CHECK</summary>
+<pre>thread t stores j = 8t, byte 32t: 0, 32, ..., 992
+each in its own 32-byte block: 32 blocks per store instruction
+2,048 x 32 = 65,536 blocks, 8 times L03's 8,192
+
+Inside one thread the places are 32 apart; across the 32 threads of one store they sit side by side.
+Both are true; memory receives only the second.</pre>
+</details>
+
+<p class="label">Worked out in full</p>
+<ul class="related">
+<li><a href="../06-gpu-threads.html">06. GPU: one changed line, and the proof of "nearby"</a></li>
+</ul>
+
+<p class="label">Related notes</p>
+<ul class="related">
+<li><a href="warp.html">The 32-thread unit</a>: the 32 threads that store together</li>
+<li><a href="operations-per-byte.html">Operations per byte</a>: when moving bytes, not arithmetic, sets the time</li>
+</ul>
+
+<div class="backlinks">
+<p class="label">Notes that point here</p>
+<!-- backlinks:begin -->
+<ul class="related">
+<li><a href="MIT-6.S894.html">MIT 6.S894 Accelerated Computing: notes for self-learners</a></li>
+<li><a href="operations-per-byte.html">Operations per byte</a></li>
+<li><a href="warp.html">The 32-thread unit</a></li>
+</ul>
+<!-- backlinks:end -->
+</div>
+
+<nav><a href="index.html">all notes</a><a href="MIT-6.S894.html">MIT 6.S894 course page</a></nav>
+</main>
+</body>
+</html>

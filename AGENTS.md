@@ -81,6 +81,7 @@ Prefer the learner's own invented words: image paper, graph paper, middleman pai
 - Page structure, in order: The story (plain English for anyone, ends on an open question, never previews a result) -> Guess first -> Your words (learner quotes) -> Work it out (L-lines, DO blanks, CHECK) -> Connect the numbers (5 to 10 earlier results, one meaning, the tempting answer that fails and the line that refutes it) -> In plain words (non-coder, plus one line for a manager) -> Your guess against the machine -> The interviewer's next question -> navigation.
 - Every code block gets a "Read the code in English, line by line" panel under it.
 - Every technical word goes into `words.html`. Every new page gets a line in `symptoms.html`.
+- The notes section (`notes/`) uses the shorter note format described in `CLAUDE.md`: one idea, "The idea", L-lines with DO and CHECK, the lab pages that work it out, related notes, and a generated list of the notes that point to it. The axiom rule and the banned words apply there too.
 
 ## The method behind every page ("derive the need")
 
@@ -104,4 +105,4 @@ Read from https://github.com/accelerated-computing-class/lab2: `warp_scheduler.c
 
 ## Checking
 
-`tools/check_banned.py` checks banned words, count-first sentences, forward-reference phrases, praise, common analogy phrases, and "think/imagine/understand" inside DO lines, on every `.html` page, skipping learner quotes. It cannot check the axiom rule, the honesty of numbers, or repetition; check those by reading every line yourself.
+`tools/check_banned.py` checks banned words, count-first sentences, forward-reference phrases, praise, common analogy phrases, and "think/imagine/understand" inside DO lines, on every `.html` page and every page in `notes/`, skipping learner quotes. `tools/build_notes.py` fills the generated lists in `notes/` (notes that point here, A to Z, by topic) and fails on any address that points to a missing file or `#id`; run it before the checker whenever `notes/` changes. It cannot check the axiom rule, the honesty of numbers, or repetition; check those by reading every line yourself.

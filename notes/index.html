@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Short GPU notes for self-learners, one idea each, with numbers to calculate.">
+<title>All Notes</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+<p class="crumbs"><a href="../index.html">GPU Learnings</a> / notes</p>
+<h1>Notes</h1>
+<p class="sub">Short notes for self-learners, one idea each: a few plain sentences, then numbered lines to calculate with real numbers. These are plain pages with no scripts, so there is no search box: press Ctrl+F (Cmd+F on a Mac) on this page to find a word.</p>
+
+<p class="label">Course pages</p>
+<ul class="related">
+<li><a href="MIT-6.S894.html">MIT 6.S894 Accelerated Computing</a>: Labs 1 and 2, note by note, in course order.</li>
+</ul>
+
+<p class="label">All notes, A to Z</p>
+<!-- all:begin -->
+<ul class="related">
+<li><a href="program-counter.html">A program counter for every thread</a>: Since Volta, each thread keeps its own program counter; the 32-thread unit still matters, because equal program counters let one instruction serve 32 threads.</li>
+<li><a href="second-round.html">A second round of blocks</a>: On the course GPU, 12.5 percent more work took 87 percent more time. Blocks that do not fit wait for a second round.</li>
+<li><a href="reduction.html">Adding up an array: chain or tree</a>: A plain loop over 20 million floats is a chain of 20 million adds and stops counting at 16,777,216; a tree has 25 levels and gets 20,000,000.</li>
+<li><a href="combining-speedups.html">Combining speedups</a>: The product of step-by-step speedups always equals the total, so it tests nothing. Compare a technique's gain alone with its gain on top of the others.</li>
+<li><a href="filling-the-wait.html">Filling the 4-cycle wait: needed against held</a>: A scheduler of the GTX 1650 holds up to 8 sets of 32 threads, but chains of multiply-adds need only 2. Why filling the chip to its maximum is not the target.</li>
+<li><a href="independent-chains.html">Independent chains inside one thread</a>: A multiply-add that needs the previous result waits 4 cycles; a second chain fills the wait; a fourth chain finds nothing left to fill.</li>
+<li><a href="iters.html">iters: repetitions until the while loop is left</a>: What each number of the Mandelbrot picture counts, why it ranges from 1 to 1000, and why equal numbers of places are not equal work.</li>
+<li><a href="subtract-two-lengths.html">Measuring by subtracting two lengths</a>: 281 / 64 = 4.39 is not the cost of one multiply-add; (1055 - 281) / (256 - 64) = 4.03 is. And a single division makes four chains look faster than two.</li>
+<li><a href="nearby.html">Nearby: 32 stores in 4 blocks of 32 bytes</a>: The profiler's 2,048 requests and 8,192 sectors derived by hand, and a split of places that would move 8 times more.</li>
+<li><a href="operations-per-byte.html">Operations per byte</a>: Adding two arrays does 0.083 adds per byte moved; the GTX 1650 needs about 10.5 to keep its arithmetic busy, so memory sets the time.</li>
+<li><a href="owner.html">Owner: exactly one writer per place</a>: A correct split gives every place one owner; a fast split also gives every owner similar work: 4.72 against 5.98 on the Lab 2 picture.</li>
+<li><a href="simd-avx2.html">SIMD on the CPU: 8 places in one AVX2 instruction</a>: Why 8 places per instruction gave 7.07 times, not 8, and why the picture, not the instructions, decides it.</li>
+<li><a href="sm.html">SM: the block of hardware a GPU chip is built from</a>: What one SM of the GTX 1650 contains, 896 FP32 units against the CPU's 48 floats per instruction, and why the CPU still finished first.</li>
+<li><a href="warp.html">The 32-thread unit</a>: NVIDIA calls it a warp: one instruction begins for 32 threads at once, and threads that are done wait. Why 32 threads gave 22.75 times, not 32.</li>
+<li><a href="mask.html">The mask, and why all ones reads as -1</a>: How each of 8 indexes keeps its own count inside one AVX2 while loop, with no if.</li>
+<li><a href="middleman-pair.html">The middleman pair (cx, cy)</a>: How a place (i, j) on the image paper becomes a point (cx, cy) on the graph paper, and what img_size does and does not change.</li>
+<li><a href="register-budget.html">The register budget</a>: Every SM has 65,536 registers, shared by all the threads it holds: 64 each at 1,024 threads, and when using more actually slows a kernel.</li>
+<li><a href="tiles.html">Tiles in shared memory</a>: The plain matrix multiply reads 8.6 billion bytes for 2.1 billion operations; tiles of T by T divide that by T; T = 84 would need 55 KB of an SM's 64 KB.</li>
+<li><a href="clock-reads.html">What sits between two clock reads</a>: The source code put an add before the timer; the machine listing put it after. How to know what a timing contains, and how giving the clock read inputs fixes it.</li>
+<li><a href="checking-the-output.html">What the printed difference can hide</a>: A single wrong place prints 0.000000000477; a missing line of the picture prints 169 times less than a harmless rounding change.</li>
+</ul>
+<!-- all:end -->
+
+<p class="label">By topic</p>
+<!-- topics:begin -->
+<p><b>chains</b></p>
+<ul class="related">
+<li><a href="reduction.html">Adding up an array: chain or tree</a></li>
+<li><a href="independent-chains.html">Independent chains inside one thread</a></li>
+</ul>
+<p><b>CPU</b></p>
+<ul class="related">
+<li><a href="simd-avx2.html">SIMD on the CPU: 8 places in one AVX2 instruction</a></li>
+<li><a href="mask.html">The mask, and why all ones reads as -1</a></li>
+</ul>
+<p><b>GPU chip</b></p>
+<ul class="related">
+<li><a href="program-counter.html">A program counter for every thread</a></li>
+<li><a href="second-round.html">A second round of blocks</a></li>
+<li><a href="filling-the-wait.html">Filling the 4-cycle wait: needed against held</a></li>
+<li><a href="independent-chains.html">Independent chains inside one thread</a></li>
+<li><a href="nearby.html">Nearby: 32 stores in 4 blocks of 32 bytes</a></li>
+<li><a href="sm.html">SM: the block of hardware a GPU chip is built from</a></li>
+<li><a href="warp.html">The 32-thread unit</a></li>
+<li><a href="register-budget.html">The register budget</a></li>
+</ul>
+<p><b>measuring</b></p>
+<ul class="related">
+<li><a href="combining-speedups.html">Combining speedups</a></li>
+<li><a href="subtract-two-lengths.html">Measuring by subtracting two lengths</a></li>
+<li><a href="clock-reads.html">What sits between two clock reads</a></li>
+<li><a href="checking-the-output.html">What the printed difference can hide</a></li>
+</ul>
+<p><b>memory</b></p>
+<ul class="related">
+<li><a href="nearby.html">Nearby: 32 stores in 4 blocks of 32 bytes</a></li>
+<li><a href="operations-per-byte.html">Operations per byte</a></li>
+<li><a href="tiles.html">Tiles in shared memory</a></li>
+</ul>
+<p><b>splitting work</b></p>
+<ul class="related">
+<li><a href="second-round.html">A second round of blocks</a></li>
+<li><a href="iters.html">iters: repetitions until the while loop is left</a></li>
+<li><a href="owner.html">Owner: exactly one writer per place</a></li>
+</ul>
+<p><b>the picture</b></p>
+<ul class="related">
+<li><a href="iters.html">iters: repetitions until the while loop is left</a></li>
+<li><a href="middleman-pair.html">The middleman pair (cx, cy)</a></li>
+</ul>
+<!-- topics:end -->
+
+<p class="label">Elsewhere on this site</p>
+<ul class="related">
+<li><a href="../index.html">The lab pages</a>: each note's idea worked out in full, with a story, a puzzle and an interview question.</li>
+<li><a href="../tutorial.html">The GPU basics track</a>: adding arrays, summing an array, multiplying matrices.</li>
+<li><a href="../words.html">Words used on this site</a>: every technical word in plain English.</li>
+</ul>
+
+<nav><a href="../index.html">site index</a><a href="MIT-6.S894.html">MIT 6.S894 course page</a></nav>
+</main>
+</body>
+</html>

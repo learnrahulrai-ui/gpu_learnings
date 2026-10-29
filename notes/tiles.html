@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="The plain matrix multiply reads 8.6 billion bytes for 2.1 billion operations; tiles of T by T divide that by T; T = 84 would need 55 KB of an SM&#x27;s 64 KB.">
+<meta name="keywords" content="memory">
+<title>Tiles in shared memory</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+<p class="crumbs"><a href="../index.html">GPU Learnings</a> / <a href="index.html">notes</a> / <a href="MIT-6.S894.html">MIT 6.S894</a></p>
+<h1>Tiles in shared memory</h1>
+<p class="sub">Topics: memory. A single idea, with a few lines to calculate. Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+
+<p class="label">The idea</p>
+<div class="story">
+<p>Multiplying two tables of numbers uses every value of each table many times. The plain GPU program fetches a value from the graphics card's memory every time it uses it. A tile is a small square piece of a table, copied once into fast storage inside the SM and then used by many threads.</p>
+<p>The question here: how far must reuse go before memory stops setting the time, and does a square tile that far fit?</p>
+</div>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> Tables A, B and the answer C are 1024 by 1024 floats. The answer at (i, j) adds 1024 products of A at (i, k) and B at (k, j): 1024 x 1024 x 1024 = 1,073,741,824 multiply-adds, 2 operations each. The plain program has one thread per answer, each reading its 1024 values of A and 1024 of B from memory. <span class="from">from: definition, code (the standard tutorial program)</span></p>
+<p class="ln"><b>L02</b> GTX 1650 published figures, with an assumed clock: memory moves 128 billion bytes per second (GDDR5 version); 896 FP32 units each begin one multiply-add per cycle; 1.5 billion cycles per second assumed. <span class="from">from: NVIDIA specifications, assumption</span></p>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> Bytes read with no reuse = 1024 x 1024 threads x 2 x 1024 values x 4 bytes = ____ . Operations per byte = 2,147,483,648 / that = ____ . Operations the GPU can do per byte its memory moves = 896 x 2 x 1.5 billion / 128 billion = ____ . <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>8,589,934,592 bytes
+0.25 operations per byte
+2.688e12 / 128e9 = 21 operations per byte needed</pre>
+</details>
+<p class="ln"><b>L04</b> Shared memory: storage inside each SM that all threads of a block can read and write, far faster than the graphics card's memory; at most 64 KB per SM on Turing. With tiles, a block of T by T threads copies a T by T square of A and one of B into it, and each copied value is used T times, so the bytes read from memory are divided by T. <span class="from">from: NVIDIA Turing Tuning Guide</span></p>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> Operations per byte with T = 16: 0.25 x 16 = ____ . T that reaches the 21 of L03: 0.25 x T = 21, T = ____ . Shared memory for the two squares at that T = 2 x T x T x 4 bytes = ____ bytes = ____ KB. <span class="from">from: L03, L04</span></p>
+<details><summary>CHECK</summary>
+<pre>T = 16: 4 operations per byte, still about 5 times too few
+T = 84
+2 x 84 x 84 x 4 = 56,448 bytes = 55.1 KB of the SM's 64 KB
+One such block fills the SM's shared memory, so no second block fits beside it.</pre>
+</details>
+
+<p class="label">Worked out in full</p>
+<ul class="related">
+<li><a href="../t3-multiply-matrices.html">T3. Multiplying matrices: same arithmetic, very different times</a></li>
+</ul>
+
+<p class="label">Related notes</p>
+<ul class="related">
+<li><a href="operations-per-byte.html">Operations per byte</a>: the same comparison for adding two arrays</li>
+<li><a href="sm.html">SM: the block of hardware a GPU chip is built from</a>: what else one SM must hold</li>
+</ul>
+
+<div class="backlinks">
+<p class="label">Notes that point here</p>
+<!-- backlinks:begin -->
+<ul class="related">
+<li><a href="MIT-6.S894.html">MIT 6.S894 Accelerated Computing: notes for self-learners</a></li>
+<li><a href="operations-per-byte.html">Operations per byte</a></li>
+</ul>
+<!-- backlinks:end -->
+</div>
+
+<nav><a href="index.html">all notes</a><a href="MIT-6.S894.html">MIT 6.S894 course page</a></nav>
+</main>
+</body>
+</html>

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A correct split gives every place one owner; a fast split also gives every owner similar work: 4.72 against 5.98 on the Lab 2 picture.">
+<meta name="keywords" content="splitting work">
+<title>Owner: exactly one writer per place</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+<p class="crumbs"><a href="../index.html">GPU Learnings</a> / <a href="index.html">notes</a> / <a href="MIT-6.S894.html">MIT 6.S894</a></p>
+<h1>Owner: exactly one writer per place</h1>
+<p class="sub">Topics: splitting work. A single idea, with a few lines to calculate. Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+
+<p class="label">The idea</p>
+<div class="story">
+<p>When several workers, CPU threads or GPU threads, compute one picture, each place must be written by exactly one of them, its owner. A place with two owners is written twice; a place with none keeps whatever was there. A split can be correct and still slow, when one owner gets far more work than the rest.</p>
+<p>The question here: on the real Lab 2 picture, how much does the shape of a correct split matter?</p>
+</div>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The Lab 2 picture: 1024 by 1024 places, max_iters = 2000. Each place costs some number of repetitions of the while loop; computed in 32-bit fractions from the starter's own constants, they total 138,219,822. <span class="from">from: Lab 2 starter code, computation</span></p>
+<p class="ln"><b>L02</b> Split by i among 6 owners in bands: [0, 171), [171, 342), [342, 513), [513, 684), [684, 855), [855, 1024). Repetitions per band: 20,219,285; 20,203,424; 28,346,172; 29,263,472; 19,303,420; 20,884,049. Split in turns instead (owner t takes i = t, t + 6, t + 12, ...): 23,029,821; 23,043,321; 23,099,034; 23,079,169; 22,974,325; 22,994,152. <span class="from">from: same computation</span></p>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> The job ends with the owner that has the most work. Bands: speedup over one worker = 138,219,822 / ____ = ____ . Turns: 138,219,822 / ____ = ____ . In turns, owner of i = 1023 = ____ ; why can no i have two owners? ____ . <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>bands: 138,219,822 / 29,263,472 = 4.72
+turns: 138,219,822 / 23,099,034 = 5.98
+1023 = 170 x 6 + 3 -&gt; owner 3; each i has exactly one remainder when divided by 6
+Both splits are correct; only the turns give every owner similar work.</pre>
+</details>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> GPU: <code>&lt;&lt;&lt;2, 32&gt;&gt;&gt;</code> makes 2 blocks of 32 threads; <code>threadIdx.x</code> goes from 0 to 31 in every block and <code>blockIdx.x</code> is the block's number. If each thread owns place <code>threadIdx.x</code>, block 1's thread 0 owns place ____ , the same as block ____ 's thread 0. With place <code>blockIdx.x * 32 + threadIdx.x</code>, block 1's thread 0 owns ____ . <span class="from">from: CUDA programming guide</span></p>
+<details><summary>CHECK</summary>
+<pre>without blockIdx.x: place 0, the same as block 0's thread 0 -&gt; two owners, and places 32 to 63 have none
+with blockIdx.x * 32 + threadIdx.x: place 32</pre>
+</details>
+
+<p class="label">Worked out in full</p>
+<ul class="related">
+<li><a href="../14-ownership.html">14. Lab 2: who writes which place, and who finishes last</a></li>
+<li><a href="../18-two-places-per-thread.html">18. Lab 2 on the GPU: two places per thread, 461 ms and 231 ms</a></li>
+</ul>
+
+<p class="label">Related notes</p>
+<ul class="related">
+<li><a href="iters.html">iters: repetitions until the while loop is left</a>: why bands of equal size carry unequal work</li>
+<li><a href="checking-the-output.html">What the printed difference can hide</a>: how a place with no owner shows up in the printed difference</li>
+</ul>
+
+<div class="backlinks">
+<p class="label">Notes that point here</p>
+<!-- backlinks:begin -->
+<ul class="related">
+<li><a href="iters.html">iters: repetitions until the while loop is left</a></li>
+<li><a href="MIT-6.S894.html">MIT 6.S894 Accelerated Computing: notes for self-learners</a></li>
+<li><a href="checking-the-output.html">What the printed difference can hide</a></li>
+</ul>
+<!-- backlinks:end -->
+</div>
+
+<nav><a href="index.html">all notes</a><a href="MIT-6.S894.html">MIT 6.S894 course page</a></nav>
+</main>
+</body>
+</html>

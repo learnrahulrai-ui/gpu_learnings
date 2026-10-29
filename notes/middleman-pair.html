@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="How a place (i, j) on the image paper becomes a point (cx, cy) on the graph paper, and what img_size does and does not change.">
+<meta name="keywords" content="the picture">
+<title>The middleman pair (cx, cy)</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+<p class="crumbs"><a href="../index.html">GPU Learnings</a> / <a href="index.html">notes</a> / <a href="MIT-6.S894.html">MIT 6.S894</a></p>
+<h1>The middleman pair (cx, cy)</h1>
+<p class="sub">Topics: the picture. A single idea, with a few lines to calculate. Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+
+<p class="label">The idea</p>
+<div class="story">
+<p>The Mandelbrot labs fill a sheet of whole numbers, one for each place (i, j), with i counting down and j counting right. The learner called that sheet the image paper. The loop that makes each number never reads i or j: it works on two fractions, cx and cy, computed from them. They mark a point on a second sheet with (0, 0) at its center, the graph paper. The learner named (cx, cy) the middleman pair.</p>
+<p>The question here: when the picture gets more places, does it show more of the graph paper, or the same part in finer steps?</p>
+</div>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The Lab 1 file <code>mandelbrot_cpu.cpp</code> computes, for the place (i, j): <code>float cx = (float(j) / float(img_size)) * 2.5f - 2.0f;</code> and <code>float cy = (float(i) / float(img_size)) * 2.5f - 1.25f;</code> In English: divide j by img_size, multiply by 2.5 and subtract 2.0 to get cx; do the same with i and subtract 1.25 to get cy. <span class="from">from: Lab 1 starter code</span></p>
+<p class="ln"><b>L02</b> Your machine printed: image size 256x256, 1000 max iterations. So img_size = 256, and i and j each go from 0 to 255. <span class="from">from: your output</span></p>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> Place (64, 64): cx = 64 / 256 x 2.5 - 2.0 = ____ , cy = ____ . The same place with img_size = 512: cx = ____ , cy = ____ . Which place at 512 gives the pair that (64, 64) gave at 256? ____ . <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>256: 64 / 256 = 0.25, x 2.5 = 0.625 -&gt; cx = 0.625 - 2.0 = -1.375, cy = 0.625 - 1.25 = -0.625
+512: 64 / 512 = 0.125, x 2.5 = 0.3125 -&gt; cx = -1.6875, cy = -0.9375
+(128, 128) at 512: 128 / 512 = 0.25 -&gt; (-1.375, -0.625), the pair that (64, 64) gave at 256</pre>
+</details>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> Smallest cx (j = 0) at either size = ____ . Largest cx at 256 (j = 255) = ____ . Largest at 512 (j = 511) = ____ . The value that j / img_size never reaches = ____ , so cx never reaches ____ . <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>j = 0: cx = -2.0 at both sizes
+j = 255 at 256: 255 / 256 = 0.99609375, x 2.5 = 2.490234375, - 2.0 = 0.490234375
+j = 511 at 512: 511 / 512 = 0.998046875, x 2.5 = 2.4951171875, - 2.0 = 0.4951171875
+j / img_size never reaches 1, so cx never reaches 1 x 2.5 - 2.0 = 0.5
+
+img_size changes how many pairs are taken between -2.0 and 0.5, and how close together they sit.
+It never changes which part of the graph paper is covered: that comes only from 2.5, 2.0 and 1.25,
+typed into L01. A bigger picture is the same part in finer steps.</pre>
+</details>
+
+<p class="label">Worked out in full</p>
+<ul class="related">
+<li><a href="../01-image-to-middleman.html">01. From (i, j) to the middleman pair (cx, cy)</a></li>
+<li><a href="../02-square-and-add.html">02. The while loop by hand</a></li>
+</ul>
+
+<p class="label">Related notes</p>
+<ul class="related">
+<li><a href="iters.html">iters: repetitions until the while loop is left</a>: does the same place (i, j) give the same number at another img_size?</li>
+</ul>
+
+<div class="backlinks">
+<p class="label">Notes that point here</p>
+<!-- backlinks:begin -->
+<ul class="related">
+<li><a href="iters.html">iters: repetitions until the while loop is left</a></li>
+<li><a href="MIT-6.S894.html">MIT 6.S894 Accelerated Computing: notes for self-learners</a></li>
+</ul>
+<!-- backlinks:end -->
+</div>
+
+<nav><a href="index.html">all notes</a><a href="MIT-6.S894.html">MIT 6.S894 course page</a></nav>
+</main>
+</body>
+</html>

@@ -1,6 +1,6 @@
 """Scan every page of the site for banned words and banned patterns listed in AGENTS.md.
 
-Usage, from the repository root:  python3 tools/check_banned.py
+Usage, from the repository root:  python3 tools/check_banned.py   (scans *.html and notes/*.html)
 Needs: beautifulsoup4.  Exit code 1 if anything is found.
 Learner quotes (class "you") are skipped: they are the learner's own words.
 """
@@ -33,12 +33,13 @@ ANALOGY = re.compile(r"\b(think of it as|it is like a|just like a|imagine a|simi
 THINK_IN_DO = re.compile(r"\b(think|imagine|understand)\b", re.I)
 
 # Allowed exceptions: warp is defined on these pages before use; program output quoted verbatim.
-WARP_OK = {"11-program-counter.html", "12-the-48-trap.html", "13-the-864-cliff.html", "14-ownership.html", "17-hardware-or-launch.html", "18-two-places-per-thread.html", "words.html"}
+WARP_OK = {"11-program-counter.html", "12-the-48-trap.html", "13-the-864-cliff.html", "14-ownership.html", "17-hardware-or-launch.html", "18-two-places-per-thread.html", "words.html",
+           "notes/warp.html", "notes/filling-the-wait.html", "notes/register-budget.html", "notes/program-counter.html", "notes/index.html"}
 OUTPUT_OK = re.compile(r"Latency of \w+ code snippet")
 
 
 def scan(path):
-    name = os.path.basename(path)
+    name = os.path.relpath(path, ROOT)
     soup = bs4.BeautifulSoup(open(path, encoding="utf-8").read(), "html.parser")
     for q in soup.select(".you"):
         q.decompose()
@@ -66,7 +67,7 @@ def scan(path):
 
 def main():
     problems = []
-    for path in sorted(glob.glob(os.path.join(ROOT, "*.html"))):
+    for path in sorted(glob.glob(os.path.join(ROOT, "*.html")) + glob.glob(os.path.join(ROOT, "notes", "*.html"))):
         problems += scan(path)
     for name, label, hit, txt in problems:
         print(f"{name}: {label}: {hit!r} | {txt[:100]}")

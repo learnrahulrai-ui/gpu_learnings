@@ -74,3 +74,9 @@ dl.words dd { margin: 2px 0 0 0; }
 .guess { border: 2px dashed var(--ok); border-radius: 8px; padding: 12px 16px 4px; margin: 20px 0 16px; }
 .interview { border-left: 4px solid var(--mark); background: var(--box); border-radius: 0 8px 8px 0; padding: 12px 16px 4px; margin: 20px 0 16px; }
 .guess > .label, .interview > .label { margin-top: 0; }
+.crumbs { font: 13px "DejaVu Sans Mono", Menlo, Consolas, monospace; color: var(--dim); margin: 0 0 14px; }
+ul.related { padding-left: 22px; margin: 0 0 12px; }
+ul.related li { margin-bottom: 8px; }
+ol.toc { margin: 0 0 12px; padding-left: 26px; }
+.full { color: var(--dim); }
+.backlinks { margin-top: 28px; }

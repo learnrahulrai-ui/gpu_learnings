@@ -19,20 +19,25 @@
 <dt>bit, byte</dt><dd>A bit holds 0 or 1. A byte is 8 bits. A float or a <code>uint32_t</code> takes 32 bits, which is 4 bytes.</dd>
 <dt>block (CUDA)</dt><dd>A set of GPU threads started together. The launch <code>&lt;&lt;&lt;B, T&gt;&gt;&gt;</code> starts B blocks of T threads each. Each block executes on one SM.</dd>
 <dt>chain</dt><dd>A list of operations in which each one needs the value of the one before it, so they cannot overlap.</dd>
+<dt>clock read</dt><dd>Copying the GPU's cycle counter (<code>%clock64</code>) into a variable. The difference between two reads is the number of cycles between them, but only for the instructions the machine listing actually places between them.</dd>
 <dt>cache</dt><dd>Small, fast memory that keeps recently read values so a second read of the same value does not go back to the slow memory chips. The program does not control it directly.</dd>
 <dt>CHECK</dt><dd>On this site, the fold-out box under each exercise that holds the worked answer. Open it only after writing your own.</dd>
 <dt>compiler</dt><dd>The program (here <code>g++</code> for the CPU and <code>nvcc</code> for the GPU) that turns source code into machine instructions. It may reorder instructions when nothing forbids it.</dd>
 <dt>core</dt><dd>A part of a CPU that executes its own sequence of instructions. The Ryzen 5 4600H has 6.</dd>
 <dt>CPU</dt><dd>The central processor of a computer, built to finish one sequence of instructions as fast as possible.</dd>
+<dt>CS2R, LDG</dt><dd>GPU machine instructions: LDG copies a value from the graphics card's memory into a register; CS2R copies a special register, such as the cycle counter, into an ordinary one.</dd>
 <dt>cycle</dt><dd>A single tick of a processor's clock. Times inside the GPU are counted in cycles.</dd>
 <dt>DRAM</dt><dd>The memory chips. On a graphics card they sit outside the GPU chip, so reading from them takes many cycles.</dd>
 <dt>FFMA, FADD</dt><dd>Names of GPU machine instructions: FFMA multiplies two fractions and adds a third in one step; FADD adds two fractions.</dd>
 <dt>float</dt><dd>A fraction stored in 32 bits. It can only hold certain values; a typed number becomes the nearest one it can hold.</dd>
 <dt>fmadd (fused multiply-add)</dt><dd>A single instruction that computes a times b plus c. On the CPU, <code>_mm256_fmadd_ps</code> does it at 8 indexes at once.</dd>
 <dt>FP32 unit</dt><dd>A circuit in the GPU that does one 32-bit multiply-add for one thread. The GTX 1650 has 896 of them.</dd>
+<dt>GDDR5, GDDR6</dt><dd>Kinds of memory chips used on graphics cards. GDDR6 moves more bytes per second over the same wires.</dd>
 <dt>GPU</dt><dd>A graphics processor: thousands of simple arithmetic circuits that are fast when many of them do the same instruction at the same moment.</dd>
 <dt>graph paper</dt><dd>The learner's word for the mathematical plane with (0, 0) at its center, where the middleman pairs live.</dd>
 <dt>image paper</dt><dd>The learner's word for the 256 by 256 sheet of results, the array <code>out</code>, with i counting down and j counting right.</dd>
+<dt>IEEE 754</dt><dd>The standard that fixes how floats are stored and how a result that falls between two floats is rounded.</dd>
+<dt>index-repetition</dt><dd>On this site: one index of an 8-float AVX2 variable doing one repetition of the loop. A repetition of the vector loop costs 8 of them, useful or not.</dd>
 <dt>index 0 to 7</dt><dd>The place of one of the 8 values held in a 256-bit AVX2 variable.</dd>
 <dt>instruction</dt><dd>A basic step a processor executes: add, multiply, compare, copy, jump.</dd>
 <dt>intrinsic</dt><dd>A function name in C++ that the compiler turns into one specific processor instruction, such as <code>_mm256_add_ps</code>.</dd>
@@ -42,7 +47,10 @@
 <dt>mask</dt><dd>The result of an AVX2 compare: at each index, 32 bits all 1 where the test was true, all 0 where it was false.</dd>
 <dt>Mandelbrot set</dt><dd>The picture the labs compute. For each point, a short calculation is repeated until the value moves farther than 2 from (0, 0) or a cap of repetitions is reached.</dd>
 <dt>max_iters</dt><dd>The cap on repetitions, 1000 in the lab measurements on this site.</dd>
+<dt>memory bus</dt><dd>The wires between the GPU chip and its memory chips. On the GTX 1650 it is 128 bits, so 16 bytes move per transfer.</dd>
 <dt>middleman pair</dt><dd>The learner's word for (cx, cy), the two fractions computed from (i, j) that the Mandelbrot loop actually works on.</dd>
+<dt>notes (this site)</dt><dd>The short pages in the notes section: one idea each, a few lines to calculate, and the notes that point to each one.</dd>
+<dt>nsys (Nsight Systems)</dt><dd>NVIDIA's tool that times what the CPU and the GPU did, kernel by kernel. <code>nsys profile --stats=true ./program</code> prints the time of each kernel.</dd>
 <dt>profiler</dt><dd>A tool (here NVIDIA Nsight Compute) that counts what the GPU did, such as memory requests and sectors.</dd>
 <dt>operations per byte</dt><dd>How many arithmetic operations a program does for each byte it moves to or from memory. Below what the hardware needs to stay busy, memory sets the time.</dd>
 <dt>operations per second (FLOP/s)</dt><dd>Arithmetic operations completed per second. A multiply-add counts as 2: one multiply and one add.</dd>
@@ -55,12 +63,16 @@
 <dt>register</dt><dd>A small storage cell inside the processor chip. Arithmetic reads its inputs only from registers.</dd>
 <dt>register budget</dt><dd>On a Turing SM, 65,536 registers shared by every thread it holds; at 1,024 threads that is 64 per thread. The compiler reports a kernel's use with <code>-Xptxas -v</code>.</dd>
 <dt>repetition</dt><dd>A single trip through the lines inside a loop.</dd>
+<dt>request, sector (profiler)</dt><dd>Words of the Nsight Compute profiler: a request is one memory instruction for the 32 threads of a warp; a sector is a 32-byte block of memory that the instruction touches.</dd>
 <dt>scoreboard</dt><dd>A record inside the GPU of registers still waiting for a value; an instruction that needs one of them is held until it arrives.</dd>
 <dt>shared memory</dt><dd>Storage inside each SM that all threads of one block can read and write, much faster than the graphics card's memory chips. At most 64 KB per SM on Turing.</dd>
+<dt>significant bits</dt><dd>The bits of a float that hold its digits, as opposed to the bits that say how large it is. A float has 24, so above 16,777,216 it cannot hold every whole number.</dd>
 <dt>SIMD</dt><dd>Single instruction, multiple data: one instruction acting on several values at once, as AVX2 does with 8.</dd>
 <dt>SM</dt><dd>Each of the identical blocks of hardware an NVIDIA GPU chip is built from. The GTX 1650 has 14, each with 64 FP32 units.</dd>
 <dt>tile</dt><dd>A small square piece of a large table, copied into shared memory so many threads can use each value without fetching it again.</dd>
 <dt>thread</dt><dd>A sequence of instructions being executed. On a GPU, thousands can exist at once, each with its own values.</dd>
+<dt>thread-instruction, thread-repetition</dt><dd>On this site: one GPU thread doing one instruction, or one repetition of a loop. An instruction that begins for a warp has room for 32 thread-instructions, whether or not every thread has work.</dd>
+<dt>Turing, Volta, Ada</dt><dd>Names of NVIDIA GPU generations. The GTX 1650 is Turing; Volta came just before it; the course GPU, an RTX 4000 Ada, is a later generation.</dd>
 <dt>warp scheduler</dt><dd>A circuit in each SM that, every cycle, picks which warp's next instruction begins. Turing and Ada GPUs have 4 per SM.</dd>
 <dt>wave (second round)</dt><dd>When a launch has more blocks than the SMs can hold at once, the extra blocks wait until earlier ones finish and then execute as a further round.</dd>
 <dt>warp</dt><dd>NVIDIA's name for 32 consecutive threads of a block that the hardware handles together, one instruction at a time.</dd>

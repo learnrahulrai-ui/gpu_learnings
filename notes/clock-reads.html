@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="The source code put an add before the timer; the machine listing put it after. How to know what a timing contains, and how giving the clock read inputs fixes it.">
+<meta name="keywords" content="measuring">
+<title>What sits between two clock reads</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+<p class="crumbs"><a href="../index.html">GPU Learnings</a> / <a href="index.html">notes</a> / <a href="MIT-6.S894.html">MIT 6.S894</a></p>
+<h1>What sits between two clock reads</h1>
+<p class="sub">Topics: measuring. A single idea, with a few lines to calculate. Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+
+<p class="label">The idea</p>
+<div class="story">
+<p>The Lab 2 prelab times multiply-adds by reading the GPU's cycle counter before and after them. The compiler is free to move an instruction across a clock read when nothing ties the two together, so the order in the source code is not necessarily the order on the chip.</p>
+<p>The question here: what actually lies between the two reads, and how can it be pinned?</p>
+</div>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The Lab 2 starter <code>fma_latency.cu</code> reads the clock with <code>asm volatile("mov.u64 %0, %%clock64;" : "=l"(ret));</code> In English: copy the GPU's 64-bit cycle counter into ret; the part after the colon lists one output and no input. <span class="from">from: Lab 2 starter code</span></p>
+<p class="ln"><b>L02</b> Your interleaved kernel copies <code>*n</code> from DRAM, the memory chips outside the GPU chip, into a register that both x and y begin from, then does <code>x = x + 3.0f; y = y + 4.0f;</code>, then reads the clock. Hardware fact: the chip begins the instruction after a load without waiting; an instruction that reads the loaded register is held until the value arrives. So the adds are there to pay the wait for the load before the first clock read. <span class="from">from: your code, Jia et al. 2019, Dissecting the NVIDIA Turing T4 GPU</span></p>
+<p class="ln"><b>L03</b> Your machine listing (<code>cuobjdump -sass</code>) showed the start clock read (CS2R at 0060) before both FADD instructions (0080, 0090) that read the loaded register (written by LDG at 0020). <span class="from">from: your listing</span></p>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> From L03, which waits now fall inside the timed window? ____ . What in L01 allowed the move? ____ . Fix: a clock read that lists x and y as inputs. If only x is listed, which add may still move inside? ____ . <span class="from">from: L01, L02, L03</span></p>
+<details><summary>CHECK</summary>
+<pre>inside: the wait for the DRAM load, plus the two FADDs themselves
+allowed by: L01's clock read has no input, so nothing ties it to the adds
+only x listed: the add on y is tied to nothing and may move after the read
+(your report showed exactly this)</pre>
+</details>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> End clock read with no input: can it begin before the last multiply-add of the chain has its value? ____ . Then the printed cycles are too ____ (small or large). <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>yes: it reads no register that the last multiply-add writes, so nothing holds it
+too small: the wait for the last value is left out
+
+Both reads take the chain's final values as inputs. Only the machine listing shows what is timed;
+the source code showed the add above the clock read in every version.</pre>
+</details>
+
+<p class="label">Worked out in full</p>
+<ul class="related">
+<li><a href="../09-clock-read-trap.html">09. Lab 2 prelab: what sits between the clock reads</a></li>
+</ul>
+
+<p class="label">Related notes</p>
+<ul class="related">
+<li><a href="subtract-two-lengths.html">Measuring by subtracting two lengths</a>: removing whatever part of a timing is not the work itself</li>
+</ul>
+
+<div class="backlinks">
+<p class="label">Notes that point here</p>
+<!-- backlinks:begin -->
+<ul class="related">
+<li><a href="subtract-two-lengths.html">Measuring by subtracting two lengths</a></li>
+<li><a href="MIT-6.S894.html">MIT 6.S894 Accelerated Computing: notes for self-learners</a></li>
+</ul>
+<!-- backlinks:end -->
+</div>
+
+<nav><a href="index.html">all notes</a><a href="MIT-6.S894.html">MIT 6.S894 course page</a></nav>
+</main>
+</body>
+</html>

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="How each of 8 indexes keeps its own count inside one AVX2 while loop, with no if.">
+<meta name="keywords" content="CPU">
+<title>The mask, and why all ones reads as -1</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+<p class="crumbs"><a href="../index.html">GPU Learnings</a> / <a href="index.html">notes</a> / <a href="MIT-6.S894.html">MIT 6.S894</a></p>
+<h1>The mask, and why all ones reads as -1</h1>
+<p class="sub">Topics: CPU. A single idea, with a few lines to calculate. Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+
+<p class="label">The idea</p>
+<div class="story">
+<p>In the AVX2 while loop every instruction acts on all 8 indexes, so no single index can be told to stop. Lab 1's vector code instead keeps 8 counters in one variable and adds 1 only where the place is still inside the loop, using a compare and one subtraction.</p>
+<p>The question here: why does subtracting the compare result add 1?</p>
+</div>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> Your code: <code>__m256 mask = _mm256_cmp_ps(_mm256_add_ps(x2_vec, y2_vec), four, _CMP_LE_OQ);</code> In English: at each index, add x2 and y2 and compare the sum with 4; where it is at most 4 put 32 bits all 1, elsewhere 32 bits all 0, and keep the 8 answers in mask. <span class="from">from: your code, intrinsic definition</span></p>
+<p class="ln do"><b>L02</b> <b class="x">DO</b> Add 1, in binary, to the 32-bit integer whose bits are all 1. Every 1 + 1 gives 0 and carries 1 upward; the carry out of bit 31 does not fit. The 32 bits left = ____ . So all ones, read as a signed 32-bit integer, is ____ . <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>  11111111 11111111 11111111 11111111
++                                   1
+= 1 00000000 00000000 00000000 00000000   (the leading 1 does not fit)
+32 bits left: all 0, which is 0
+the integer that becomes 0 when 1 is added is -1: all ones = -1</pre>
+</details>
+<p class="ln"><b>L03</b> Your code: <code>iters_vec = _mm256_sub_epi32(iters_vec, _mm256_castps_si256(mask));</code> In English: read the bits of mask as 8 whole numbers, without changing any bit, and subtract them from the 8 counters, index by index. <span class="from">from: your code, intrinsic definition</span></p>
+<p class="ln"><b>L04</b> Fact about this loop: an index whose scalar iters is c has x2 + y2 at most 4 before each of repetitions 1 to c, and above 4 before repetition c + 1 and every later one; once (x, y) is farther than 2 from (0, 0), every further repetition keeps it farther. <span class="from">from: the lab's while loop, Mandelbrot iteration</span></p>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> Index with all ones: iters - (____) = iters + ____ . Index with all zeros: iters - 0 = ____ . Real block i = 40, j = 208 to 215, scalar iters 12, 8, 7, 6, 6, 6, 5, 5: iters_vec after repetition 7 = ____ ; after repetition 12 = ____ . <span class="from">from: L02, L03, L04</span></p>
+<details><summary>CHECK</summary>
+<pre>all ones:  iters - (-1) = iters + 1
+all zeros: iters - 0 = iters
+after repetition 7:  7 7 7 6 6 6 5 5
+after repetition 12: 12 8 7 6 6 6 5 5   = the scalar iters
+
+No index was asked whether it had finished. Its own mask value stopped its own count.</pre>
+</details>
+
+<p class="label">Worked out in full</p>
+<ul class="related">
+<li><a href="../05-simd-while-loop.html">05. SIMD and the while loop: eight iters, one loop</a></li>
+</ul>
+
+<p class="label">Related notes</p>
+<ul class="related">
+<li><a href="simd-avx2.html">SIMD on the CPU: 8 places in one AVX2 instruction</a>: what the repetitions after an index has stopped cost</li>
+<li><a href="warp.html">The 32-thread unit</a>: the GPU's version: finished threads wait for the others</li>
+</ul>
+
+<div class="backlinks">
+<p class="label">Notes that point here</p>
+<!-- backlinks:begin -->
+<ul class="related">
+<li><a href="MIT-6.S894.html">MIT 6.S894 Accelerated Computing: notes for self-learners</a></li>
+<li><a href="simd-avx2.html">SIMD on the CPU: 8 places in one AVX2 instruction</a></li>
+<li><a href="warp.html">The 32-thread unit</a></li>
+</ul>
+<!-- backlinks:end -->
+</div>
+
+<nav><a href="index.html">all notes</a><a href="MIT-6.S894.html">MIT 6.S894 course page</a></nav>
+</main>
+</body>
+</html>

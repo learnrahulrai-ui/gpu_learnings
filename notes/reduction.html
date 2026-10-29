@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A plain loop over 20 million floats is a chain of 20 million adds and stops counting at 16,777,216; a tree has 25 levels and gets 20,000,000.">
+<meta name="keywords" content="chains">
+<title>Adding up an array: chain or tree</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+<p class="crumbs"><a href="../index.html">GPU Learnings</a> / <a href="index.html">notes</a> / <a href="MIT-6.S894.html">MIT 6.S894</a></p>
+<h1>Adding up an array: chain or tree</h1>
+<p class="sub">Topics: chains. A single idea, with a few lines to calculate. Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+
+<p class="label">The idea</p>
+<div class="story">
+<p>Adding up an array looks like the easiest program there is: one loop and one total that every add updates. Each add needs the total the previous add produced, so the adds form one chain, and a float total can hold only so much precision.</p>
+<p>The question here: what does adding in a tree order change, the time, the answer, or both?</p>
+</div>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The plain loop: <code>for (k = 0; k &lt; n; ++k) s = s + x[k];</code> In English: add each value into s, one after another; each add reads the s that the add before it wrote, so the n adds form one chain. <span class="from">from: code (the standard tutorial program)</span></p>
+<p class="ln"><b>L02</b> Measured on your GTX 1650 in the Lab 2 prelab: a multiply-add that needs the previous one's value waits 4 cycles; on Turing an add waits the same 4 cycles. This note assumes 1.5 billion cycles per second. <span class="from">from: your output, Jia et al. 2019, assumption</span></p>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> n = 20,000,000. Plain loop: cycles = 20,000,000 x 4 = ____ ; time = ____ ms, however many threads exist. Tree (add neighbouring pairs, then pairs of those totals, until one is left): adds = ____ ; levels = ____ (2^24 = 16,777,216 and 2^25 = 33,554,432). <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>80,000,000 cycles, 80,000,000 / 1.5e9 = 53.3 ms
+each add turns two totals into one: 20,000,000 - 1 = 19,999,999 adds
+16,777,216 &lt; 20,000,000 &lt;= 33,554,432 -&gt; 25 levels
+Almost the same number of adds; the longest chain is 25 instead of 20,000,000.</pre>
+</details>
+<p class="ln"><b>L04</b> Float fact: a float holds 24 significant bits, so between 16,777,216 (2^24) and 33,554,432 the floats are 2 apart. A result halfway between two floats goes to the one whose last bit is 0. <span class="from">from: IEEE 754 float32</span></p>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> Plain loop over 20,000,000 ones in floats: after 16,777,216 adds, s = 16,777,216. The next add gives 16,777,217, halfway between 16,777,216 and 16,777,218; it becomes ____ . Final s = ____ . Error = ____ percent. The tree order, computed in 32-bit fractions, gives 20,000,000. <span class="from">from: L01, L04, computation</span></p>
+<details><summary>CHECK</summary>
+<pre>16,777,216 (2^24 ends in a 0 bit); every later add of 1 rounds back to it
+final s = 16,777,216
+3,222,784 / 20,000,000 = 16.1 percent short
+The tree adds totals of similar size, so rounding never swallows what is added;
+the same tree shape also shortens the chain to 25 levels.</pre>
+</details>
+
+<p class="label">Worked out in full</p>
+<ul class="related">
+<li><a href="../t2-sum-an-array.html">T2. Summing an array: the chain, the tree, and the wrong answer</a></li>
+</ul>
+
+<p class="label">Related notes</p>
+<ul class="related">
+<li><a href="independent-chains.html">Independent chains inside one thread</a>: where the 4-cycle wait comes from, and what independent work does to it</li>
+</ul>
+
+<div class="backlinks">
+<p class="label">Notes that point here</p>
+<!-- backlinks:begin -->
+<ul class="related">
+<li><a href="independent-chains.html">Independent chains inside one thread</a></li>
+<li><a href="MIT-6.S894.html">MIT 6.S894 Accelerated Computing: notes for self-learners</a></li>
+</ul>
+<!-- backlinks:end -->
+</div>
+
+<nav><a href="index.html">all notes</a><a href="MIT-6.S894.html">MIT 6.S894 course page</a></nav>
+</main>
+</body>
+</html>

@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="MIT 6.S894 Accelerated Computing, Labs 1 and 2, note by note in course order, with the numbers measured on a Ryzen 5 4600H and a GTX 1650.">
+<meta name="keywords" content="course">
+<title>MIT 6.S894 Notes</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+<p class="crumbs"><a href="../index.html">GPU Learnings</a> / <a href="index.html">notes</a> / MIT 6.S894</p>
+<h1>MIT 6.S894 Accelerated Computing: notes for self-learners</h1>
+<p class="sub">Topics: course. Labs 1 and 2, in course order. Each part of a lab below says what the lab asks and what was measured, then lists the short notes behind it. Each note is one idea: a few plain sentences, then numbered lines to calculate. No search box and no scripts: the notes are plain pages, so use your browser's find (Ctrl+F) on the <a href="index.html">list of all notes</a>.</p>
+
+<p class="label">The course</p>
+<div class="story">
+<p>MIT 6.S894, Accelerated Computing, is a graduate course from MIT EECS, taught in Fall 2025 by Jonathan Ragan-Kelley. Its pages are public at <a href="https://accelerated-computing.academy/fall25/">accelerated-computing.academy/fall25</a>, and the starter code of every lab is public at <a href="https://github.com/accelerated-computing-class">github.com/accelerated-computing-class</a>. The labs program NVIDIA GPUs in CUDA, beginning with the CPU for comparison.</p>
+<p>These notes cover Lab 1 and Lab 2 as done by one learner outside MIT, on a laptop instead of the course machines: a Ryzen 5 4600H CPU and a GTX 1650 GPU. Every measured number comes from that laptop unless a line says otherwise. Where a note says "your output" or "your code", it means that learner's; redo each line with your own numbers if your machine differs.</p>
+</div>
+
+<p class="label">On this page</p>
+<ol class="toc">
+<li><a href="#lab1-cpu">Lab 1: the picture on one CPU core</a></li>
+<li><a href="#lab1-simd">Lab 1: 8 places per CPU instruction</a></li>
+<li><a href="#lab1-gpu">Lab 1: the picture on the GPU</a></li>
+<li><a href="#lab2-fma">Lab 2 prelab: timing one multiply-add</a></li>
+<li><a href="#lab2-busy">Lab 2 prelab: how many threads keep the GPU busy</a></li>
+<li><a href="#lab2-main">Lab 2: a bigger picture, split many ways</a></li>
+<li><a href="#beyond">Beyond the labs: the standard programs</a></li>
+<li><a href="#map">Map of the notes</a></li>
+</ol>
+
+<h2 id="lab1-cpu">Lab 1: the picture on one CPU core</h2>
+<p>The lab computes a 256 by 256 picture of the Mandelbrot set. For each place it repeats a short calculation at most 1000 times and stores how many repetitions it did. Measured on the laptop: 61.6 ms on one core, and the counts of all places add up to 16,274,722.</p>
+<ul class="related">
+<li><a href="middleman-pair.html">The middleman pair (cx, cy)</a>: from a place on the image paper to a point on the graph paper, and what a bigger picture changes</li>
+<li><a href="iters.html">iters: repetitions until the while loop is left</a>: what each number counts, and whether places are equal work</li>
+</ul>
+<p class="full">Full exercises: <a href="../01-image-to-middleman.html">01</a>, <a href="../02-square-and-add.html">02</a>, <a href="../03-the-w-line.html">03</a>.</p>
+
+<h2 id="lab1-simd">Lab 1: 8 places per CPU instruction</h2>
+<p>The same picture with AVX2 instructions, which act on 8 floats at once. Measured: 8.71 ms on one core, against 61.6 ms without them.</p>
+<ul class="related">
+<li><a href="simd-avx2.html">SIMD on the CPU: 8 places in one AVX2 instruction</a>: what it costs when the 8 places need different numbers of repetitions</li>
+<li><a href="mask.html">The mask, and why all ones reads as -1</a>: how each of the 8 keeps its own count</li>
+</ul>
+<p class="full">Full exercises: <a href="../04-simd-cx.html">04</a>, <a href="../05-simd-while-loop.html">05</a>.</p>
+
+<h2 id="lab1-gpu">Lab 1: the picture on the GPU</h2>
+<p>The same picture on the GTX 1650, first with one GPU thread, then with one block of 32 threads. Measured: 403.435 ms and 17.732 ms.</p>
+<ul class="related">
+<li><a href="sm.html">SM: the block of hardware a GPU chip is built from</a>: what the chip contains, and whether more circuits win by default</li>
+<li><a href="warp.html">The 32-thread unit</a>: what happens to threads that finish early</li>
+<li><a href="program-counter.html">A program counter for every thread</a>: why the 32-thread unit still matters</li>
+<li><a href="nearby.html">Nearby: 32 stores in 4 blocks of 32 bytes</a>: the profiler's two counts, derived by hand</li>
+</ul>
+<p class="full">Full exercises: <a href="../00-what-a-gpu-is.html">00</a>, <a href="../06-gpu-threads.html">06</a>, <a href="../11-program-counter.html">11</a>.</p>
+
+<h2 id="lab2-fma">Lab 2 prelab: timing one multiply-add</h2>
+<p>The starter file <code>fma_latency.cu</code> reads the GPU's cycle counter around chains of multiply-adds. Measured on the laptop, in cycles: one chain 281 (64 multiply-adds) and 1055 (256), two chains 295 and 551, four chains 519 and 1031.</p>
+<ul class="related">
+<li><a href="clock-reads.html">What sits between two clock reads</a>: why the source code order does not say what is timed</li>
+<li><a href="subtract-two-lengths.html">Measuring by subtracting two lengths</a>: the cost of one multiply-add, without the fixed part</li>
+<li><a href="independent-chains.html">Independent chains inside one thread</a>: when extra chains stop helping</li>
+</ul>
+<p class="full">Full exercises: <a href="../09-clock-read-trap.html">09</a>, <a href="../10-cycles-per-ffma.html">10</a>.</p>
+
+<h2 id="lab2-busy">Lab 2 prelab: how many threads keep the GPU busy</h2>
+<p>The starter file <code>warp_scheduler.cu</code> launches chains of multiply-adds in 48 x m blocks of 64 threads and reports operations per second. Reported for the course GPU in the learner's notes: 26.4575 x 10^12 at m = 8 and 15.9401 x 10^12 at m = 9.</p>
+<ul class="related">
+<li><a href="filling-the-wait.html">Filling the 4-cycle wait: needed against held</a>: how many threads a scheduler needs, against how many it can hold</li>
+<li><a href="second-round.html">A second round of blocks</a>: the jump between m = 8 and m = 9</li>
+<li><a href="register-budget.html">The register budget</a>: when fewer threads fit, and when that matters</li>
+</ul>
+<p class="full">Full exercises: <a href="../12-the-48-trap.html">12</a>, <a href="../13-the-864-cliff.html">13</a>, <a href="../17-hardware-or-launch.html">17</a>.</p>
+
+<h2 id="lab2-main">Lab 2: a bigger picture, split many ways</h2>
+<p>A 1024 by 1024 picture with at most 2000 repetitions per place, computed with several CPU threads and many GPU threads, then with independent sets of work inside each thread. Measured: 221.97 ms on the GPU for one block of 32 threads, after a sign error in the window was fixed.</p>
+<ul class="related">
+<li><a href="owner.html">Owner: exactly one writer per place</a>: correct splits, fast splits</li>
+<li><a href="checking-the-output.html">What the printed difference can hide</a>: whether a broken version can look better than a correct one</li>
+<li><a href="combining-speedups.html">Combining speedups</a>: which comparison says whether a technique still helps</li>
+</ul>
+<p class="full">Full exercises: <a href="../07-waiting-chain.html">07</a>, <a href="../08-fat-loop-stop.html">08</a>, <a href="../14-ownership.html">14</a>, <a href="../15-trusting-a-number.html">15</a>, <a href="../16-combining-speedups.html">16</a>, <a href="../18-two-places-per-thread.html">18</a>.</p>
+
+<h2 id="beyond">Beyond the labs: the standard programs</h2>
+<p>Programs that every GPU course meets, worked out from the GTX 1650's published figures, with a line in each asking for your own measurement.</p>
+<ul class="related">
+<li><a href="operations-per-byte.html">Operations per byte</a>: whether memory or arithmetic sets the time when adding two arrays</li>
+<li><a href="tiles.html">Tiles in shared memory</a>: how much reuse a matrix multiply needs, and whether a tile that size fits</li>
+<li><a href="reduction.html">Adding up an array: chain or tree</a>: what the order of the adds changes</li>
+</ul>
+<p class="full">Full exercises: <a href="../t1-add-two-arrays.html">T1</a>, <a href="../t2-sum-an-array.html">T2</a>, <a href="../t3-multiply-matrices.html">T3</a>.</p>
+
+<h2 id="map">Map of the notes</h2>
+<p>An arrow points to a good next note: Lab 1 on the left, the Lab 2 prelab on the right.</p>
+<pre>  LAB 1                                  LAB 2 PRELAB
+
+      middleman-pair                      clock-reads
+            |                                  |
+            v                                  v
+          iters -----&gt; owner          subtract-two-lengths
+            |            |                     |
+            v            v                     v
+        simd-avx2   checking-the-output  independent-chains ----&gt; reduction
+            |                              |             |
+            v                              v             v
+          mask                      filling-the-wait   combining-speedups
+            |                         |           |
+            v                         v           v
+  sm --&gt; 32-thread-unit         second-round   register-budget
+            |       \
+            v        \
+          nearby    program-counter
+            |
+            v
+   operations-per-byte --&gt; tiles</pre>
+
+<nav><a href="index.html">all notes</a><a href="middleman-pair.html">first note: the middleman pair</a></nav>
+</main>
+</body>
+</html>

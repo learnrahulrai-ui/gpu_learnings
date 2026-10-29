@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="What each number of the Mandelbrot picture counts, why it ranges from 1 to 1000, and why equal numbers of places are not equal work.">
+<meta name="keywords" content="the picture, splitting work">
+<title>iters: repetitions until the while loop is left</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+<p class="crumbs"><a href="../index.html">GPU Learnings</a> / <a href="index.html">notes</a> / <a href="MIT-6.S894.html">MIT 6.S894</a></p>
+<h1>iters: repetitions until the while loop is left</h1>
+<p class="sub">Topics: the picture, splitting work. A single idea, with a few lines to calculate. Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+
+<p class="label">The idea</p>
+<div class="story">
+<p>For each middleman pair (cx, cy) the lab repeats a short calculation and counts the repetitions. It leaves the while loop when x2 + y2 goes above 4, which means the point (x, y) has got farther than 2 from (0, 0), or when the count reaches max_iters. The picture stores the count, iters.</p>
+<p>The question here: is every place about the same amount of work, so that giving each worker the same number of places is fair?</p>
+</div>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> Lab 1 settings, from your output: img_size = 256 and max_iters = 1000, so the picture has 256 x 256 = 65,536 places, and each place costs from 1 to 1000 repetitions. <span class="from">from: your output, Lab 1 starter code</span></p>
+<p class="ln"><b>L02</b> Real data, computed with the lab's own lines for every place: the iters add up to 16,274,722, the "CPU total" your machine printed. Of the 65,536 places, 15,902 have iters 1000. <span class="from">from: computation on the lab code, your output</span></p>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> Average iters per place = 16,274,722 / 65,536 = ____ . Share of places at 1000 = ____ percent. Share of all repetitions done by those places = 15,902 x 1000 / 16,274,722 = ____ percent. <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>average = 248.3
+places at 1000: 15,902 / 65,536 = 24.3 percent
+their repetitions: 15,902,000 / 16,274,722 = 97.7 percent of all the work</pre>
+</details>
+<p class="ln"><b>L04</b> Split the picture between 4 workers by i, in consecutive bands: i = 0 to 63, 64 to 127, 128 to 191, 192 to 255. Each band has 16,384 places. Sums of iters per band, from the same data: 462,567; 7,558,684; 7,747,009; 506,462. <span class="from">from: computation on the lab code</span></p>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> Share of the work in the largest band = ____ percent. The job ends when the slowest worker ends, so if time follows repetitions, 4 workers are faster than 1 by 16,274,722 / ____ = ____ . <span class="from">from: L02, L04</span></p>
+<details><summary>CHECK</summary>
+<pre>largest band: 7,747,009 / 16,274,722 = 47.6 percent
+speedup = 16,274,722 / 7,747,009 = 2.10, not 4
+
+A quarter of the places do almost all the work (L03), and they sit together in the middle bands.
+Equal numbers of places are not equal work; a split by count of places is uneven before it begins.</pre>
+</details>
+
+<p class="label">Worked out in full</p>
+<ul class="related">
+<li><a href="../02-square-and-add.html">02. The while loop by hand</a></li>
+<li><a href="../14-ownership.html">14. Lab 2: who writes which place, and who finishes last</a></li>
+</ul>
+
+<p class="label">Related notes</p>
+<ul class="related">
+<li><a href="middleman-pair.html">The middleman pair (cx, cy)</a>: where the pair (cx, cy) that the loop works on comes from</li>
+<li><a href="owner.html">Owner: exactly one writer per place</a>: how to split the picture so that every worker gets similar work</li>
+<li><a href="simd-avx2.html">SIMD on the CPU: 8 places in one AVX2 instruction</a>: what happens when 8 neighbouring places share one instruction</li>
+</ul>
+
+<div class="backlinks">
+<p class="label">Notes that point here</p>
+<!-- backlinks:begin -->
+<ul class="related">
+<li><a href="MIT-6.S894.html">MIT 6.S894 Accelerated Computing: notes for self-learners</a></li>
+<li><a href="owner.html">Owner: exactly one writer per place</a></li>
+<li><a href="simd-avx2.html">SIMD on the CPU: 8 places in one AVX2 instruction</a></li>
+<li><a href="middleman-pair.html">The middleman pair (cx, cy)</a></li>
+</ul>
+<!-- backlinks:end -->
+</div>
+
+<nav><a href="index.html">all notes</a><a href="MIT-6.S894.html">MIT 6.S894 course page</a></nav>
+</main>
+</body>
+</html>

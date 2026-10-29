@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A scheduler of the GTX 1650 holds up to 8 sets of 32 threads, but chains of multiply-adds need only 2. Why filling the chip to its maximum is not the target.">
+<meta name="keywords" content="GPU chip">
+<title>Filling the 4-cycle wait: needed against held</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+<p class="crumbs"><a href="../index.html">GPU Learnings</a> / <a href="index.html">notes</a> / <a href="MIT-6.S894.html">MIT 6.S894</a></p>
+<h1>Filling the 4-cycle wait: needed against held</h1>
+<p class="sub">Topics: GPU chip. A single idea, with a few lines to calculate. Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+
+<p class="label">The idea</p>
+<div class="story">
+<p>While one set of 32 threads waits for a result, a scheduler can begin an instruction for another set that is ready. The hardware can hold many sets per scheduler. How many a program needs depends on how long each wait is and how long each instruction takes to begin.</p>
+<p>The question here: on this laptop, how many sets of 32 threads does each scheduler need for chains of multiply-adds, and how does that compare with what it can hold?</p>
+</div>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> NVIDIA facts, GTX 1650 (Turing): 14 SMs. An SM handles threads in consecutive sets of 32, which NVIDIA calls warps. Each SM has 4 schedulers and holds at most 32 warps; each scheduler begins at most one warp's instruction per cycle. <span class="from">from: NVIDIA Turing Tuning Guide, CUDA programming guide</span></p>
+<p class="ln"><b>L02</b> Measured on your GTX 1650 in the Lab 2 prelab: a 32-thread FFMA takes 2 cycles to begin, and an FFMA that needs the previous one's value waits 4 cycles for it. <span class="from">from: your output</span></p>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> Warps one scheduler holds = 32 / 4 = ____ . When every warp is a single chain of FFMAs, warps one scheduler needs = 4 / ____ = ____ . Whole GPU: needs 14 x 4 x ____ = ____ warps; holds 14 x 32 = ____ . <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>holds 8 per scheduler
+needs 4 / 2 = 2 per scheduler (warp A at cycle 0, warp B at cycle 2, warp A's next ready at cycle 4)
+whole GPU: needs 112 warps, holds 448
+The maximum the chip allows is a ceiling; the target comes from the wait and the begin time.</pre>
+</details>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> The course GPU (RTX 4000 Ada, 48 SMs, 128 FP32 units per SM, so 32 per scheduler) begins a 32-thread FFMA in ____ cycle(s). With the same 4-cycle wait assumed, warps needed per scheduler = ____ . Your Lab 2 notes counted 224 warps for the GTX 1650 with that per-scheduler figure: 14 x 4 x ____ = 224. The count from L03 = ____ . <span class="from">from: L01, L02, NVIDIA specifications, your Lab 2 notes</span></p>
+<details><summary>CHECK</summary>
+<pre>32 threads / 32 units = 1 cycle
+4 / 1 = 4 warps per scheduler
+14 x 4 x 4 = 224: the course GPU's figure applied to the laptop
+L03: 112. The laptop's 2-cycle begin halves the count.</pre>
+</details>
+
+<p class="label">Worked out in full</p>
+<ul class="related">
+<li><a href="../13-the-864-cliff.html">13. Lab 2: 12.5 percent more work, 87 percent more time</a></li>
+<li><a href="../17-hardware-or-launch.html">17. Fixed by the chip, or made by the launch?</a></li>
+</ul>
+
+<p class="label">Related notes</p>
+<ul class="related">
+<li><a href="independent-chains.html">Independent chains inside one thread</a>: the same wait filled inside one thread</li>
+<li><a href="second-round.html">A second round of blocks</a>: what happens when a launch asks for more blocks than the SMs hold</li>
+<li><a href="register-budget.html">The register budget</a>: what can stop a scheduler from holding even 2 sets of 32 threads</li>
+</ul>
+
+<div class="backlinks">
+<p class="label">Notes that point here</p>
+<!-- backlinks:begin -->
+<ul class="related">
+<li><a href="second-round.html">A second round of blocks</a></li>
+<li><a href="combining-speedups.html">Combining speedups</a></li>
+<li><a href="independent-chains.html">Independent chains inside one thread</a></li>
+<li><a href="MIT-6.S894.html">MIT 6.S894 Accelerated Computing: notes for self-learners</a></li>
+<li><a href="sm.html">SM: the block of hardware a GPU chip is built from</a></li>
+<li><a href="register-budget.html">The register budget</a></li>
+</ul>
+<!-- backlinks:end -->
+</div>
+
+<nav><a href="index.html">all notes</a><a href="MIT-6.S894.html">MIT 6.S894 course page</a></nav>
+</main>
+</body>
+</html>

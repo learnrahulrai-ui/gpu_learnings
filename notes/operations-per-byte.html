@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Adding two arrays does 0.083 adds per byte moved; the GTX 1650 needs about 10.5 to keep its arithmetic busy, so memory sets the time.">
+<meta name="keywords" content="memory">
+<title>Operations per byte</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+<p class="crumbs"><a href="../index.html">GPU Learnings</a> / <a href="index.html">notes</a> / <a href="MIT-6.S894.html">MIT 6.S894</a></p>
+<h1>Operations per byte</h1>
+<p class="sub">Topics: memory. A single idea, with a few lines to calculate. Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+
+<p class="label">The idea</p>
+<div class="story">
+<p>A program moves bytes between the graphics card's memory and the chip, and does arithmetic on them. Whichever takes longer sets the time. Dividing the arithmetic a program does by the bytes it moves, and comparing that with what the hardware can do per byte, says which one it is before anything is measured.</p>
+<p>The question here: for the first program of every GPU tutorial, adding two arrays, which one sets the time, and by how much?</p>
+</div>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> Adding two arrays of n = 16,777,216 floats into a third: for each place k, read a[k] (4 bytes), read b[k] (4 bytes), write c[k] (4 bytes), and do one add. <span class="from">from: code (the standard tutorial program)</span></p>
+<p class="ln"><b>L02</b> GTX 1650 published figures: a 128-bit memory bus, 16 bytes per transfer; with GDDR5 at 8 billion transfers per second, 128 billion bytes per second. The chip has 896 FP32 units, each beginning one add per cycle; this note assumes 1.5 billion cycles per second. <span class="from">from: NVIDIA specifications, assumption</span></p>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> Bytes moved = 12 x 16,777,216 = ____ . Adds per byte = ____ . Memory time = ____ ms. Add time = 16,777,216 / (896 x 1.5 billion) = ____ ms. Ratio = ____ . <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>201,326,592 bytes
+1 / 12 = 0.083 adds per byte
+201,326,592 / 128e9 = 1.573 ms
+16,777,216 / 1.344e12 = 0.0125 ms
+1.573 / 0.0125 = 126</pre>
+</details>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> Adds the GPU can do per byte its memory moves = 896 x 1.5 billion / 128 billion = ____ . This program does ____ . Would 8-at-once instructions or twice the threads shorten the time? ____ . <span class="from">from: L02, L03</span></p>
+<details><summary>CHECK</summary>
+<pre>1.344e12 / 128e9 = 10.5 adds per byte needed to keep the units busy
+this program: 0.083, about 126 times too few
+no: neither moves fewer bytes. What helps: fewer bytes (16-bit numbers halve them),
+or more arithmetic on each number while it is on the chip.</pre>
+</details>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> Measure your own: time the kernel alone (for example <code>nsys profile --stats=true ./add</code>) = ____ ms. Nearer 1.573 or 0.0125? ____ . <span class="from">from: L03, your machine</span></p>
+<details><summary>CHECK</summary>
+<pre>If moving bytes sets the time, expect between 1.05 ms (GDDR6, 192 billion bytes per second)
+and 1.57 ms, plus a little. This note has no measurement from the learner's laptop; yours is the first.</pre>
+</details>
+
+<p class="label">Worked out in full</p>
+<ul class="related">
+<li><a href="../t1-add-two-arrays.html">T1. Adding two arrays: what actually limits the GPU</a></li>
+<li><a href="../t3-multiply-matrices.html">T3. Multiplying matrices: same arithmetic, very different times</a></li>
+</ul>
+
+<p class="label">Related notes</p>
+<ul class="related">
+<li><a href="tiles.html">Tiles in shared memory</a>: raising operations per byte by using each fetched value many times</li>
+<li><a href="nearby.html">Nearby: 32 stores in 4 blocks of 32 bytes</a>: how the 32 threads of one store instruction meet the 32-byte blocks of memory</li>
+</ul>
+
+<div class="backlinks">
+<p class="label">Notes that point here</p>
+<!-- backlinks:begin -->
+<ul class="related">
+<li><a href="MIT-6.S894.html">MIT 6.S894 Accelerated Computing: notes for self-learners</a></li>
+<li><a href="nearby.html">Nearby: 32 stores in 4 blocks of 32 bytes</a></li>
+<li><a href="tiles.html">Tiles in shared memory</a></li>
+</ul>
+<!-- backlinks:end -->
+</div>
+
+<nav><a href="index.html">all notes</a><a href="MIT-6.S894.html">MIT 6.S894 course page</a></nav>
+</main>
+</body>
+</html>
