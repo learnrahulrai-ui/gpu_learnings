@@ -14,63 +14,43 @@
 <nav><a href="MIT-6.S894.html#syllabus">Lessons</a><a href="index.html">Notes</a><a href="../index.html">Lab pages</a><a href="../words.html">Words</a></nav>
 </header>
 <main>
-<p class="crumbs"><a href="MIT-6.S894.html">MIT 6.S894 tutorial</a> / Lab 2, part 1 (vector + ILP) / Lesson 8</p>
+<p class="crumbs"><a href="MIT-6.S894.html">MIT 6.S894 tutorial</a> / Lesson 8</p>
 <h1>Lesson 8. Independent work inside one thread</h1>
-<p class="meta"><span>Lab 2, part 1 (vector + ILP)</span><span>you build: mandelbrot_cpu_vector_ilp, mandelbrot_gpu_vector_ilp and its launch</span><span>you need: the ported Lab 2 vector versions</span></p>
-<p class="sub">Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+<p class="sub">This lesson covers part 1 of Lab 2, where you write mandelbrot_cpu_vector_ilp, mandelbrot_gpu_vector_ilp and its launch, beginning from the ported Lab 2 vector versions. Paragraphs with a red rule beside them are for your pencil; work each one before opening its CHECK.</p>
+<p>Part 1 of Lab 2 asks each loop to carry several independent sets of places at once, so that while one set waits for a result another can compute. On the CPU a set is one more vector of 8 places, and on the GPU it is one more place per thread. In the way stand three questions: which line waits for which, how a loop carrying two sets knows when to stop, and why a second place per GPU thread can leave the time unchanged or even double it. When does a second independent set fill waiting time, and when is there no waiting left to fill?</p>
+<p>The loop that carries two sets is the fat while loop, and the confusion it caused at this step sounded like this:</p>
+<p class="you">"My while loop becomes longer and fatter. Then what is a pass? A pass is a collection of a fat while loop or a thin while loop?" / "It was already difficult to do for 8. Now I have to do for 16." / "My brain refuses to see that I actually solved the problem in lab 1."</p>
+<p class="do">Write a guess. On the GTX 1650, the Lab 2 GPU baseline with one block of 32 threads took about 208 ms. With two places per thread, in a correct version, do you expect about 104 ms, about 160 ms, or about 230 ms?</p>
 
-<p class="label">In this lesson</p>
-<ol class="toc">
-<li><a href="#story">The story</a></li>
-<li><a href="#work">Work it out</a></li>
-<li><a href="#measure">Measure it</a></li>
-<li><a href="#connect">Connect the numbers</a></li>
-<li><a href="#wrong">When it goes wrong</a></li>
-<li><a href="#questions">The lab's questions</a></li>
-<li><a href="#plain">In plain words</a></li>
-<li><a href="#deeper">Go deeper</a></li>
-</ol>
-
-<h2 id="story">The story</h2>
-<div class="story">
-<p>Part 1 of Lab 2 asks each loop to carry several independent sets of places at once, so that while one set waits for a result, another can compute. On the CPU a set is one more vector of 8 places; on the GPU it is one more place per thread.</p>
-<p>The learner hit three walls: which line actually waits for which, how a loop carrying two sets knows when to stop, and why giving each GPU thread a second place first made the program twice as slow, then no faster at all.</p>
-<p>When does a second independent set fill waiting time, and when is there no waiting left to fill?</p>
-</div>
-
-<div class="guess">
-<p class="label">Guess first</p>
-<p>On the GTX 1650 the Lab 2 GPU baseline, one block of 32 threads, took about 208 ms. Guess the time with two places per thread, in a correct version: about 104 ms, about 160 ms, or about 230 ms?</p>
-<p>Write your guess on paper now, before any calculation on this page.</p>
-</div>
-
-<p class="you">Your words: "My while loop becomes longer and fatter. Then what is a pass? A pass is a collection of a fat while loop or a thin while loop?" / "It was already difficult to do for 8. Now I have to do for 16." / "My brain refuses to see that I actually solved the problem in lab 1."</p>
-
-<h2 id="work">Work it out</h2>
-<p class="ln"><b>L01</b> The Lab 2 loop body, lines A to F: x = x2 - y2 + cx; y = w - (x2 + y2) + cy; x2 = x times x; y2 = y times y; z = x + y; w = z times z. The while check computes x2 + y2 before each repetition, and the compiler reuses that sum in line B: 9 FP32 instructions per repetition (the learner's listing: 6 FADD, 3 FMUL). <span class="from">from: Lab 2 starter code, your listing</span></p>
-<p class="ln do"><b>L02</b> <b class="x">DO</b> Each operation's value is ready 4 cycles after it begins (measured on this GPU). With the y of one repetition ready at cycle 0: y2 is ready at ____ , z = x + y at ____ , w = z times z at ____ , the next check's x2 + y2 at ____ , w - (x2 + y2) at ____ , and the next y at ____ . Cycles per repetition along the chain = ____ . <span class="from">from: L01, your output (Lab 2 prelab)</span></p>
+<h2 id="a-repetition-of-the-lab-2-loop-takes-16-cycles-along-its-cha">A repetition of the Lab 2 loop takes 16 cycles along its chain</h2>
+<p>Lines A to F of the Lab 2 loop are x = x2 - y2 + cx, y = w - (x2 + y2) + cy, x2 = x times x, y2 = y times y, z = x + y and w = z times z. The while check computes x2 + y2 before each repetition, and the compiler reuses that sum in line B, so the laptop's listing showed 9 float instructions per repetition, 6 adds and 3 multiplies. Each value is ready 4 cycles after its operation begins, as the prelab measured on this GPU.</p>
+<p class="do">Take the y of one repetition as ready at cycle 0. Work out when y2 is ready, when z = x + y is, when w = z times z is, when the next check's x2 + y2 is, when w - (x2 + y2) is, and when the next y is. How many cycles does one repetition take along this chain?</p>
 <details><summary>CHECK</summary>
-<pre>y2 at 4, z at 4, w at 8, x2 + y2 at 8, w - (x2 + y2) at 12, next y at 16
-16 cycles per repetition: the chain that repeats is 4 operations (w - s, + cy, x + y, z times z)</pre>
+<pre>y2 at 4, z at 4, w at 8, x2 + y2 at 8, w - (x2 + y2) at 12, next y at 16</pre>
+<p>A repetition takes 16 cycles, and the chain that repeats from one repetition into the next is 4 operations long: w - (x2 + y2), then + cy, then x + y, then z times z.</p>
 </details>
-<p class="ln"><b>L03</b> Measured on this GPU: a 32-thread FP32 instruction takes 2 cycles to begin, and a scheduler begins at most one instruction per cycle. <span class="from">from: your output (Lab 2 prelab), NVIDIA Turing Tuning Guide</span></p>
-<p class="ln do"><b>L04</b> <b class="x">DO</b> GPU, one set of places per thread: cycles to begin its 9 FP32 instructions = 9 x 2 = ____ , against ____ cycles along the chain. With two independent sets: 18 x 2 = ____ against 16, so ____ cycles per set. Saving from the second set = ____ percent. On a GPU that begins a 32-thread FP32 instruction every cycle: one set max(9, 16) = ____ , two sets max(18, 16) = ____ , ____ per set, saving ____ percent. <span class="from">from: L02, L03</span></p>
+
+<h2 id="on-the-laptop-s-gpu-the-instructions-already-fill-those-16-c">On the laptop's GPU the instructions already fill those 16 cycles</h2>
+<p>The GTX 1650 is built from 14 identical blocks of hardware that NVIDIA calls SMs, each with 4 schedulers, the circuits that pick which instruction begins next. Measured on this GPU in the prelab, a float instruction for 32 threads takes 2 cycles to begin, and NVIDIA's Turing tuning guide gives a scheduler at most one instruction begun per cycle.</p>
+<p class="do">With one set of places per thread, work out the cycles to begin its 9 float instructions and set them beside the 16 cycles of the chain. With two independent sets, work out the same, the cycles per set, and the saving. Then repeat both for a GPU that begins a 32-thread float instruction every cycle.</p>
 <details><summary>CHECK</summary>
-<pre>one set: 18 cycles of begins against a 16-cycle chain: the begins already fill the wait
-two sets: 36 cycles, 18 per set: saving 0 percent
-1 cycle per begin: one set 16; two sets 18, so 9 per set: saving (16 - 9) / 16 = 44 percent
-A second set fills only waiting that exists.</pre>
+<pre>laptop, one set:  9 x 2 = 18 cycles of begins against a 16-cycle chain -&gt; 18
+laptop, two sets: 18 x 2 = 36 cycles -&gt; 18 per set, saving 0 percent
+1 cycle per begin, one set:  the larger of 9 and 16  = 16
+1 cycle per begin, two sets: the larger of 18 and 16 = 18 -&gt; 9 per set, saving (16 - 9) / 16 = 44 percent</pre>
+<p>A second set fills only waiting that exists, and on the laptop's GPU, with one set of 32 threads per scheduler, the begins already fill the chain's 16 cycles.</p>
 </details>
-<p class="ln"><b>L05</b> Published figures for the laptop's CPU core (Zen 2): an add or multiply that needs the previous result waits 3 cycles, and at least 2 vector FP32 instructions can begin per cycle. <span class="from">from: Agner Fog's instruction tables (Zen 2)</span></p>
-<p class="ln do"><b>L06</b> <b class="x">DO</b> CPU, per 8-place set: chain = 4 x 3 = ____ cycles; begins = 9 / 2 = ____ cycles. Sets that fill the wait = ____ / ____ = ____ . Cycles per set with 1, 2 and 3 sets = ____ , ____ , ____ . <span class="from">from: L01, L05</span></p>
+<p>The laptop's CPU differs. Agner Fog's published instruction tables for its Zen 2 cores give a wait of 3 cycles for an add or multiply that needs the previous result, and at least 2 vector float instructions begun per cycle.</p>
+<p class="do">For one 8-place set on the CPU, work out the chain, 4 x 3 cycles, and the begins, 9 / 2 cycles. How many sets fill the wait, and how many cycles per set do 1, 2 and 3 sets cost?</p>
 <details><summary>CHECK</summary>
-<pre>chain 12 cycles; begins 4.5 cycles
-12 / 4.5 = 2.7 sets
-1 set: 12; 2 sets: max(9, 12) = 12, 6 per set; 3 sets: max(13.5, 12) = 13.5, 4.5 per set
-On this CPU a second and a third set should help; on this GPU with one set of 32 threads per
-scheduler (L04), not.</pre>
+<pre>chain 12 cycles; begins 4.5 cycles; 12 / 4.5 = 2.7 sets fill the wait
+1 set: 12 cycles
+2 sets: the larger of 9 and 12 = 12 -&gt; 6 per set
+3 sets: the larger of 13.5 and 12 = 13.5 -&gt; 4.5 per set</pre>
+<p>On this CPU a second and a third set should help, and on this GPU with one set of 32 threads per scheduler they should not.</p>
 </details>
-<p class="ln"><b>L07</b> A loop carrying two 8-place sets, A and B, with its stopping test left open, copied from page 08: <span class="from">from: your code</span></p>
+
+<h2 id="a-loop-carrying-two-sets-may-stop-only-when-both-masks-are-e">A loop carrying two sets may stop only when both masks are empty</h2>
 <pre>while (iter &lt; max_iters) {
     maskA = (x2A + y2A &lt;= 4)        maskB = (x2B + y2B &lt;= 4)
     /* stopping test: ____ (not decided yet) */
@@ -78,137 +58,67 @@ scheduler (L04), not.</pre>
     lines A..F on set A             lines A..F on set B
     ++iter;
 }</pre>
-<div class="english">
-<p class="label">Read the code in English, line by line</p>
-<ol class="code-en">
-<li><code>while (iter &lt; max_iters) {</code><span>Repeat the lines in braces as long as iter is below max_iters.</span></li>
-<li><code>maskA = (x2A + y2A &lt;= 4)        maskB = (x2B + y2B &lt;= 4)</code><span>Written in short form, not real C++: compare set A's x2 plus y2 with 4 at each index, and the same for set B.</span></li>
-<li><code>/* stopping test: ____ (not decided yet) */</code><span>A blank for the rule that decides when to leave the loop. Deciding it is the exercise.</span></li>
-<li><code>itersA = itersA - maskA         itersB = itersB - maskB</code><span>Short form: subtract each set's mask from that set's counters, index by index.</span></li>
-<li><code>lines A..F on set A             lines A..F on set B</code><span>Short form: lines A to F for set A, and lines A to F for set B, in the same repetition.</span></li>
-<li><code>++iter;</code><span>Add 1 to iter.</span></li>
-<li><code>}</code><span>End of the block opened by the matching brace above.</span></li>
-</ol>
-</div>
-<p class="ln do"><b>L08</b> <b class="x">DO</b> Real data from the Lab 1 picture, i = 40: set A (j = 208 to 215) needs 12, 8, 7, 6, 6, 6, 5, 5; set B (j = 216 to 223) needs 5 at every index. Wrong test 1, leave when maskB is all zeros: repetitions = ____ , set A's counts = ____ . Wrong test 2, leave when maskA is all zeros and count B with no mask: set B's counts = ____ . The right test: leave when ____ . <span class="from">from: L07, computation on the lab code</span></p>
+<p>Read in English, and written in short form rather than real C++, the fat while loop repeats while iter is below max_iters; it compares set A's x2 plus y2 with 4 at each index, and the same for set B; it leaves a blank for the rule that decides when to leave the loop, and deciding that rule is the exercise; it subtracts each set's mask from that set's counters, index by index; it does lines A to F for set A and for set B in the same repetition; and it adds 1 to iter.</p>
+<p class="do">Take real counts from the Lab 1 picture at i = 40: set A, j = 208 to 215, needs 12, 8, 7, 6, 6, 6, 5 and 5, and set B, j = 216 to 223, needs 5 at every index. If the loop is left when maskB is all zeros, how many repetitions does it make and what counts does set A get? If it is left when maskA is all zeros and set B is counted with no mask, what counts does set B get? What is the right test?</p>
 <details><summary>CHECK</summary>
-<pre>test 1: 5 repetitions; A gets 5 5 5 5 5 5 5 5 (6 of 8 wrong)
-test 2: 12 repetitions; B gets 12 at all 8 (all wrong)
-right: leave when maskA and maskB are both all zeros; each mask still stops its own indexes</pre>
+<p>Left on maskB, the loop makes 5 repetitions and set A gets 5 at every index, 6 of 8 wrong. Left on maskA with B counted without its mask, set B gets 12 at every index, all wrong. The right test leaves the loop only when maskA and maskB are both all zeros, while each mask still stops its own indexes.</p>
 </details>
-<p class="ln do"><b>L09</b> <b class="x">DO</b> Cost of the right test: thin loops (A alone, then B alone) = 12 + 5 = ____ repetitions; the fat loop = ____ repetitions, each doing both sets. Over the whole Lab 1 picture, pairing each block of 8 with the next: thin 2,290,207 repetitions, fat 1,236,522. Ratio = ____ ; best possible = ____ . <span class="from">from: L08, computation on the scalar iters</span></p>
+<p class="do">Work out what the right test costs. Thin loops, A alone and then B alone, need 12 + 5 repetitions; the fat loop needs as many repetitions as the slower set. Over the whole Lab 1 picture, pairing each vector of 8 places with the next, thin loops need 2,290,207 repetitions and fat loops 1,236,522. Work out the ratio and the best a pair can give.</p>
 <details><summary>CHECK</summary>
-<pre>thin 17, fat 12: more useless index-repetitions (the finished set keeps computing), fewer repetitions
-whole picture: 2,290,207 / 1,236,522 = 1.85; best 2.0, when both blocks of a pair need the same</pre>
+<p>Thin loops need 12 + 5 = 17 repetitions and the fat loop 12, each doing both sets: set B keeps computing uselessly after its 5, yet the repetitions fall from 17 to 12. Over the whole picture 2,290,207 / 1,236,522 = 1.85, against 2.0 for a pair whose two vectors need the same.</p>
 </details>
-<p class="ln"><b>L10</b> On the GPU each thread takes two neighbouring places; the learner's indexing, copied from page 18: <span class="from">from: your code</span></p>
+
+<h2 id="a-second-place-per-gpu-thread-gave-461-ms-then-231-ms-agains">A second place per GPU thread gave 461 ms, then 231 ms, against 208</h2>
 <pre>for (uint64_t j = threadIdx.x * 2; j &lt; img_size; j += blockDim.x * 2) {
     float cx0 = (float(j) / float(img_size)) * window_zoom + window_x;
     /* cx1 for j + 1, then both places' loops */
 }</pre>
-<div class="english">
-<p class="label">Read the code in English, line by line</p>
-<ol class="code-en">
-<li><code>for (uint64_t j = threadIdx.x * 2; j &lt; img_size; j += blockDim.x * 2) {</code><span>Give j a first value of twice this thread's number, then keep adding twice the number of threads in the block, while j is below img_size.</span></li>
-<li><code>float cx0 = (float(j) / float(img_size)) * window_zoom + window_x;</code><span>The middleman number for place j, using Lab 2's window: j divided by img_size, times the window size, plus the window's left edge.</span></li>
-<li><code>/* cx1 for j + 1, then both places' loops */</code><span>A note for people: the same for place j + 1, then the arithmetic for both places.</span></li>
-<li><code>}</code><span>End of the j loop.</span></li>
-</ol>
-</div>
-<p class="ln do"><b>L11</b> <b class="x">DO</b> With 32 threads, one round of the j loop covers 64 places. Places thread 0 takes for i = 0: ____ . If only the first place were doubled (j = threadIdx.x x 2, step 32), how many of the 1024 places would be owned twice? ____ . If only the step were doubled (j = threadIdx.x, step 64), how many owned by nobody? ____ . <span class="from">from: L10</span></p>
+<p>Read in English, each thread's j begins at twice its number and grows by twice the number of threads in the block while it stays below img_size; for each j the thread computes cx0, the cx of place j with Lab 2's window, j divided by img_size, times window_zoom, plus window_x, and the comment stands for cx1 of place j + 1 followed by both places' loops.</p>
+<p class="do">With 32 threads, one round of the j loop covers 64 places. List the places thread 0 takes for i = 0. Call the thread that writes a place its owner. If only the first place were doubled, j beginning at twice the thread's number and growing by 32, how many of the 1024 places would have two owners? If only the step were doubled, j beginning at the thread's number and growing by 64, how many would have none?</p>
 <details><summary>CHECK</summary>
-<pre>thread 0: 0, 1, 64, 65, 128, 129, ...
-first place doubled only: 32 owned once, 992 owned twice
-step doubled only: 496 owned by nobody (33 to 63 in every 64), 496 twice, 32 once</pre>
+<p>Thread 0 takes 0, 1, 64, 65, 128, 129 and so on. Doubling only the first place leaves 32 places with one owner and 992 with two; doubling only the step leaves 496 places with no owner, 33 to 63 in every 64, 496 with two and 32 with one.</p>
 </details>
-<p class="ln"><b>L12</b> The learner's two GPU versions, against the baseline of one place per thread, three executions each: version 1, a condition wrapped around each place's arithmetic: 460.74, 461.50, 460.84 ms against 222.90, 207.55, 208.67; version 2, both places computed every repetition and only the unfinished one counted: 230.89, 231.50, 232.01 against 221.11, 207.87, 207.82. All printed difference 0. In version 1's listing, 18 of the loop's 35 instructions were control. <span class="from">from: your output, your listing</span></p>
-<p class="ln do"><b>L13</b> <b class="x">DO</b> Version 1 / baseline = 460.74 / 222.90 = ____ . Version 2 / baseline, middle executions = 231.50 / 207.87 = ____ . Control share of version 1's loop = 18 / 35 = ____ percent. <span class="from">from: L12</span></p>
+<p>The laptop measured two versions against the baseline of one place per thread, three executions each. The first, with a condition wrapped around each place's arithmetic, took 460.74, 461.50 and 460.84 ms against 222.90, 207.55 and 208.67, and in its listing 18 of the loop's 35 instructions were control. The second, computing both places every repetition and only counting the unfinished one, took 230.89, 231.50 and 232.01 ms against 221.11, 207.87 and 207.82. Both printed a difference of exactly 0.</p>
+<p class="do">Work out 460.74 / 222.90 and 231.50 / 207.87, and the share of the first version's loop that is control.</p>
 <details><summary>CHECK</summary>
-<pre>version 1: 2.07 to 2.22 times slower
-version 2: 1.114, about the same, slightly slower
-51 percent of version 1's loop decided where to go, not what to compute</pre>
+<pre>first version:  460.74 / 222.90 = 2.07, and 2.22 for the other executions
+second version: 231.50 / 207.87 = 1.114, slightly slower
+control: 18 / 35 = 51 percent of the loop decided where to go, not what to compute</pre>
 </details>
-<p class="ln do"><b>L14</b> <b class="x">DO</b> Name one repetition of the loop by the whole set of 32 threads a warp-repetition; NVIDIA calls such a set a warp. Computed from the Lab 2 iters: the baseline needs 8,792,320 warp-repetitions, version 2 needs 5,470,868. Ratio = ____ . If a version 2 repetition cost the same as a baseline one, the time ratio would be ____ ; if twice, ____ . Measured 1.114, so a version 2 repetition costs ____ baseline repetitions. <span class="from">from: L04, L12, L13, computation on the Lab 2 iters</span></p>
+<p class="do">The 32 threads are one warp, NVIDIA's name for a set of 32 threads that begin each instruction together; call one repetition of the loop by the whole warp a warp-repetition. Computed from the Lab 2 counts, the baseline needs 8,792,320 warp-repetitions and the second version 5,470,868. Work out the ratio. If a second-version repetition cost the same as a baseline one, what would the time ratio be, and what if it cost twice as much? From the measured 1.114, what does one second-version repetition cost?</p>
 <details><summary>CHECK</summary>
-<pre>5,470,868 / 8,792,320 = 0.622 (not 0.5: a set of 64 places waits for the slowest of 64)
-cost 1 -&gt; 0.622; cost 2 -&gt; 1.244; measured 1.114 -&gt; 1.114 / 0.622 = 1.79
-The second place nearly doubled the cost of a repetition, as L04 predicted: one set's FP32 begins
-(18 cycles) already filled the 16-cycle chain.</pre>
+<pre>5,470,868 / 8,792,320 = 0.622
+cost 1 -&gt; 0.622;  cost 2 -&gt; 1.244;  measured 1.114 -&gt; 1.114 / 0.622 = 1.79</pre>
+<p>The ratio is 0.622, not 0.5, because a set of 64 places waits for the slowest of 64. The second place nearly doubled the cost of a repetition, as the begin count predicted: one set's 18 cycles of begins already filled the 16-cycle chain.</p>
 </details>
 
-<h2 id="measure">Measure it</h2>
-<p class="ln do"><b>L15</b> <b class="x">DO</b> Your CPU ILP version with 2 sets: time = ____ ms, against your vector version's ____ ms; ratio = ____ . Under L06's model two sets cost the same 12 cycles per repetition as one, so the ratio predicted for the Lab 1 picture is L09's ____ ; compute the Lab 2 picture's the same way from its iters. <span class="from">from: L06, L09, your output</span></p>
+<h2 id="your-cpu-version-with-two-sets-should-come-close-to-1-85-tim">Your CPU version with two sets should come close to 1.85 times</h2>
+<p class="do">Time your CPU version with 2 sets against your vector version and write the ratio. Under the CPU calculation above, two sets cost the same 12 cycles per repetition as one, so the ratio predicted for the Lab 1 picture is the 1.85 of thin against fat repetitions; compute the Lab 2 picture's the same way from its counts.</p>
 <details><summary>CHECK</summary>
-<pre>1.85 for the Lab 1 picture (thin repetitions / fat repetitions under L06's model)
-The laptop's CPU ILP times were not recorded in the chats; yours are the first.</pre>
+<p>The laptop's CPU times for this part were not recorded, so your ratio is the first measurement of it; 1.85 is the prediction for the Lab 1 picture.</p>
 </details>
 
-<div class="connect" id="connect">
-<p class="label">Connect the numbers</p>
-<p class="ln do"><b>L16</b> <b class="x">DO</b> Collect L02 (16-cycle chain), L04 (GPU: 18 cycles of begins, no saving), L06 (CPU: 2.7 sets fill the wait), L09 (1.85, not 2), L13 (2.2 times slower, then 1.11), L14 (1.79 baseline repetitions per version 2 repetition). Write one sentence: what single comparison decides whether a second independent set inside a thread helps? <span class="from">from: L02, L04, L06, L09, L13, L14</span></p>
+<h2 id="a-second-set-fills-only-the-waiting-that-exists">A second set fills only the waiting that exists</h2>
+<p>Gathered together, the chain of the Lab 2 loop takes 16 cycles per repetition; on the laptop's GPU the begins take 18, so a second set saves nothing, while on its CPU 2.7 sets fill the wait; the fat loop's cost leaves 1.85 instead of 2; the GPU's first version was 2.2 times slower and its second 1.11; and a second-version repetition cost 1.79 baseline repetitions.</p>
+<p class="do">Write one sentence: what single comparison decides whether a second independent set inside a thread helps?</p>
 <details><summary>CHECK</summary>
-<pre>Compare the time along the chain with the time to begin all the instructions of one set: a
-second set fills only the difference. On the CPU core the chain (12 cycles) is far longer than
-the begins (4.5), so sets help; on the GPU with one set of 32 threads per scheduler the begins
-(18) already exceed the chain (16), so the second place mostly adds work.
-
-Tempting answer that fails: "32 threads on 32 places are 32 independent chains, so the wait is
-already hidden". They are 32 sets of data on ONE instruction stream: when that instruction waits,
-all 32 wait; only another instruction can fill the wait.</pre>
+<p>The time along the chain against the time to begin all the instructions of one set: a second set fills only the difference. On the CPU core the chain, 12 cycles, is far longer than the begins, 4.5, so sets help; on the GPU with one set of 32 threads per scheduler the begins, 18, already exceed the chain, 16, so the second place mostly adds work.</p>
+<p>The reading "32 threads on 32 places are 32 independent chains, so the wait is already hidden" fails: they are 32 sets of data on one instruction stream, all 32 wait when that instruction waits, and only another instruction can fill the wait.</p>
 </details>
-</div>
-
-<h2 id="wrong">When it goes wrong</h2>
-<ul class="pitfalls">
-<li><b>A loop with two sets gives wrong counts in one set.</b> The stopping test reads one mask only (L08).</li>
-<li><b>A second place per thread repeats or misses places.</b> Only the first place or only the step was doubled (L11).</li>
-<li><b>A second place per thread made the GPU 2 times slower.</b> A condition around each place's arithmetic turned half the loop into control (L12, L13). Compute both places every repetition and stop only the count.</li>
-<li><b>A second place per thread is correct but no faster.</b> The FP32 begins already fill the wait with one set of 32 threads per scheduler (L04, L14).</li>
-</ul>
-
-<h2 id="questions">The lab's questions</h2>
-<p>Paraphrased from the Fall 2025 handout. Write your own answers from the lines named; the numbers are yours to measure.</p>
-<ul class="related">
-<li><b>Question 1: what speedup do you get from more independent work per loop on the CPU and on the GPU, how did you split the places, and what limits the gain?</b> L06 and L15 for the CPU, L13 and L14 for the GPU, L09 and the connect line for the limits.</li>
-</ul>
-
-<div class="plain" id="plain">
-<p class="label">In plain words</p>
-<p>Inside one thread, two independent pieces of work can overlap only where the processor would otherwise wait. The laptop's CPU had plenty of waiting to fill; the laptop's GPU, with one set of 32 threads per scheduler, was already busy beginning instructions, so a second piece of work mostly added work.</p>
-<p>For a manager: an optimization that removes waiting helps only where waiting exists. Find out where the time goes before choosing it.</p>
-</div>
-
-<div class="guess">
-<p class="label">Your guess against the machine</p>
-<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
-<details><summary>CHECK your guess</summary>
-<pre>About 230: version 2 measured 230.89 to 232.01 ms, against 207 to 223 ms for the baseline.</pre>
-</details>
-</div>
-
-<div class="interview">
-<p class="label">The interviewer's next question</p>
-<p>On the course GPU a 32-thread FFMA begins in 1 cycle instead of 2. Redo L04 for it and predict what a second place per thread would save there.</p>
+<p>The Fall 2025 handout's first question asks what speedup more independent work per loop gives on the CPU and on the GPU, how the places were split, and what limits the gain; the CPU calculation and your own ratio answer the first part for the CPU, the measured 1.114 and its 1.79 for the GPU, and the 1.85 together with the chain against the begins for the limits.</p>
+<p>Wrong counts in one of two sets come from a stopping test that reads one mask only; places repeated or missed come from doubling only the first place or only the step; a slowdown of 2 times comes from a condition around each place's arithmetic, and computing both places while stopping only the count avoids it; and a second place that is correct but no faster means the float begins already fill the wait with one set of 32 threads per scheduler.</p>
+<p>Without code, two independent pieces of work inside one thread can overlap only where the processor would otherwise wait. The laptop's CPU had plenty of waiting to fill, and the laptop's GPU, with one set of 32 threads per scheduler, was already busy beginning instructions, so a second piece of work mostly added work. An optimization that removes waiting helps only where waiting exists, so where the time goes has to be found before the optimization is chosen.</p>
+<p>The guess at the top has its answer: about 230 ms, the second version's 230.89 to 232.01 ms against 207 to 223 ms for the baseline.</p>
+<p class="do">A harder question to finish with. On the course GPU a 32-thread multiply-add begins in 1 cycle instead of 2. Redo the begin count for it and predict what a second place per thread would save there.</p>
 <details><summary>CHECK</summary>
-<pre>One set: max(9, 16) = 16 cycles per repetition; two sets: max(18, 16) = 18, so 9 per set.
-Saving (16 - 9) / 16 = 44 percent, against 0 percent on the laptop: the same code gains on that
-GPU and not on this one, because twice the FP32 units per scheduler leave waiting to fill.</pre>
+<p>A single set costs the larger of 9 and 16, 16 cycles per repetition, and two sets the larger of 18 and 16, 18, so 9 per set: a saving of (16 - 9) / 16 = 44 percent, against 0 percent on the laptop. Twice the float circuits per scheduler leave waiting to fill, so the same code gains on that GPU and not on this one.</p>
 </details>
-</div>
+<p>The lab pages <a href="../07-waiting-chain.html">which line waits for which line</a>, <a href="../08-fat-loop-stop.html">when the fat while loop stops</a> and <a href="../18-two-places-per-thread.html">a second place per thread</a> work these numbers out at length, and the notes on <a href="independent-chains.html">independent chains</a> and <a href="filling-the-wait.html">filling the 4-cycle wait</a> hold the short versions.</p>
 
-<h2 id="deeper">Go deeper</h2>
-<ul class="related">
-<li><a href="../07-waiting-chain.html">07. Lab 2: which line waits for which line</a></li>
-<li><a href="../08-fat-loop-stop.html">08. Lab 2: when does the fat while loop stop?</a></li>
-<li><a href="../18-two-places-per-thread.html">18. Lab 2 on the GPU: two places per thread, 461 ms and 231 ms</a></li>
-<li><a href="independent-chains.html">Independent chains inside one thread</a></li>
-<li><a href="filling-the-wait.html">Filling the 4-cycle wait: needed against held</a></li>
-</ul>
-
-<nav class="pager"><a href="lesson-07-lab2-picture.html"><small>previous</small>Lesson 7. The Lab 2 picture: port, check, time</a><a class="next" href="lesson-09-many-cores.html"><small>next</small>Lesson 9. Many CPU cores, many SMs</a></nav>
+<nav class="pager"><a href="lesson-07-lab2-picture.html">&larr; Lesson 7. The Lab 2 picture: port, check, time</a><a class="next" href="lesson-09-many-cores.html">Lesson 9. Many CPU cores, many SMs &rarr;</a></nav>
 </main>
 <footer class="site">
-<p>Independent self-study material for MIT 6.S894 Accelerated Computing, written from one learner's work. Not affiliated with or endorsed by MIT or the course staff. Course pages: <a href="https://accelerated-computing.academy/fall25/">accelerated-computing.academy/fall25</a>. Starter code: <a href="https://github.com/accelerated-computing-class">github.com/accelerated-computing-class</a>. Every measured number comes from one laptop (Ryzen 5 4600H, GTX 1650) unless a line says otherwise.</p>
+<p>Independent self-study material for MIT 6.S894 Accelerated Computing, written from one learner's work, and not affiliated with or endorsed by MIT or the course staff. The course pages are at <a href="https://accelerated-computing.academy/fall25/">accelerated-computing.academy/fall25</a> and the starter code at <a href="https://github.com/accelerated-computing-class">github.com/accelerated-computing-class</a>. Every measured number comes from one laptop, a Ryzen 5 4600H with a GTX 1650, unless a sentence says otherwise.</p>
 </footer>
 </body>
 </html>

@@ -3,6 +3,9 @@
 Usage, from the repository root:  python3 tools/check_banned.py   (scans *.html and notes/*.html)
 Needs: beautifulsoup4.  Exit code 1 if anything is found.
 Learner quotes (class "you") are skipped: they are the learner's own words.
+The tutorial pages (notes/MIT-6.S894.html and notes/lesson-*.html) are also held to the prose style:
+no lists, tables or bold, no heading that begins with "The", no label-colon openings, no loose words,
+no narrator or template phrases, no L-numbers or ____ blanks, and on lessons a reading after every code block.
 """
 import glob
 import os
@@ -39,6 +42,23 @@ WARP_OK = {"11-program-counter.html", "12-the-48-trap.html", "13-the-864-cliff.h
            "notes/lesson-09-many-cores.html", "notes/lesson-10-many-threads.html"}
 OUTPUT_OK = re.compile(r"Latency of \w+ code snippet")
 
+# Prose style of the tutorial (notes/MIT-6.S894.html, notes/lesson-*.html).
+TUTORIAL = re.compile(r"notes/(MIT-6\.S894|lesson-[^/]*)\.html$")
+LOOSE = re.compile(
+    r"\b(actually|just|really|models?|hypothes[ie]s|honest(ly)?|puzzles?|meaning|property|mechanisms?|simply|"
+    r"essentially|basically|crucial|robust|intuition|intuitive|concepts?)\b",
+    re.I,
+)
+NARRATOR = re.compile(r"\b(the learner|interviewer|tempting answer)\b", re.I)
+LABEL = re.compile(
+    r"(^|[.!?]\s+)(notes?|tips?|answer|examples?|sources?|summary|results?|key (idea|point)|story|goals?|hint|warning|"
+    r"pitfalls?|measured|computed|assumed|prediction|check|fix|cause|symptom|rule|takeaway|bottom line|in short|"
+    r"for a manager|your words|guess first|in plain words|go deeper|you need|you build|lab part|topics|lessons?|"
+    r"full exercises|from|step \d+|question \d+|read the code[^:]*)\s*:",
+    re.I,
+)
+LEFTOVER = re.compile(r"\bL\d\d\b|____")
+
 
 def scan(path):
     name = os.path.relpath(path, ROOT)
@@ -64,7 +84,38 @@ def scan(path):
         if "do" in (t.get("class") or []):
             for m in THINK_IN_DO.finditer(body):
                 found.append(("ASKS TO THINK, NOT DO", m.group(0), body))
+    if TUTORIAL.search(name.replace(os.sep, "/")):
+        found += scan_tutorial(name, soup)
     return [(name,) + f for f in found]
+
+
+def scan_tutorial(name, soup):
+    found = []
+    main = soup.find("main")
+    for t in main.select("nav"):
+        t.decompose()
+    for t in main.find_all(["ul", "ol", "li", "table", "b", "strong"]):
+        found.append(("LIST, TABLE OR BOLD IN THE TUTORIAL", t.name, t.get_text(" ", strip=True)[:80]))
+    for h in main.find_all("h2"):
+        if re.match(r"the\b", h.get_text(" ", strip=True), re.I):
+            found.append(("HEADING BEGINS WITH THE", h.get_text(" ", strip=True), ""))
+    for t in main.find_all(["p", "h1", "h2", "summary", "pre"]):
+        txt = t.get_text(" ", strip=True)
+        for rx, label in ((LOOSE, "LOOSE WORD"), (NARRATOR, "NARRATOR OR TEMPLATE PHRASE")):
+            for m in rx.finditer(txt):
+                found.append((label, m.group(0), txt))
+        if t.name != "pre":  # code copied from the lab pages may hold its own blanks and colons
+            for rx, label in ((LEFTOVER, "TEMPLATE LEFTOVER"), (LABEL, "LABEL-COLON OPENING")):
+                for m in rx.finditer(txt):
+                    found.append((label, m.group(0).strip(), txt))
+    if "lesson-" in name:
+        for pre in main.find_all("pre"):
+            if pre.find_parent("details"):
+                continue
+            nxt = pre.find_next_sibling()
+            if nxt is None or nxt.name != "p" or "do" in (nxt.get("class") or []):
+                found.append(("CODE WITHOUT A READING AFTER IT", pre.get_text()[:60], ""))
+    return found
 
 
 def main():

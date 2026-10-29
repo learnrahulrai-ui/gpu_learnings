@@ -14,51 +14,23 @@
 <nav><a href="MIT-6.S894.html#syllabus">Lessons</a><a href="index.html">Notes</a><a href="../index.html">Lab pages</a><a href="../words.html">Words</a></nav>
 </header>
 <main>
-<p class="crumbs"><a href="MIT-6.S894.html">MIT 6.S894 tutorial</a> / Lab 1, part 2 (CPU vector) / Lesson 3</p>
+<p class="crumbs"><a href="MIT-6.S894.html">MIT 6.S894 tutorial</a> / Lesson 3</p>
 <h1>Lesson 3. Vector code on the CPU: 8 places per instruction</h1>
-<p class="meta"><span>Lab 1, part 2 (CPU vector)</span><span>you build: mandelbrot_cpu_vector</span><span>you need: a CPU with AVX2 (or AVX-512)</span></p>
-<p class="sub">Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+<p class="sub">This lesson covers Lab 1, part 2, on the CPU, where you write mandelbrot_cpu_vector. It needs a CPU with AVX2, or AVX-512 as the handout assumes. Paragraphs with a red rule beside them are for your pencil; work each one before opening its CHECK.</p>
+<p>The second part of Lab 1 asks for the same picture computed with explicit vector instructions, each acting on several places at once. The Fall 2025 handout uses AVX-512, 16 floats per instruction; the laptop has AVX2, 8 floats, so everything below is written for 8, and with AVX-512 every 8 becomes 16. A direct translation of the reference meets two problems: the reference computes cx from one j, but a vector needs 8 different values of cx at once, and each place leaves the while loop after its own number of repetitions while every instruction acts on all 8. How do 8 places with different counts share one loop, and what does the sharing cost?</p>
+<p>The second problem is the one that stops most people, and it was put this way at this step:</p>
+<p class="you">"SIMD does not even understand while loop. So where is the connection between this while loop and SIMD?" / "How can I tell SIMD that don't update 8, 9 but only update 10, 11, 12?" / "Suppose one square finishes after two repetitions, but another needs five. There is no way to know." / "It just happens that the mask contains negative numbers, right?"</p>
+<p class="do">Write a guess. With 8 places per instruction, what speedup over the reference on the same core do you expect: 8, a little under 8, or much less?</p>
 
-<p class="label">In this lesson</p>
-<ol class="toc">
-<li><a href="#story">The story</a></li>
-<li><a href="#work">Work it out</a></li>
-<li><a href="#build">Build it</a></li>
-<li><a href="#measure">Measure it</a></li>
-<li><a href="#connect">Connect the numbers</a></li>
-<li><a href="#wrong">When it goes wrong</a></li>
-<li><a href="#questions">The lab's questions</a></li>
-<li><a href="#plain">In plain words</a></li>
-<li><a href="#deeper">Go deeper</a></li>
-</ol>
-
-<h2 id="story">The story</h2>
-<div class="story">
-<p>The second part of Lab 1 asks for the same picture computed with explicit vector instructions: one instruction acting on several places at once. The handout uses AVX-512, 16 floats per instruction; the laptop in this tutorial has AVX2, 8 floats. Everything below is written for 8; with AVX-512, replace 8 by 16.</p>
-<p>A direct translation meets two problems. The reference computes cx from one j, but a vector needs 8 different cx at once. And each place leaves the while loop after its own number of repetitions, while every instruction acts on all 8.</p>
-<p>How do 8 places with different counts share one loop, and what does the sharing cost?</p>
-</div>
-
-<div class="guess">
-<p class="label">Guess first</p>
-<p>With 8 places per instruction, guess the speedup over the reference on the same core: 8, a little under 8, or much less?</p>
-<p>Write your guess on paper now, before any calculation on this page.</p>
-</div>
-
-<p class="you">Your words: "SIMD does not even understand while loop. So where is the connection between this while loop and SIMD?" / "How can I tell SIMD that don't update 8, 9 but only update 10, 11, 12?" / "Suppose one square finishes after two repetitions, but another needs five. There is no way to know." / "It just happens that the mask contains negative numbers, right?"</p>
-
-<h2 id="work">Work it out</h2>
-<p class="ln"><b>L01</b> AVX2 facts in C++: <code>__m256</code> holds 8 floats at index 0 to 7; <code>_mm256_set1_ps(a)</code> puts a at all 8 indexes; <code>_mm256_set_ps(e7, e6, e5, e4, e3, e2, e1, e0)</code> takes its arguments from index 7 down to index 0; add, subtract and multiply act index by index; <code>_mm256_fmadd_ps(a, b, c)</code> computes a times b plus c at each index. <span class="from">from: Intel intrinsics guide</span></p>
-<p class="ln"><b>L02</b> The vector code takes 8 neighbours at once: the same i, and j, j + 1, ..., j + 7, with j a multiple of 8. The reference computes cx = j / img_size x 2.5 - 2.0 for each j. <span class="from">from: your code, reference code</span></p>
-<p class="ln do"><b>L03</b> <b class="x">DO</b> Split cx at j + k: (j + k) / img_size x 2.5 - 2.0 = (j / img_size x 2.5 - 2.0) + k x ____ . With img_size = 256 the step = 2.5 / 256 = ____ . For j = 64: cx at k = 0 = ____ , at k = 7 = ____ . <span class="from">from: L02</span></p>
+<h2 id="all-8-values-of-cx-come-from-one-number-plus-the-offsets-0-t">All 8 values of cx come from one number plus the offsets 0 to 7</h2>
+<p>In C++, as Intel's intrinsics guide documents them, a <code>__m256</code> variable holds 8 floats at index 0 to 7, <code>_mm256_set1_ps(a)</code> puts a at all 8 indexes, and <code>_mm256_set_ps(e7, e6, e5, e4, e3, e2, e1, e0)</code> takes its arguments from index 7 down to index 0. Adding, subtracting and multiplying act index by index, and <code>_mm256_fmadd_ps(a, b, c)</code>, a fused multiply-add, computes a times b plus c at each index in one instruction. The vector code takes 8 neighbours at once, the same i and j, j + 1, up to j + 7, with j a multiple of 8, while the reference computes cx = j / img_size x 2.5 - 2.0 for each j separately.</p>
+<p class="do">Split cx at j + k into the cx of j plus k times a step, and write the step. With img_size = 256 work out the step, then cx at k = 0 and at k = 7 for j = 64.</p>
 <details><summary>CHECK</summary>
-<pre>cx(j + k) = cx(j) + k x (2.5 / img_size)
-2.5 / 256 = 0.009765625
-j = 64: k = 0 -&gt; -1.375; k = 7 -&gt; -1.375 + 7 x 0.009765625 = -1.306640625
-So one vector of offsets 0 to 7, times the step, plus the cx of j, gives all 8 cx in one
-instruction: _mm256_fmadd_ps(offsets, step, cx of j).</pre>
+<pre>cx(j + k) = (j / img_size x 2.5 - 2.0) + k x (2.5 / img_size)
+step = 2.5 / 256 = 0.009765625
+j = 64: k = 0 -&gt; -1.375;  k = 7 -&gt; -1.375 + 7 x 0.009765625 = -1.306640625</pre>
+<p>So one vector of offsets 0 to 7, times the step, plus the cx of j, gives all 8 values of cx in one instruction, <code>_mm256_fmadd_ps(offsets, step, cx of j)</code>.</p>
 </details>
-<p class="ln"><b>L04</b> The learner's code for the 8 cx values, copied from page 04 of the lab pages: <span class="from">from: your code</span></p>
 <pre>__m256 offsets = _mm256_set_ps(7, 6, 5, 4, 3, 2, 1, 0);
 float  dx      = 2.5f / float(img_size);
 for (uint64_t i = 0; i &lt; img_size; ++i) {
@@ -70,29 +42,13 @@ for (uint64_t i = 0; i &lt; img_size; ++i) {
         /* the while loop works on cx_vec, cy_vec here */
     }
 }</pre>
-<div class="english">
-<p class="label">Read the code in English, line by line</p>
-<ol class="code-en">
-<li><code>__m256 offsets = _mm256_set_ps(7, 6, 5, 4, 3, 2, 1, 0);</code><span>Make a 256-bit variable named offsets that holds 8 fractions. The instruction _mm256_set_ps fills them from index 7 down to index 0 with the listed values, so index k holds k.</span></li>
-<li><code>float  dx      = 2.5f / float(img_size);</code><span>Make one fraction dx: 2.5 divided by img_size.</span></li>
-<li><code>for (uint64_t i = 0; i &lt; img_size; ++i) {</code><span>Give i the values 0 up to img_size minus 1, one after another.</span></li>
-<li><code>float  cy     = (float(i) / float(img_size)) * 2.5f - 1.25f;</code><span>Compute one cy for this value of i, the same way as the scalar code.</span></li>
-<li><code>__m256 cy_vec = _mm256_set1_ps(cy);</code><span>Copy that one cy into all 8 indexes of a 256-bit variable named cy_vec.</span></li>
-<li><code>for (uint64_t j = 0; j &lt; img_size; j += 8) {</code><span>Give j the values 0, 8, 16, and so on: each step of this loop covers 8 values of j at once.</span></li>
-<li><code>float  cx     = (float(j) / float(img_size)) * 2.5f - 2.0f;</code><span>Compute one cx, for the j this loop is at, the same way as the scalar code.</span></li>
-<li><code>__m256 cx_vec = _mm256_fmadd_ps(offsets, _mm256_set1_ps(dx), _mm256_set1_ps(cx));</code><span>At each of the 8 indexes, multiply offsets by dx and add cx, all in one instruction (fmadd = fused multiply-add). Keep the 8 results in cx_vec.</span></li>
-<li><code>/* the while loop works on cx_vec, cy_vec here */</code><span>A note for people: the loop that uses cx_vec and cy_vec goes here; it is not copied in this block.</span></li>
-<li><code>}</code><span>End of the block opened by the matching brace above.</span></li>
-<li><code>}</code><span>End of the block opened by the matching brace above.</span></li>
-</ol>
-</div>
-<p class="ln do"><b>L05</b> <b class="x">DO</b> In L04, which index holds offset 0? ____ . If the offsets were written <code>_mm256_set_ps(0, 1, 2, 3, 4, 5, 6, 7)</code>, index 0 would hold ____ , and the 8 results of each block would be stored ____ . <span class="from">from: L01, L04</span></p>
+<p>Read in English, the first line puts 0 at index 0 up to 7 at index 7, since <code>_mm256_set_ps</code> takes index 7 first; the second computes the step 2.5 / img_size once. For each i, cy is computed once as in the reference and copied to all 8 indexes. For each j in steps of 8, cx is computed for j alone, and the fmadd line makes the 8 values offset times step plus that cx. The comment marks where the while loop works on these 8 values.</p>
+<p class="do">Which index holds offset 0 in that code? If the offsets were written <code>_mm256_set_ps(0, 1, 2, 3, 4, 5, 6, 7)</code> instead, which offset would index 0 hold, and how would each block of 8 results be stored?</p>
 <details><summary>CHECK</summary>
-<pre>_mm256_set_ps(7, 6, 5, 4, 3, 2, 1, 0) puts 0 at index 0 and 7 at index 7
-written 0, 1, ..., 7: index 0 holds 7, so every block of 8 is stored mirror-reversed
-(_mm256_setr_ps takes its arguments in index order instead)</pre>
+<p>Written 7, 6, 5, 4, 3, 2, 1, 0, offset 0 sits at index 0. Written 0, 1, ..., 7, index 0 holds 7, so every block of 8 is stored mirror-reversed; <code>_mm256_setr_ps</code> takes its arguments in index order instead.</p>
 </details>
-<p class="ln"><b>L06</b> The learner's vector while loop, with lines A to F shortened, copied from page 05: <span class="from">from: your code</span></p>
+
+<h2 id="subtracting-the-compare-result-adds-1-because-all-ones-is-1">Subtracting the compare result adds 1, because all ones is -1</h2>
 <pre>__m256  four      = _mm256_set1_ps(4.0f);
 __m256i iters_vec = _mm256_setzero_si256();
 uint32_t iter = 0;
@@ -103,122 +59,58 @@ while (iter &lt; max_iters) {
     /* lines A to F, each one an _mm256_..._ps instruction */
     ++iter;
 }</pre>
-<div class="english">
-<p class="label">Read the code in English, line by line</p>
-<ol class="code-en">
-<li><code>__m256  four      = _mm256_set1_ps(4.0f);</code><span>Copy the fraction 4.0 into all 8 indexes of a variable named four.</span></li>
-<li><code>__m256i iters_vec = _mm256_setzero_si256();</code><span>Make 8 whole-number counters, all 0, in one 256-bit variable named iters_vec. The i at the end of __m256i means whole numbers.</span></li>
-<li><code>uint32_t iter = 0;</code><span>Make one whole-number counter named iter, holding 0. It counts how many times the loop itself repeats.</span></li>
-<li><code>while (iter &lt; max_iters) {</code><span>Repeat the lines in braces as long as iter is below max_iters.</span></li>
-<li><code>__m256 mask = _mm256_cmp_ps(_mm256_add_ps(x2_vec, y2_vec), four, _CMP_LE_OQ);</code><span>At each index, add x2 and y2, then compare the sum with 4. Where the sum is at most 4, put 32 bits all set to 1; elsewhere put 32 bits all 0. Keep the 8 answers in mask.</span></li>
-<li><code>if (_mm256_testz_ps(mask, mask)) break;</code><span>If all 256 bits of mask are 0, leave the while loop immediately.</span></li>
-<li><code>iters_vec = _mm256_sub_epi32(iters_vec, _mm256_castps_si256(mask));</code><span>Read the bits of mask as 8 whole numbers, and subtract them from the 8 counters, index by index.</span></li>
-<li><code>/* lines A to F, each one an _mm256_..._ps instruction */</code><span>A note for people: lines A to F go here, each written as an instruction that acts on all 8 indexes.</span></li>
-<li><code>++iter;</code><span>Add 1 to iter.</span></li>
-<li><code>}</code><span>End of the block opened by the matching brace above.</span></li>
-</ol>
-</div>
-<p class="ln"><b>L07</b> Intrinsic facts: <code>_mm256_cmp_ps(..., _CMP_LE_OQ)</code> writes 32 bits all 1 at each index where x2 + y2 &lt;= 4 and 32 bits all 0 elsewhere; that is mask. <code>_mm256_testz_ps(mask, mask)</code> returns 1 when all 256 bits are 0. <code>_mm256_sub_epi32</code> subtracts index by index, reading the bits as whole numbers. <span class="from">from: Intel intrinsics guide</span></p>
-<p class="ln do"><b>L08</b> <b class="x">DO</b> Add 1 in binary to the 32-bit integer whose bits are all 1: the result in 32 bits = ____ , so all ones read as a signed integer = ____ . At an index where mask is all ones, iters - mask = iters + ____ ; where all zeros, iters + ____ . <span class="from">from: L07</span></p>
+<p>Read in English, the first two lines make a vector of 8 fours and 8 counters at 0, and iter counts repetitions of the whole loop. Each repetition first adds x2 and y2 at each index and compares the sum with 4, putting 32 bits all 1 where it is at most 4 and all 0 elsewhere, which is mask. If all 256 bits of mask are 0, the loop is left at once. Otherwise mask, read as 8 whole numbers, is subtracted from the 8 counters, lines A to F are done with vector instructions, and iter goes up by 1.</p>
+<p><code>_mm256_testz_ps(mask, mask)</code> returns 1 only when every bit of mask is 0, and <code>_mm256_sub_epi32</code> subtracts index by index, reading the bits as whole numbers. Nothing in the loop asks an index whether it has finished.</p>
+<p class="do">Add 1 in binary to the 32-bit integer whose bits are all 1, and write what is left in 32 bits. What is all ones as a signed integer, and so what does subtracting mask do at an index that is all ones, and at one that is all zeros?</p>
 <details><summary>CHECK</summary>
-<pre>11111111 11111111 11111111 11111111 + 1 = 1 00000000 ... 0: the leading 1 does not fit,
-the 32 bits left are 0, so all ones = -1
-all ones: iters - (-1) = iters + 1; all zeros: iters - 0 = iters
-Each index counts itself, with no if.</pre>
+<pre>  11111111 11111111 11111111 11111111
++                                   1
+= 1 00000000 00000000 00000000 00000000   (the leading 1 does not fit)</pre>
+<p>The 32 bits left are all 0, so all ones is the integer that becomes 0 when 1 is added, which is -1. At an all-ones index, iters - (-1) = iters + 1; at an all-zeros index, iters - 0 = iters. Each index counts itself, with no if.</p>
 </details>
-<p class="ln do"><b>L09</b> <b class="x">DO</b> Real block, i = 40, j = 208 to 215, scalar iters 12, 8, 7, 6, 6, 6, 5, 5. An index with scalar iters c has mask all ones before repetitions 1 to c and all zeros after (a point farther than 2 from (0, 0) never comes back). Repetitions of the vector loop = ____ . iters_vec after repetition 7 = ____ . <span class="from">from: L06, L07, L08</span></p>
+<p class="do">Take a real block, i = 40 and j = 208 to 215, whose scalar counts are 12, 8, 7, 6, 6, 6, 5 and 5. An index with count c has mask all ones before repetitions 1 to c and all zeros after, because a point farther than 2 from (0, 0) never comes back. How many repetitions does the vector loop make, and what does the counter vector hold after repetition 7?</p>
 <details><summary>CHECK</summary>
-<pre>testz returns 1 before repetition 13 (index 0, with 12, is the last one inside): 12 repetitions
-after repetition 7: 7 7 7 6 6 6 5 5; after 12: 12 8 7 6 6 6 5 5 = the scalar iters</pre>
+<p>The test returns 1 before repetition 13, since index 0, with 12, is the last one inside, so the loop makes 12 repetitions. After repetition 7 the counters read 7 7 7 6 6 6 5 5, and after repetition 12 they read 12 8 7 6 6 6 5 5, the scalar counts.</p>
 </details>
 
-<h2 id="build">Build it</h2>
-<p class="ln"><b>L10</b> What to write in <code>mandelbrot_cpu_vector</code> (no full solution here): loop over every i, and over j in steps of 8; build cx as in L04 and cy with <code>_mm256_set1_ps</code>; begin x2, y2, w at zero and iters_vec at zero; repeat lines A to F with <code>_ps</code> instructions inside the loop of L06; store the 8 counts with <code>_mm256_storeu_si256</code> at <code>out + i * img_size + j</code>. <span class="from">from: L03 to L09, Intel intrinsics guide</span></p>
-<p class="ln do"><b>L11</b> <b class="x">DO</b> Compile as in the setup (-march=native gives you AVX2) and execute with <code>./mandelbrot_cpu -i vector</code>. Printed difference = ____ . It must be exactly ____ . <span class="from">from: L10, your output</span></p>
+<h2 id="writing-mandelbrot-cpu-vector-and-the-exact-0-it-must-print">Writing mandelbrot_cpu_vector, and the exact 0 it must print</h2>
+<p>The function loops over every i, and over j in steps of 8; builds cx as above and cy with <code>_mm256_set1_ps</code>; begins x2, y2 and w at zero and the counters at zero; repeats lines A to F with <code>_ps</code> instructions inside the loop above; and stores the 8 counts with <code>_mm256_storeu_si256</code> at <code>out + i * img_size + j</code>. The aligned store, <code>_mm256_store_si256</code>, needs an address that is a multiple of 32 bytes, which the starter's out is not guaranteed to be, and it crashes with a segmentation fault where the unaligned one works.</p>
+<p class="do">Compile as in the setup lesson, with -march=native for AVX2, execute <code>./mandelbrot_cpu -i vector</code>, and write the printed difference.</p>
 <details><summary>CHECK</summary>
-<pre>exactly 0 for a correct version
-about 0.248: nothing stored (the store line is missing)
-small but not 0: some indexes wrong; the commonest causes are the offsets order of L05 and
-a loop that stops before the last index has left</pre>
+<p>A correct version prints exactly 0. About 0.248 means nothing was stored, usually a missing store line. A small value that is not 0 means some indexes are wrong, most often the offsets order above, or a loop that stops before the last index has left.</p>
+<p>A version that is correct at img_size 256 and wrong at a size such as 384 has met rounding: 2.5 / img_size is exact in a float only when img_size is a power of 2, so cx built by steps rounds differently from the reference's division at other sizes.</p>
 </details>
 
-<h2 id="measure">Measure it</h2>
-<p class="ln"><b>L12</b> Measured on the laptop, one core: reference 61.6 ms, AVX2 version 8.71 ms. <span class="from">from: your output</span></p>
-<p class="ln"><b>L13</b> Name one index doing one repetition an index-repetition: a repetition of the vector loop costs 8 of them, useful or not; the useful ones add up to the scalar iters. Real data: for i = 22, j = 184 to 191 (iters 7, 8, 10, 15, 154, 1000, 13, 10) the loop needs 1000 repetitions; over all 8,192 blocks of 8 neighbours, 16,274,722 of 18,321,656 index-repetitions are useful; with the places shuffled at random into blocks of 8, 27.9 percent are. <span class="from">from: L06, computation on the scalar iters</span></p>
-<p class="ln do"><b>L14</b> <b class="x">DO</b> Useful share of the i = 22 block = (7 + 8 + 10 + 15 + 154 + 1000 + 13 + 10) / 8000 = ____ percent. Whole picture = ____ percent. Predicted speedup, if only index-repetitions cost time = 8 x useful share: neighbours ____ , shuffled ____ . Measured = 61.6 / 8.71 = ____ . <span class="from">from: L12, L13</span></p>
+<h2 id="neighbours-make-8-places-per-instruction-worth-7-07-times-an">Neighbours make 8 places per instruction worth 7.07 times, and shuffled places 2.23</h2>
+<p>Measured on the laptop on one core, the reference took 61.6 ms and the AVX2 version 8.71 ms. An index doing one repetition will be called an index-repetition here; each repetition of the vector loop costs 8 of them, useful or not, and the useful ones add up to the scalar counts. For the block i = 22, j = 184 to 191, with counts 7, 8, 10, 15, 154, 1000, 13 and 10, the loop needs 1000 repetitions. Over all 8,192 blocks of 8 neighbours in the picture, 16,274,722 of 18,321,656 index-repetitions are useful, and with the places shuffled at random into blocks of 8, 27.9 percent are.</p>
+<p class="do">Work out the useful share of the i = 22 block and of the whole picture. If only index-repetitions cost time, AVX2 is faster than the reference by 8 times the useful share: work that out with neighbours and with shuffled places, and set it beside the measured 61.6 / 8.71.</p>
 <details><summary>CHECK</summary>
-<pre>i = 22 block: 1217 / 8000 = 15.2 percent
-whole picture: 16,274,722 / 18,321,656 = 88.8 percent
-predicted: 8 x 0.888 = 7.11 with neighbours; 8 x 0.279 = 2.23 shuffled
-measured: 7.07</pre>
+<pre>i = 22 block:   (7 + 8 + 10 + 15 + 154 + 1000 + 13 + 10) / 8000 = 1217 / 8000 = 15.2 percent
+whole picture:  16,274,722 / 18,321,656 = 88.8 percent
+predicted:      8 x 0.888 = 7.11 with neighbours;  8 x 0.279 = 2.23 shuffled
+measured:       61.6 / 8.71 = 7.07</pre>
 </details>
 
-<div class="connect" id="connect">
-<p class="label">Connect the numbers</p>
-<p class="ln do"><b>L15</b> <b class="x">DO</b> Collect L05 (offsets order), L09 (each index counts itself), L14 (15.2 percent in one block, 88.8 percent overall, 7.11 predicted, 7.07 measured, 2.23 shuffled). The same instructions give 7.11 or 2.23. Write one sentence on what decides the speedup of 8 places per instruction. <span class="from">from: L05, L09, L14</span></p>
+<h2 id="similar-neighbours-not-the-instructions-decide-the-speedup">Similar neighbours, not the instructions, decide the speedup</h2>
+<p>Gathered together, the offsets have to go in reverse into <code>_mm256_set_ps</code>; each index counts itself through the mask; one block can waste 85 percent of its index-repetitions while the whole picture wastes 11; the prediction from useful index-repetitions is 7.11 against 7.07 measured; and the same instructions on shuffled places predict 2.23.</p>
+<p class="do">Write one sentence on what decides the speedup of 8 places per instruction.</p>
 <details><summary>CHECK</summary>
-<pre>Neighbouring places usually need similar numbers of repetitions, so most blocks of 8 finish
-together and waste little; only blocks on the edge of the set mix 1000 with small counts.
-The 7 times comes from that property of the picture, not from the instructions: shuffled
-blocks give 2.23 with the same code.
-
-Tempting answer that fails: "8 floats per instruction, so 8 times minus overhead". L14 refutes
-it: the same code predicts 2.23 when the places in each block are not neighbours.</pre>
+<p>Neighbouring places usually need similar numbers of repetitions, so most blocks of 8 finish together and waste little, and only blocks on the edge of the set mix 1000 with small counts. The 7 times comes from that feature of the picture, not from the instructions: shuffled blocks give 2.23 with the same code.</p>
+<p>The reading "8 floats per instruction, so 8 times minus overhead" fails, because the same code predicts 2.23 when the places in each block are not neighbours.</p>
 </details>
-</div>
-
-<h2 id="wrong">When it goes wrong</h2>
-<ul class="pitfalls">
-<li><b>Each block of 8 comes out mirror-reversed.</b> The offsets were written 0, 1, ..., 7 into <code>_mm256_set_ps</code> (L05).</li>
-<li><b>Correct at 256 but mismatches at a size such as 384.</b> 2.5 / img_size is exact in a float only when img_size is a power of 2; cx built by steps then rounds differently from the reference's division.</li>
-<li><b>The loop never ends, or always takes max_iters repetitions.</b> The test of L07 uses the wrong mask, or the repetition counter is not compared with max_iters.</li>
-<li><b>A crash (segmentation fault) at the store.</b> <code>_mm256_store_si256</code> needs an address that is a multiple of 32 bytes, and the starter's out is not guaranteed to be one; <code>_mm256_storeu_si256</code> accepts any address (L10).</li>
-</ul>
-
-<h2 id="questions">The lab's questions</h2>
-<p>Paraphrased from the Fall 2025 handout. Write your own answers from the lines named; the numbers are yours to measure.</p>
-<ul class="related">
-<li><b>Question 2: how did you set up cx and cy, how did you handle places in the same vector needing different numbers of repetitions, and how does the vector version compare with the scalar ones?</b> L03 to L05 (cx), L07 to L09 (the mask), L14 (7.07 measured against 7.11 predicted).</li>
-</ul>
-
-<div class="plain" id="plain">
-<p class="label">In plain words</p>
-<p>Processing 8 places with one instruction is close to 8 times faster only because neighbouring places of this picture need similar amounts of work. Mixed with unlike places, the same instructions gain barely 2 times.</p>
-<p>For a manager: the gain from doing several things at once depends on how alike those things are. A benchmark on friendly data does not carry over to mixed data.</p>
-</div>
-
-<div class="guess">
-<p class="label">Your guess against the machine</p>
-<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
-<details><summary>CHECK your guess</summary>
-<pre>A little under 8: 7.07 times (61.6 ms against 8.71 ms), against 7.11 predicted from the
-useful share of index-repetitions.</pre>
-</details>
-</div>
-
-<div class="interview">
-<p class="label">The interviewer's next question</p>
-<p>Before writing any code, how would you predict the AVX-512 version's speedup on the course machine, 16 places per instruction, from data you already have?</p>
+<p>The handout's second question asks how you set up cx and cy, how you handled places in one vector that need different numbers of repetitions, and how the vector version compares with the scalar ones; the offsets and the step answer the first part, the mask that counts each index by itself the second, and 7.07 measured against 7.11 predicted the third. A loop that never ends, or always takes max_iters repetitions, has its test on the wrong mask or compares no repetition counter with max_iters.</p>
+<p>Without code, processing 8 places with one instruction is close to 8 times faster only because neighbouring places of this picture need similar amounts of work; mixed with unlike places, the same instructions gain barely 2 times, so the gain from doing several things at once depends on how alike those things are, and a gain measured on friendly data does not carry over to mixed data.</p>
+<p>The guess at the top has its answer: a little under 8, 7.07 times, against 7.11 predicted from the useful share of index-repetitions.</p>
+<p class="do">A harder question to finish with. Before writing any code, how would you predict the AVX-512 version's speedup on the course machine, 16 places per instruction, from data you already have?</p>
 <details><summary>CHECK</summary>
-<pre>Repeat L13 with blocks of 16 neighbours: useful share = sum of iters / (16 x sum over blocks of
-the largest iters in the block), then predicted speedup = 16 x that share. Blocks of 16 mix more
-unlike places than blocks of 8, so the share falls below 88.8 percent and the speedup below
-16 x 0.888 = 14.2. Compute it from the scalar iters before measuring.</pre>
+<p>Repeat the count with blocks of 16 neighbours: the useful share is the sum of the counts divided by 16 times the sum, over blocks, of the largest count in each block, and the predicted speedup is 16 times that share. Blocks of 16 mix more unlike places than blocks of 8, so the share falls below 88.8 percent and the speedup below 16 x 0.888 = 14.2. Compute it from the scalar counts before measuring.</p>
 </details>
-</div>
+<p>The lab pages <a href="../04-simd-cx.html">SIMD: eight cx values from one number</a> and <a href="../05-simd-while-loop.html">SIMD and the while loop</a> work these numbers out at length, and the notes on <a href="simd-avx2.html">SIMD on the CPU</a> and on <a href="mask.html">the mask</a> hold the short versions.</p>
 
-<h2 id="deeper">Go deeper</h2>
-<ul class="related">
-<li><a href="../04-simd-cx.html">04. SIMD: eight cx values from one number</a></li>
-<li><a href="../05-simd-while-loop.html">05. SIMD and the while loop: eight iters, one loop</a></li>
-<li><a href="simd-avx2.html">SIMD on the CPU: 8 places in one AVX2 instruction</a></li>
-<li><a href="mask.html">The mask, and why all ones reads as -1</a></li>
-</ul>
-
-<nav class="pager"><a href="lesson-02-gpu-one-thread.html"><small>previous</small>Lesson 2. The picture on one GPU thread</a><a class="next" href="lesson-04-gpu-32-threads.html"><small>next</small>Lesson 4. The picture on 32 GPU threads</a></nav>
+<nav class="pager"><a href="lesson-02-gpu-one-thread.html">&larr; Lesson 2. The picture on one GPU thread</a><a class="next" href="lesson-04-gpu-32-threads.html">Lesson 4. The picture on 32 GPU threads &rarr;</a></nav>
 </main>
 <footer class="site">
-<p>Independent self-study material for MIT 6.S894 Accelerated Computing, written from one learner's work. Not affiliated with or endorsed by MIT or the course staff. Course pages: <a href="https://accelerated-computing.academy/fall25/">accelerated-computing.academy/fall25</a>. Starter code: <a href="https://github.com/accelerated-computing-class">github.com/accelerated-computing-class</a>. Every measured number comes from one laptop (Ryzen 5 4600H, GTX 1650) unless a line says otherwise.</p>
+<p>Independent self-study material for MIT 6.S894 Accelerated Computing, written from one learner's work, and not affiliated with or endorsed by MIT or the course staff. The course pages are at <a href="https://accelerated-computing.academy/fall25/">accelerated-computing.academy/fall25</a> and the starter code at <a href="https://github.com/accelerated-computing-class">github.com/accelerated-computing-class</a>. Every measured number comes from one laptop, a Ryzen 5 4600H with a GTX 1650, unless a sentence says otherwise.</p>
 </footer>
 </body>
 </html>

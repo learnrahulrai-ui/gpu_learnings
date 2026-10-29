@@ -30,12 +30,14 @@
 <dt>CPU</dt><dd>The central processor of a computer, built to finish one sequence of instructions as fast as possible.</dd>
 <dt>CS2R, LDG</dt><dd>GPU machine instructions: LDG copies a value from the graphics card's memory into a register; CS2R copies a special register, such as the cycle counter, into an ordinary one.</dd>
 <dt>cudaMalloc, cudaMemcpy, cudaDeviceSynchronize</dt><dd>CUDA calls made from the CPU: the first reserves memory on the graphics card, the second copies between CPU memory and the graphics card's memory, the third waits until everything sent to the GPU has finished.</dd>
+<dt>cudaGetDeviceProperties, multiProcessorCount</dt><dd>A CUDA call made from the CPU that fills a record describing the GPU; its field multiProcessorCount holds the number of SMs, 14 on the GTX 1650 and 48 on the course GPU.</dd>
+<dt>cudaOccupancyMaxActiveBlocksPerMultiprocessor</dt><dd>A CUDA call made from the CPU that returns how many blocks of a given kernel, at a given number of threads per block, one SM can hold at once.</dd>
 <dt>cycle</dt><dd>A single tick of a processor's clock. Times inside the GPU are counted in cycles.</dd>
 <dt>DRAM</dt><dd>The memory chips. On a graphics card they sit outside the GPU chip, so reading from them takes many cycles.</dd>
 <dt>FFMA, FADD, FMUL</dt><dd>Names of GPU machine instructions: FFMA multiplies two fractions and adds a third in one step; FADD adds two fractions; FMUL multiplies two.</dd>
 <dt>float</dt><dd>A fraction stored in 32 bits. It can only hold certain values; a typed number becomes the nearest one it can hold.</dd>
 <dt>fmadd (fused multiply-add)</dt><dd>A single instruction that computes a times b plus c. On the CPU, <code>_mm256_fmadd_ps</code> does it at 8 indexes at once.</dd>
-<dt>FP32 unit</dt><dd>A circuit in the GPU that does one 32-bit multiply-add for one thread. The GTX 1650 has 896 of them.</dd>
+<dt>FP32 unit</dt><dd>A circuit in the GPU that does one 32-bit multiply-add for one thread. The GTX 1650 has 896 of them; NVIDIA's specifications call them CUDA cores.</dd>
 <dt>hardware thread (SMT)</dt><dd>An instruction sequence that a CPU core keeps going alongside others. The laptop's cores keep 2 each, sharing the core's arithmetic circuits, so either can begin instructions while the other waits.</dd>
 <dt>GDDR5, GDDR6</dt><dd>Kinds of memory chips used on graphics cards. GDDR6 moves more bytes per second over the same wires.</dd>
 <dt>GPU</dt><dd>A graphics processor: thousands of simple arithmetic circuits that are fast when many of them do the same instruction at the same moment.</dd>
@@ -65,6 +67,7 @@
 <dt>owner</dt><dd>On this site: the worker (CPU thread or GPU thread) responsible for writing a given place of the output. A correct split gives every place exactly one owner.</dd>
 <dt>median</dt><dd>The middle value of a list once it is sorted. Of 10, 10, 11, 14, 30 it is 11.</dd>
 <dt>predication</dt><dd>An instruction that is executed for every thread but has effect only where a stated condition is true, so no jump is needed. Shown in a listing with a prefix such as <code>@!P2</code>.</dd>
+<dt>PTX</dt><dd>The instruction language NVIDIA defines for its GPUs, one step above the machine instructions that nvcc finally produces. Code can insert a PTX instruction by hand with <code>asm volatile</code>, as the clock read of the Lab 2 prelab does with <code>mov.u64</code>.</dd>
 <dt>program counter</dt><dd>The address of the next instruction a thread will execute.</dd>
 <dt>pthread_create, pthread_join</dt><dd>CPU library calls: the first starts a new thread executing a given function; the second waits until that thread has finished.</dd>
 <dt>reduction</dt><dd>Turning many numbers into one, such as adding up an array. The work is easy to split; the dependence between partial results is the hard part.</dd>

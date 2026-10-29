@@ -14,41 +14,15 @@
 <nav><a href="MIT-6.S894.html#syllabus">Lessons</a><a href="index.html">Notes</a><a href="../index.html">Lab pages</a><a href="../words.html">Words</a></nav>
 </header>
 <main>
-<p class="crumbs"><a href="MIT-6.S894.html">MIT 6.S894 tutorial</a> / Lab 1, part 1 (CPU reference) / Lesson 1</p>
+<p class="crumbs"><a href="MIT-6.S894.html">MIT 6.S894 tutorial</a> / Lesson 1</p>
 <h1>Lesson 1. The reference program, by hand</h1>
-<p class="meta"><span>Lab 1, part 1 (CPU reference)</span><span>you build: a total of all iters, printed by main</span><span>you need: the Lab 1 folder compiled</span></p>
-<p class="sub">Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+<p class="sub">This lesson covers the reference function of Lab 1, part 1, which is already written. What you add is a total of all counts, printed by main, and it needs only the Lab 1 folder compiled. Paragraphs with a red rule beside them are for your pencil; work each one before opening its CHECK.</p>
+<p>Every later version in both labs is checked against <code>mandelbrot_cpu_scalar</code>, so its numbers come first. Hidden in its few lines are the facts that decide every speedup that follows: where the pair of fractions it works on comes from, and how unequal the work per place is. Most people skim it, because it is short and it works. How much work does one place cost, and can anyone tell before its loop is done?</p>
+<p>Its first lines look like they do nothing, and that is where the questions at this step began:</p>
+<p class="you">"if i start at 00 squaring means nothing there shall be no change at all ever" / "whyy would i start form 00 when i alreadyyy started with 1 0" / "You have not defined escape from what ... A point 9 7 is going to be at 9 7."</p>
+<p class="do">Write a guess before any arithmetic. The 256 by 256 picture has 65,536 places, and each place repeats the loop between 1 and 1000 times. What share of all repetitions do the places that reach 1000 account for: about a quarter, about half, or almost all?</p>
 
-<p class="label">In this lesson</p>
-<ol class="toc">
-<li><a href="#story">The story</a></li>
-<li><a href="#work">Work it out</a></li>
-<li><a href="#build">Build it</a></li>
-<li><a href="#check">Check it</a></li>
-<li><a href="#measure">Measure it</a></li>
-<li><a href="#connect">Connect the numbers</a></li>
-<li><a href="#wrong">When it goes wrong</a></li>
-<li><a href="#plain">In plain words</a></li>
-<li><a href="#deeper">Go deeper</a></li>
-</ol>
-
-<h2 id="story">The story</h2>
-<div class="story">
-<p>Lab 1 begins with a function that is already written, mandelbrot_cpu_scalar: the reference every later version is checked against. Most people skim it, because it is short and it works. Every later speedup in the course, however, depends on two facts hidden in it: where the numbers it works on come from, and how unequal the work per place is.</p>
-<p>The learner did not skim it. They refused the claim that squaring from zero does anything, asked what the loop is leaving, and asked why the code subtracts when the formula adds.</p>
-<p>How much work does one place cost, and can anyone tell before its loop is done?</p>
-</div>
-
-<div class="guess">
-<p class="label">Guess first</p>
-<p>The 256 by 256 picture has 65,536 places, and each place repeats the loop between 1 and 1000 times. Guess the share of all repetitions done by the places that reach 1000: about a quarter, about half, or almost all?</p>
-<p>Write your guess on paper now, before any calculation on this page.</p>
-</div>
-
-<p class="you">Your words: "if i start at 00 squaring means nothing there shall be no change at all ever" / "whyy would i start form 00 when i alreadyyy started with 1 0" / "You have not defined escape from what ... A point 9 7 is going to be at 9 7."</p>
-
-<h2 id="work">Work it out</h2>
-<p class="ln"><b>L01</b> The body of the reference for one place (i, j), copied from the Lab 1 starter; around it, i and j each go from 0 to img_size - 1: <span class="from">from: Lab 1 starter code</span></p>
+<h2 id="cx-comes-from-j-alone-and-cy-from-i-alone-and-img-size-only">cx comes from j alone and cy from i alone, and img_size only sets how many samples cover -2.0 to 0.5</h2>
 <pre>float cx = (float(j) / float(img_size)) * 2.5f - 2.0f;
 float cy = (float(i) / float(img_size)) * 2.5f - 1.25f;
 float x2 = 0.0f;
@@ -65,152 +39,97 @@ while (x2 + y2 &lt;= 4.0f &amp;&amp; iters &lt; max_iters) {
     ++iters;
 }
 out[i * img_size + j] = iters;</pre>
-<div class="english">
-<p class="label">Read the code in English, line by line</p>
-<ol class="code-en">
-<li><code>float cx = (float(j) / float(img_size)) * 2.5f - 2.0f;</code><span>Turn j and img_size into fractions, divide j by img_size, multiply by 2.5, subtract 2.0, and keep the result in a fraction named cx. The f after a number marks it as a 32-bit fraction (a float).</span></li>
-<li><code>float cy = (float(i) / float(img_size)) * 2.5f - 1.25f;</code><span>Do the same with i, but subtract 1.25, and keep the result in cy.</span></li>
-<li><code>float x2 = 0.0f;</code><span>Make a fraction named x2 holding 0.</span></li>
-<li><code>float y2 = 0.0f;</code><span>Make a fraction named y2 holding 0.</span></li>
-<li><code>float w = 0.0f;</code><span>Make a fraction named w holding 0.</span></li>
-<li><code>uint32_t iters = 0;</code><span>Make a 32-bit whole number named iters holding 0. It will count repetitions.</span></li>
-<li><code>while (x2 + y2 &lt;= 4.0f &amp;&amp; iters &lt; max_iters) {</code><span>Before each repetition, test two things: is x2 plus y2 at most 4, and is iters below max_iters? If both are true, do the lines inside the braces once and test again. If either is false, continue after the closing brace.</span></li>
-<li><code>float x = x2 - y2 + cx;        // line A</code><span>Line A: subtract y2 from x2, add cx, keep it in x.</span></li>
-<li><code>float y = w - x2 - y2 + cy;    // line B</code><span>Line B: from w subtract x2, then subtract y2, then add cy, keep it in y.</span></li>
-<li><code>x2 = x * x;                    // line C</code><span>Line C: multiply x by itself and put the result in x2, replacing the old x2.</span></li>
-<li><code>y2 = y * y;                    // line D</code><span>Line D: multiply y by itself and put the result in y2.</span></li>
-<li><code>float z = x + y;               // line E</code><span>Line E: add x and y, keep it in z.</span></li>
-<li><code>w = z * z;                     // line F</code><span>Line F: multiply z by itself and put the result in w.</span></li>
-<li><code>++iters;</code><span>Add 1 to iters.</span></li>
-<li><code>}</code><span>End of the block opened by the matching brace above.</span></li>
-<li><code>out[i * img_size + j] = iters;</code><span>Store the whole number iters into the array out, at place number i times img_size plus j.</span></li>
-</ol>
-</div>
-<p class="ln"><b>L02</b> From L01: i counts down the picture and j counts right; the result for (i, j) goes to <code>out[i * img_size + j]</code>. The learner called that sheet of results the image paper. cx is computed from j alone and cy from i alone; the pair (cx, cy) is a point on a second sheet with (0, 0) at its center, the graph paper. The learner named (cx, cy) the middleman pair. <span class="from">from: L01</span></p>
-<p class="ln do"><b>L03</b> <b class="x">DO</b> img_size = 256. Place (64, 64): cx = 64 / 256 x 2.5 - 2.0 = ____ , cy = 64 / 256 x 2.5 - 1.25 = ____ . Smallest cx (j = 0) = ____ ; largest (j = 255) = ____ ; the value cx never reaches = ____ . <span class="from">from: L01, L02</span></p>
+<p>Read in English, the first two lines turn j and i into the pair of fractions (cx, cy): j divided by img_size, times 2.5, minus 2.0 gives cx, and i treated the same way but minus 1.25 gives cy, where the f after each number marks a 32-bit fraction, a float. The next four lines set x2, y2 and w to 0 and the count, iters, to 0. The while line repeats what is inside as long as x2 + y2 is at most 4 and the count is below max_iters. Inside, line A makes x from x2 minus y2 plus cx, line B makes y from w minus x2 minus y2 plus cy, lines C and D square x and y into x2 and y2, line E adds x and y into z, line F squares z into w, and the count goes up by 1. The last line stores the count at place number i times img_size plus j of out.</p>
+<p>Around those lines, i counts down the picture and j counts right, each from 0 to img_size - 1. On these pages the sheet of stored counts is called the image paper, and the second sheet, with (0, 0) at its center and (cx, cy) as a point on it, is the graph paper; (cx, cy) itself is the middleman pair, because the loop works on it and never on (i, j).</p>
+<p class="do">Take img_size = 256 and the place (64, 64). Work out cx = 64 / 256 x 2.5 - 2.0 and cy = 64 / 256 x 2.5 - 1.25. Then find the smallest cx, at j = 0, the largest, at j = 255, and the value that cx never reaches.</p>
 <details><summary>CHECK</summary>
-<pre>64 / 256 = 0.25, x 2.5 = 0.625: cx = -1.375, cy = -0.625
-j = 0: -2.0; j = 255: 255/256 x 2.5 - 2.0 = 0.490234375; never 0.5
-The graph paper covered: x from -2.0 up to 0.5, y from -1.25 up to 1.25.
-img_size only sets how finely that same part is sampled.</pre>
+<pre>64 / 256 = 0.25,   0.25 x 2.5 = 0.625
+cx = 0.625 - 2.0  = -1.375
+cy = 0.625 - 1.25 = -0.625
+
+j = 0   : cx = -2.0
+j = 255 : 255 / 256 x 2.5 - 2.0 = 0.490234375
+j / 256 never reaches 1, so cx never reaches 1 x 2.5 - 2.0 = 0.5</pre>
+<p>The part of the graph paper covered stretches from -2.0 up to 0.5 left to right and from -1.25 up to 1.25 top to bottom, whatever img_size is; img_size sets only how finely that same part is sampled.</p>
 </details>
-<p class="ln"><b>L04</b> From L01, a repetition is lines A to F and ++iters, once, in that order. Before each, the loop checks x2 + y2 &lt;= 4 and iters &lt; max_iters; it leaves the while loop when either is false, and iters is stored. x2, y2 and w begin at 0. <span class="from">from: L01</span></p>
-<p class="ln do"><b>L05</b> <b class="x">DO</b> Place (64, 64), with cx = -1.375 and cy = -0.625. Repetition 1: x = 0 - 0 + cx = ____ , y = 0 - 0 - 0 + cy = ____ , x2 = ____ , y2 = ____ , z = x + y = ____ , w = ____ . Check before repetition 2: x2 + y2 = ____ . Repetition 2: x = ____ , y = ____ , x2 = ____ , y2 = ____ , z = ____ , w = ____ . Check before repetition 3 = ____ . <span class="from">from: L01, L03, L04</span></p>
+
+<h2 id="place-64-64-leaves-the-loop-after-3-repetitions-and-its-chec">Place (64, 64) leaves the loop after 3 repetitions, and its check goes down before it goes up</h2>
+<p>A repetition is lines A to F and the count, once, in that order. Before each one the loop checks x2 + y2 &lt;= 4 and iters &lt; max_iters, and it leaves the while loop as soon as either is false; the count at that moment is what gets stored. x2, y2 and w begin at 0.</p>
+<p class="do">Work repetitions 1 and 2 for place (64, 64), with cx = -1.375 and cy = -0.625. Repetition 1 gives x = 0 - 0 + cx and y = 0 - 0 - 0 + cy; from them work out x2, y2, z = x + y and w. Write the check x2 + y2 before repetition 2, then work repetition 2 the same way and write the check before repetition 3.</p>
 <details><summary>CHECK</summary>
-<pre>rep 1: x = -1.375, y = -0.625, x2 = 1.890625, y2 = 0.390625, z = -2.0, w = 4.0
-check 2.281250 &lt;= 4: true
-rep 2: x = 1.890625 - 0.390625 - 1.375 = 0.125
-       y = 4.0 - 1.890625 - 0.390625 - 0.625 = 1.09375
-       x2 = 0.015625, y2 = 1.196289, z = 1.21875, w = 1.485352
-check 0.015625 + 1.196289 = 1.211914: true</pre>
+<pre>rep 1: x = -1.375   y = -0.625
+       x2 = 1.890625   y2 = 0.390625   z = -2.0   w = 4.0
+check before rep 2: 1.890625 + 0.390625 = 2.281250, at most 4
+
+rep 2: x = 1.890625 - 0.390625 - 1.375         = 0.125
+       y = 4.0 - 1.890625 - 0.390625 - 0.625   = 1.09375
+       x2 = 0.015625   y2 = 1.196289   z = 1.21875   w = 1.485352
+check before rep 3: 0.015625 + 1.196289 = 1.211914, at most 4</pre>
 </details>
-<p class="ln do"><b>L06</b> <b class="x">DO</b> Repetition 3: x = ____ , y = ____ , x2 = ____ , y2 = ____ . Check before repetition 4 = ____ , so the loop ____ and stores iters = ____ . Did x2 + y2 go down at any check? ____ . <span class="from">from: L04, L05</span></p>
+<p class="do">Work repetition 3 from those values, write the check before repetition 4, and say what the loop does and which count it stores. Did x2 + y2 go down at any check?</p>
 <details><summary>CHECK</summary>
-<pre>x = 0.015625 - 1.196289 - 1.375 = -2.555664
-y = 1.485352 - 0.015625 - 1.196289 - 0.625 = -0.351562
-x2 = 6.531418, y2 = 0.123596, check 6.655015 &gt; 4: leave the while loop, iters = 3
-checks: 2.281250, 1.211914, 6.655015: it went down, then up. Only the check decides;
-the size does not grow steadily, so the count cannot be read off (cx, cy) in advance.</pre>
+<pre>rep 3: x = 0.015625 - 1.196289 - 1.375             = -2.555664
+       y = 1.485352 - 0.015625 - 1.196289 - 0.625  = -0.351562
+       x2 = 6.531418   y2 = 0.123596
+check before rep 4: 6.655015, above 4: leave the while loop, iters = 3</pre>
+<p>The checks read 2.281250, 1.211914 and 6.655015: down, then up. Only the check decides when the loop is left, and the size does not grow steadily, so the count cannot be read off (cx, cy) in advance.</p>
 </details>
-<p class="ln"><b>L07</b> A repetition is meant to turn the point (x, y) into (x times x - y times y + cx, 2 times x times y + cy). The code never multiplies x by y: line E makes z = x + y and line F makes w = z times z. <span class="from">from: Mandelbrot iteration, L01</span></p>
-<p class="ln do"><b>L08</b> <b class="x">DO</b> Expand (x + y) times (x + y) = ____ . So 2 times x times y = w - ____ - ____ . Check with repetition 2 of L05 (x = 0.125, y = 1.09375): 2 times x times y = ____ ; w - x2 - y2 = 1.485352 - 0.015625 - 1.196289 = ____ . <span class="from">from: L05, L07</span></p>
+
+<h2 id="line-b-holds-2xy-without-ever-multiplying-x-by-y">Line B holds 2xy without ever multiplying x by y</h2>
+<p>A repetition is meant to turn the point (x, y) into (x times x - y times y + cx, 2 times x times y + cy), the step that defines the Mandelbrot set, yet no line of the reference multiplies x by y. Line E makes z = x + y and line F makes w = z times z instead.</p>
+<p class="do">Expand (x + y) times (x + y) on paper, and from it write 2 times x times y in terms of w, x2 and y2. Then check the result with repetition 2 of place (64, 64), where x = 0.125, y = 1.09375, x2 = 0.015625, y2 = 1.196289 and w = 1.485352.</p>
 <details><summary>CHECK</summary>
-<pre>x times x + 2 times x times y + y times y = x2 + 2xy + y2
-2xy = w - x2 - y2, so line B is 2xy + cy
-2 x 0.125 x 1.09375 = 0.273438; 1.485352 - 0.015625 - 1.196289 = 0.273438
-Trading the multiply x times y for z times z reuses x2 and y2, which the check needs anyway.</pre>
+<pre>(x + y) times (x + y) = x times x + 2 times x times y + y times y = x2 + 2xy + y2
+so 2xy = w - x2 - y2, and line B is 2xy + cy
+
+2 x 0.125 x 1.09375            = 0.273438
+1.485352 - 0.015625 - 1.196289  = 0.273438</pre>
+<p>Trading the multiply of x by y for z times z reuses x2 and y2, which the check needs anyway.</p>
 </details>
 
-<h2 id="build">Build it</h2>
-<p class="ln"><b>L09</b> Add a check of your own that every later version can use: in main, after the reference is computed, add up all of <code>ref_result</code> in a 64-bit integer and print it with a label such as "CPU total". Write the few lines yourself; they need only a for loop over <code>ref_result</code> and <code>std::cout</code>. <span class="from">from: Lab 1 starter code (main)</span></p>
-<p class="ln do"><b>L10</b> <b class="x">DO</b> Compile and execute as before. Your CPU total = ____ . The laptop printed 16,274,722. Same? ____ . If not, what could change a count? ____ . <span class="from">from: L09, your output</span></p>
+<h2 id="a-quarter-of-the-places-do-97-7-percent-of-the-work">A quarter of the places do 97.7 percent of the work</h2>
+<p>To see the cost of every place at once, add a check of your own to main: after the reference is computed, add up all of <code>ref_result</code> in a 64-bit integer and print the total with a word such as "CPU total" before it. The few lines needed are a for loop over <code>ref_result</code> and <code>std::cout</code>, and every later version can be checked against the same total.</p>
+<p class="do">Compile and execute as before and write your total. The laptop printed 16,274,722. If yours differs, write what could change a count.</p>
 <details><summary>CHECK</summary>
-<pre>the laptop: 16,274,722
-A different total means a different picture: a changed line, img_size or max_iters, or a
-compiler that rounds differently (for example by merging a multiply and an add into one
-fused instruction). Every later version is checked against this same total.</pre>
+<p>A different total means a different picture: a changed line, img_size or max_iters, or a compiler that rounds differently, for example by merging a multiply and an add into one fused instruction. Every later version is checked against this same total, so a mismatch here has to be settled first.</p>
 </details>
-
-<h2 id="check">Check it</h2>
-<p class="ln"><b>L11</b> Real data, computed with L01 for all 65,536 places (img_size = 256, max_iters = 1000): 3,781 places have iters 1 and 15,902 have iters 1000; the iters add up to 16,274,722. <span class="from">from: computation on the lab code</span></p>
-<p class="ln do"><b>L12</b> <b class="x">DO</b> Average iters = 16,274,722 / 65,536 = ____ . Share of places at 1000 = 15,902 / 65,536 = ____ percent. Share of all repetitions done by those places = 15,902 x 1000 / 16,274,722 = ____ percent. <span class="from">from: L11</span></p>
+<p>Computed with the reference's own lines for all 65,536 places at img_size 256 and max_iters 1000, 3,781 places stop after 1 repetition, 15,902 reach 1000, and all the counts add up to 16,274,722.</p>
+<p class="do">Work out the average count per place, the share of places that reach 1000, and the share of all repetitions those places account for, 15,902 x 1000 / 16,274,722.</p>
 <details><summary>CHECK</summary>
-<pre>average 248.3
-24.3 percent of the places
-97.7 percent of all repetitions</pre>
+<pre>average: 16,274,722 / 65,536 = 248.3
+places at 1000: 15,902 / 65,536 = 24.3 percent
+their repetitions: 15,902,000 / 16,274,722 = 97.7 percent</pre>
 </details>
-<p class="ln"><b>L13</b> Same data, split by i into 4 bands of 64 (i = 0 to 63, 64 to 127, 128 to 191, 192 to 255): 462,567; 7,558,684; 7,747,009; 506,462 repetitions. <span class="from">from: computation on the lab code</span></p>
-<p class="ln do"><b>L14</b> <b class="x">DO</b> If 4 workers took one band each and time follows repetitions, the job ends with the largest band: speedup = 16,274,722 / ____ = ____ . Expected from "4 workers, 4 times faster": ____ . <span class="from">from: L11, L13</span></p>
+<p>Split the same picture between 4 workers in bands of 64 values of i, 0 to 63, 64 to 127, 128 to 191 and 192 to 255, and the bands carry 462,567, 7,558,684, 7,747,009 and 506,462 repetitions.</p>
+<p class="do">If time follows repetitions, the job ends when the largest band ends. Work out the speedup of the 4 workers over 1, and compare it with the 4 that "4 workers, 4 times faster" expects.</p>
 <details><summary>CHECK</summary>
-<pre>16,274,722 / 7,747,009 = 2.10, not 4
-the costly places sit together in the middle of the picture</pre>
+<p>16,274,722 / 7,747,009 = 2.10, not 4: the costly places sit together in the middle bands, so two workers finish almost at once and then wait.</p>
 </details>
-
-<h2 id="measure">Measure it</h2>
-<p class="ln do"><b>L15</b> <b class="x">DO</b> From your setup: the reference's printed time (the laptop: 61.6 ms) and its repetitions (16,274,722). Time per repetition = 61.6 ms / 16,274,722 = ____ ns. Yours: ____ ns. <span class="from">from: L11, your output</span></p>
+<p class="do">From the reference's printed time on the laptop, 61.6 ms for 16,274,722 repetitions, work out the time of one repetition, and your own from your time and total.</p>
 <details><summary>CHECK</summary>
-<pre>61.6e-3 / 16,274,722 = 3.79e-9 s = 3.79 ns per repetition on the laptop's core
-This is the cost every later version tries to divide.</pre>
+<p>61.6 ms / 16,274,722 = 3.79 ns per repetition on one core of the laptop. Every later version tries to divide this number.</p>
 </details>
 
-<div class="connect" id="connect">
-<p class="label">Connect the numbers</p>
-<p class="ln do"><b>L16</b> <b class="x">DO</b> Collect L03 (img_size sets only how finely), L06 (the check went down, then up), L08 (2xy without multiplying x by y), L12 (24.3 percent of places, 97.7 percent of the work), L14 (2.10 from 4 workers), L15. Write one sentence on what any faster version of this program must respect about the work per place. <span class="from">from: L03, L06, L08, L12, L14, L15</span></p>
+<h2 id="any-split-of-this-picture-has-to-be-judged-by-repetitions-no">Any split of this picture has to be judged by repetitions, not by places</h2>
+<p>Gathered together, this page has shown that img_size sets only how finely the same part of the graph paper is sampled; that the check at (64, 64) went down before it went up; that line B carries 2xy without multiplying x by y; that 24.3 percent of the places do 97.7 percent of the work; that 4 bands of equal size give 2.10 times, not 4; and that one repetition costs 3.79 ns on one core.</p>
+<p class="do">Write one sentence on what any faster version of this program has to respect about the work per place.</p>
 <details><summary>CHECK</summary>
-<pre>The cost of a place ranges from 1 to 1000 repetitions, cannot be read off (cx, cy) before the
-loop is done (L06), and the costly places sit together (L14); so any split of the picture into
-workers, vectors or threads must be judged by repetitions, not by places.
-
-Tempting answer that fails: "65,536 equal tasks". L12 refutes it: a quarter of the places do
-almost all the work.</pre>
+<p>The cost of a place ranges from 1 to 1000 repetitions, cannot be read off (cx, cy) before its loop is done, and the costly places sit together, so any split of the picture into workers, vectors or threads has to be judged by repetitions, not by places.</p>
+<p>The reading "65,536 equal tasks" fails on the numbers above: a quarter of the places do almost all the work.</p>
 </details>
-</div>
-
-<h2 id="wrong">When it goes wrong</h2>
-<ul class="pitfalls">
-<li><b>Your total differs from 16,274,722 by a little.</b> Different rounding: compiler flags, or a line written in another order (L10).</li>
-<li><b>Your total is 0 or tiny.</b> The sum reads result instead of ref_result, or adds before the reference is computed (L09).</li>
-<li><b>The picture at -r 512 shows the same shape as at 256.</b> Correct: img_size only sets how finely the same part of the graph paper is sampled (L03).</li>
-</ul>
-
-<div class="plain" id="plain">
-<p class="label">In plain words</p>
-<p>The picture is made of tens of thousands of small, independent calculations, and they are wildly unequal: a quarter of them do nearly all the work, and nobody can tell which ones in advance. That one fact shapes everything that follows, from how to split the work to why splitting it evenly by count fails.</p>
-<p>For a manager: "we split the job into equal parts" means nothing until someone checks that the parts are equal in work, not just in number.</p>
-</div>
-
-<div class="guess">
-<p class="label">Your guess against the machine</p>
-<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
-<details><summary>CHECK your guess</summary>
-<pre>Almost all: 97.7 percent of the 16,274,722 repetitions come from the 15,902 places
-(24.3 percent of the picture) that reach 1000.</pre>
-</details>
-</div>
-
-<div class="interview">
-<p class="label">The interviewer's next question</p>
-<p>Splitting by bands of i gave 2.10 out of 4. Without knowing any iters in advance, how would you split the 256 values of i between 4 workers so that each gets about a quarter of the work, and what speedup would you expect?</p>
+<p>A few results look wrong here and are not, or the other way round. A total that differs from 16,274,722 by a little comes from different rounding, through compiler flags or a line written in another order. A total of 0, or nearly 0, means the sum read result instead of ref_result, or was taken before the reference was computed. A picture at -r 512 that shows the same shape as at 256 is correct, because img_size only sets how finely the same part of the graph paper is sampled.</p>
+<p>Without code, the picture is made of tens of thousands of small, independent calculations, and they are wildly unequal: a quarter of them do nearly all the work, and no one can tell which before computing them. So "we split the job into equal parts" says nothing until someone checks that the parts are equal in work, not only in number.</p>
+<p>The guess at the top has its answer: almost all, 97.7 percent of the 16,274,722 repetitions, come from the 15,902 places, 24.3 percent of the picture, that reach 1000.</p>
+<p class="do">A harder question to finish with. Bands of i gave 2.10 out of 4. Without knowing any count in advance, how would you split the 256 values of i between 4 workers so that each gets about a quarter of the work, and what speedup would you expect?</p>
 <details><summary>CHECK</summary>
-<pre>Interleave: worker k takes i = k, k + 4, k + 8, ...; each worker gets a slice of every band,
-cheap and costly alike. Computed on the real iters: shares 25.2, 25.0, 24.9, 25.0 percent,
-speedup 3.97 out of 4. No knowledge of iters is needed, only that costly places sit together.</pre>
+<p>Deal the values of i out in turns: worker k takes i = k, k + 4, k + 8, and so on, so each worker gets a slice of every band, cheap and costly alike. Computed on the real counts, the shares are 25.2, 25.0, 24.9 and 25.0 percent, a speedup of 3.97 out of 4, and no knowledge of the counts was needed, only that costly places sit together.</p>
 </details>
-</div>
+<p>The lab pages work the same ground at length: <a href="../01-image-to-middleman.html">from (i, j) to the middleman pair</a>, <a href="../02-square-and-add.html">the while loop by hand</a> and <a href="../03-the-w-line.html">the w line</a>. The short notes on <a href="middleman-pair.html">the middleman pair</a> and on <a href="iters.html">iters</a> hold the same numbers in a minute each.</p>
 
-<h2 id="deeper">Go deeper</h2>
-<ul class="related">
-<li><a href="../01-image-to-middleman.html">01. From (i, j) to the middleman pair (cx, cy)</a></li>
-<li><a href="../02-square-and-add.html">02. The while loop by hand</a></li>
-<li><a href="../03-the-w-line.html">03. The w line: where is the squaring?</a></li>
-<li><a href="middleman-pair.html">The middleman pair (cx, cy)</a></li>
-<li><a href="iters.html">iters: repetitions until the while loop is left</a></li>
-</ul>
-
-<nav class="pager"><a href="lesson-00-setup.html"><small>previous</small>Lesson 0. Set up your machine and read the starter program</a><a class="next" href="lesson-02-gpu-one-thread.html"><small>next</small>Lesson 2. The picture on one GPU thread</a></nav>
+<nav class="pager"><a href="lesson-00-setup.html">&larr; Lesson 0. Set up your machine and read the starter program</a><a class="next" href="lesson-02-gpu-one-thread.html">Lesson 2. The picture on one GPU thread &rarr;</a></nav>
 </main>
 <footer class="site">
-<p>Independent self-study material for MIT 6.S894 Accelerated Computing, written from one learner's work. Not affiliated with or endorsed by MIT or the course staff. Course pages: <a href="https://accelerated-computing.academy/fall25/">accelerated-computing.academy/fall25</a>. Starter code: <a href="https://github.com/accelerated-computing-class">github.com/accelerated-computing-class</a>. Every measured number comes from one laptop (Ryzen 5 4600H, GTX 1650) unless a line says otherwise.</p>
+<p>Independent self-study material for MIT 6.S894 Accelerated Computing, written from one learner's work, and not affiliated with or endorsed by MIT or the course staff. The course pages are at <a href="https://accelerated-computing.academy/fall25/">accelerated-computing.academy/fall25</a> and the starter code at <a href="https://github.com/accelerated-computing-class">github.com/accelerated-computing-class</a>. Every measured number comes from one laptop, a Ryzen 5 4600H with a GTX 1650, unless a sentence says otherwise.</p>
 </footer>
 </body>
 </html>
