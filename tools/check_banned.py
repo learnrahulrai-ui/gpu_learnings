@@ -6,6 +6,7 @@ Learner quotes (class "you") are skipped: they are the learner's own words.
 The tutorial pages (notes/MIT-6.S894.html and notes/lesson-*.html) are also held to the prose style:
 no lists, tables or bold, no heading that begins with "The", no label-colon openings, no loose words,
 no narrator or template phrases, no L-numbers or ____ blanks, and on lessons a reading after every code block.
+Pages in REBUILT also may not use the word line or template openers such as "Read in English".
 """
 import glob
 import os
@@ -58,6 +59,13 @@ LABEL = re.compile(
     re.I,
 )
 LEFTOVER = re.compile(r"\bL\d\d\b|____")
+# Tutorial pages rebuilt under the axiom audit (see CLAUDE.md); a lesson joins this set once it is rebuilt.
+REBUILT = {"notes/MIT-6.S894.html", "notes/lesson-01-reference.html"}
+LABELLING = re.compile(
+    r"\b(lines?|read in english|gathered together|without code|for a manager|the guess at the top|"
+    r"a harder question to finish with)\b",
+    re.I,
+)
 
 
 def scan(path):
@@ -108,6 +116,13 @@ def scan_tutorial(name, soup):
             for rx, label in ((LEFTOVER, "TEMPLATE LEFTOVER"), (LABEL, "LABEL-COLON OPENING")):
                 for m in rx.finditer(txt):
                     found.append((label, m.group(0).strip(), txt))
+    if name.replace(os.sep, "/") in REBUILT:
+        for t in main.find_all(["p", "h1", "h2", "summary", "pre"]):
+            if t.name == "pre" and not t.find_parent("details"):
+                continue  # code copied from the starter keeps its own words
+            txt = t.get_text(" ", strip=True)
+            for m in LABELLING.finditer(txt):
+                found.append(("LABEL OR TEMPLATE OPENER", m.group(0), txt))
     if "lesson-" in name:
         for pre in main.find_all("pre"):
             if pre.find_parent("details"):

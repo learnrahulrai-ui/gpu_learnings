@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Read mandelbrot_cpu_scalar and main from the Lab 1 starter, work one place through the loop by hand, follow how line B makes 2 x a x b out of w, and add up and split the repetitions of all 65,536 places.">
+<meta name="description" content="Read mandelbrot_cpu_scalar and main from the Lab 1 starter, work one place through the loop by hand, follow how the new y gets 2 * a * b out of w, and add up and split the repetitions of all 65,536 places.">
 <meta name="keywords" content="lesson">
 <title>Lesson 1: Reference by Hand</title>
 <link rel="stylesheet" href="../style.css">
@@ -16,13 +16,13 @@
 <main>
 <p class="crumbs"><a href="MIT-6.S894.html">MIT 6.S894 tutorial</a> / Lesson 1</p>
 <h1>Lesson 1. The reference program, by hand</h1>
-<p class="sub">This lesson covers Lab 1, part 1, on the CPU, where nothing has to be written yet: the function <code>mandelbrot_cpu_scalar</code> in the starter file <code>mandelbrot_cpu.cpp</code> is already complete. What you add is a few lines in main, the function where the program begins, that add up the numbers <code>mandelbrot_cpu_scalar</code> stores and print the sum. You need g++ and the Lab 1 starter folder, fetched with <code>git clone https://github.com/accelerated-computing-class/lab1.git</code>. Paragraphs with a red rule beside them are for your pencil; work each one before opening its CHECK.</p>
-<p>The Lab 1 starter file, <code>mandelbrot_cpu.cpp</code>, holds a function that is already written, <code>mandelbrot_cpu_scalar</code>, and an empty one, <code>mandelbrot_cpu_vector</code>, which part 2 of the lab asks you to write. Its main computes the written function's answer first, keeps it, and compares the vector function's answer with it, which is why the written function is called the reference. That answer is a square sheet of whole numbers, one for each place of a picture, and each number says how many times a short loop went round at that place. A few of the reference's lines look as if they do nothing. How much work does one place take, and can anyone tell before its loop has finished?</p>
-<p>The first questions at this step were about the lines that set numbers to 0 before the loop begins:</p>
+<p class="sub">This lesson covers Lab 1, part 1, on the CPU, where nothing has to be written yet: the function <code>mandelbrot_cpu_scalar</code> in the starter file <code>mandelbrot_cpu.cpp</code> is already complete. What you add to main, the function where the program begins, is a loop that adds up the numbers <code>mandelbrot_cpu_scalar</code> stores, and a print of the sum. You need g++ and the Lab 1 starter folder, fetched with <code>git clone https://github.com/accelerated-computing-class/lab1.git</code>. Paragraphs with a red rule beside them are for your pencil; work each one before opening its CHECK.</p>
+<p>The Lab 1 starter file, <code>mandelbrot_cpu.cpp</code>, holds a function that is already written, <code>mandelbrot_cpu_scalar</code>, and an empty one, <code>mandelbrot_cpu_vector</code>, which part 2 of the lab asks you to write. Its main computes the written function's answer first, keeps it in an array named ref_result, and compares the vector function's answer with it, so the written function is the reference. That answer is a square sheet of whole numbers, one for each place of a picture, and each number says how many times a short loop went round at that place. A few steps of the reference look as if they do nothing. How much work does one place take, and can anyone tell before its loop has finished?</p>
+<p>The first questions at this step were about the numbers set to 0 before the loop begins:</p>
 <p class="you">"if i start at 00 squaring means nothing there shall be no change at all ever" / "whyy would i start form 00 when i alreadyyy started with 1 0" / "You have not defined escape from what ... A point 9 7 is going to be at 9 7."</p>
-<p class="do">Write a guess before any arithmetic. Executed with nothing typed after its name, the program first prints <code>Testing with image size 256x256 and 1000 max iterations.</code>: the picture has 256 by 256 places, and the loop may go round at most 1000 times at one place. Of all the times the loop goes round over the whole picture, what share belongs to the places where it goes round the full 1000 times: about a quarter, about half, or almost all?</p>
+<p class="do">Write a guess before any arithmetic. Executed with nothing typed after its name, the program first prints <code>Testing with image size 256x256 and 1000 max iterations.</code>, so the picture has 256 by 256 places, and the loop may go round at most 1000 times at one place. Of all the times the loop goes round over the whole picture, what share belongs to the places where it goes round the full 1000 times: about a quarter, about half, or almost all?</p>
 
-<h2 id="reading-mandelbrot-cpu-scalar-from-its-first-line-to-its-las">Reading mandelbrot_cpu_scalar from its first line to its last</h2>
+<h2 id="reading-mandelbrot-cpu-scalar-from-beginning-to-end">Reading mandelbrot_cpu_scalar from beginning to end</h2>
 <pre>void mandelbrot_cpu_scalar(uint32_t img_size, uint32_t max_iters, uint32_t *out) {
     for (uint64_t i = 0; i &lt; img_size; ++i) {
         for (uint64_t j = 0; j &lt; img_size; ++j) {
@@ -33,108 +33,100 @@
             float w = 0.0f;
             uint32_t iters = 0;
             while (x2 + y2 &lt;= 4.0f &amp;&amp; iters &lt; max_iters) {
-                float x = x2 - y2 + cx;        // line A
-                float y = w - x2 - y2 + cy;    // line B
-                x2 = x * x;                    // line C
-                y2 = y * y;                    // line D
-                float z = x + y;               // line E
-                w = z * z;                     // line F
+                float x = x2 - y2 + cx;
+                float y = w - x2 - y2 + cy;
+                x2 = x * x;
+                y2 = y * y;
+                float z = x + y;
+                w = z * z;
                 ++iters;
             }
             out[i * img_size + j] = iters;
         }
     }
 }</pre>
-<p>This is the whole function as the starter has it, with its own comments left out, the first of which says that it generates the Mandelbrot set, and with the names line A to line F added at the right. Read in English, the first line names the function and its three inputs: img_size and max_iters, two 32-bit whole numbers, and out, the address in memory where the answers go, one 32-bit whole number after another. The first for line gives i every value from 0 to img_size - 1, one after another, and inside it the second gives j every value from 0 to img_size - 1, so everything inside executes once for every pair (i, j), img_size times img_size times in all. For each pair, the cx line turns j and img_size into fractions, divides j by img_size, multiplies by 2.5 and subtracts 2.0; the cy line does the same with i but subtracts 1.25; and the f after each number marks a 32-bit fraction, which C++ calls a float. The next four lines make the floats x2, y2 and w and the whole number iters, all 0. The while line tests two things before each trip through the lines in its braces, whether x2 + y2 is at most 4 and whether iters is below max_iters, and makes the trip only when both hold. In the trip, line A makes x from x2 minus y2 plus cx; line B makes y from w minus x2, minus y2, plus cy; line C puts x times x into x2 and line D puts y times y into y2; line E adds x and y into z; line F puts z times z into w; and the last line of the trip adds 1 to iters. Once the while loop is left, the line after it stores iters in out at entry number i times img_size plus j.</p>
-<p>Call one trip through lines A to F and the line that adds 1 a repetition; iters then counts the repetitions at one pair (i, j), and the stored number is that pair's count. Each pair is one place of the picture, and out holds img_size times img_size counts, the count of (i, j) at entry i times img_size plus j. These pages draw out as a sheet with i counting down from the top and j counting right, and call it the image paper. The pair of fractions (cx, cy) is a point on a second sheet, the plane drawn with (0, 0) at its center, which these pages call the graph paper, and (cx, cy) itself is called the middleman pair, because it stands between the place and its count: the cx line reads only j, the cy line reads only i, and no line inside the while loop reads i, j or anything that belongs to another place.</p>
-<p class="do">Take img_size = 256 and the place (64, 64), with i = 64 and j = 64. Work out cx = 64 / 256 x 2.5 - 2.0 and cy = 64 / 256 x 2.5 - 1.25. Then work out cx at j = 0 and at j = 255, and cy at i = 0 and at i = 255.</p>
+<p>This is the whole function as the starter has it, with its comments left out; the first of them says that the function generates the Mandelbrot set. It takes three inputs: img_size and max_iters, two 32-bit whole numbers, and out, the address in memory where the answers go, one 32-bit whole number after another. The outer for loop gives i every value from 0 to img_size - 1, one after another, and for each i the inner for loop gives j every value from 0 to img_size - 1, so everything inside executes once for every pair (i, j), img_size times img_size times in all. For each pair, cx is j divided by img_size, times 2.5, minus 2.0, with j and img_size first turned into fractions, and cy is i treated the same way but minus 1.25; the f after each number marks a 32-bit fraction, which C++ calls a float. Then x2, y2 and w are made as floats and iters as a whole number, all 0. Before each trip through its braces, the while loop tests whether x2 + y2 is at most 4 and whether iters is below max_iters, and it makes the trip only when both hold. In the trip, x becomes x2 minus y2 plus cx; y becomes w minus x2, minus y2, plus cy; x2 becomes x times x and y2 becomes y times y; z becomes x plus y; w becomes z times z; and iters goes up by 1. Once the while loop is left, iters is stored in out at entry number i times img_size plus j.</p>
+<p>Call one trip through the braces of the while loop a repetition; iters then counts the repetitions at one pair (i, j), and the stored number is that pair's count. Each pair is one place of the picture, and out holds img_size times img_size counts, the count of (i, j) at entry i times img_size plus j. These pages draw out as a sheet with i counting down from the top and j counting right, and call it the image paper. The pair of fractions (cx, cy) is a point on a second sheet, the plane drawn with (0, 0) at its center, which these pages call the graph paper, and (cx, cy) itself is called the middleman pair, because it stands between the place and its count: cx is computed from j alone, cy from i alone, and nothing inside the while loop reads i, j or anything that belongs to another place.</p>
+<p class="do">Take img_size = 256 and the place (64, 64), with i = 64 and j = 64. Work out cx = 64 / 256 * 2.5 - 2.0 and cy = 64 / 256 * 2.5 - 1.25. Then work out cx at j = 0 and at j = 255, and cy at i = 0 and at i = 255.</p>
 <details><summary>CHECK</summary>
-<pre>64 / 256 = 0.25,   0.25 x 2.5 = 0.625
+<pre>64 / 256 = 0.25,   0.25 * 2.5 = 0.625
 cx = 0.625 - 2.0  = -1.375
 cy = 0.625 - 1.25 = -0.625
 
-j = 0:    cx = 0 x 2.5 - 2.0 = -2.0
-j = 255:  255 / 256 = 0.99609375,  x 2.5 = 2.490234375,  - 2.0 = 0.490234375
-i = 0:    cy = 0 x 2.5 - 1.25 = -1.25
-i = 255:  2.490234375 - 1.25 = 1.240234375</pre>
+j = 0    -&gt;  cx = 0 * 2.5 - 2.0 = -2.0
+j = 255  -&gt;  255 / 256 = 0.99609375,  x 2.5 = 2.490234375,  - 2.0 = 0.490234375
+i = 0    -&gt;  cy = 0 * 2.5 - 1.25 = -1.25
+i = 255  -&gt;  cy = 2.490234375 - 1.25 = 1.240234375</pre>
 </details>
 <p class="do">For any img_size, j goes from 0 to img_size - 1, so j / img_size goes from 0 up to (img_size - 1) / img_size. Work out that largest value at img_size = 256 and at 512, and say whether it can reach 1 at any img_size; from that, write the values that cx and cy never reach. Then subtract the cx of j from the cx of j + 1 to get the step between neighbouring places, and work it out at 256 and at 512.</p>
 <details><summary>CHECK</summary>
-<pre>256: 255 / 256 = 0.99609375        512: 511 / 512 = 0.998046875
+<pre>255 / 256 = 0.99609375 at img_size = 256,   511 / 512 = 0.998046875 at 512
 (img_size - 1) / img_size = 1 - 1 / img_size, below 1 at every img_size, so
-cx never reaches 1 x 2.5 - 2.0 = 0.5, and cy never reaches 1 x 2.5 - 1.25 = 1.25
+cx never reaches 1 * 2.5 - 2.0 = 0.5, and cy never reaches 1 * 2.5 - 1.25 = 1.25
 
-step: ((j + 1) / img_size x 2.5 - 2.0) - (j / img_size x 2.5 - 2.0) = 2.5 / img_size
-      2.5 / 256 = 0.009765625        2.5 / 512 = 0.0048828125</pre>
+((j + 1) / img_size * 2.5 - 2.0) - (j / img_size * 2.5 - 2.0) = 2.5 / img_size
+2.5 / 256 = 0.009765625,   2.5 / 512 = 0.0048828125</pre>
 <p>At every img_size, cx begins at -2.0 and stays below 0.5, and cy begins at -1.25 and stays below 1.25, so the places always cover the same part of the graph paper; a larger img_size puts more places on it, closer together, at 512 half the step of 256.</p>
 </details>
 
 <h2 id="working-place-64-64-through-the-while-loop-by-hand">Working place (64, 64) through the while loop by hand</h2>
-<p>Call the test x2 + y2 &lt;= 4 the check. Before repetition 1 at any place, x2 and y2 are both 0, so the check reads 0 + 0 = 0, which is at most 4, and iters is 0, below max_iters; with max_iters at least 1, every place therefore makes at least 1 repetition. After each repetition the while line tests again, and the loop is left as soon as the check reads above 4 or iters has reached max_iters. The trip that would take iters above max_iters is never made, so every count lies between 1 and max_iters, here 1 and 1000.</p>
-<p class="do">Work repetitions 1 and 2 at place (64, 64), with cx = -1.375 and cy = -0.625. In repetition 1, line A gives x = 0 - 0 + cx and line B gives y = 0 - 0 - 0 + cy; from them work out x2, y2, z and w with lines C to F, then the check before repetition 2. Work repetition 2 the same way from the new x2, y2 and w, and write the check before repetition 3.</p>
+<p>Before repetition 1 at any place, x2 and y2 are both 0, so x2 + y2 = 0, which is at most 4, and iters is 0, below max_iters; with max_iters at least 1, every place therefore makes at least 1 repetition. After each repetition the while loop tests x2 + y2 and iters again, and it is left as soon as x2 + y2 is above 4 or iters has reached max_iters. The trip that would take iters above max_iters is never made, so every count lies between 1 and max_iters, here 1 and 1000.</p>
+<p class="do">Work repetitions 1 and 2 at place (64, 64), with cx = -1.375 and cy = -0.625. In repetition 1, x = 0 - 0 + cx and y = 0 - 0 - 0 + cy; from them work out x2, y2, z and w, then x2 + y2 before repetition 2. Work repetition 2 the same way from the new x2, y2 and w, and write x2 + y2 before repetition 3.</p>
 <details><summary>CHECK</summary>
-<pre>rep 1: x = 0 - 0 + (-1.375)      = -1.375
-       y = 0 - 0 - 0 + (-0.625)  = -0.625
-       x2 = 1.890625   y2 = 0.390625   z = -2.0   w = 4.0
-check before rep 2: 1.890625 + 0.390625 = 2.28125, at most 4
+<pre>repetition 1:  x = 0 - 0 + (-1.375)      = -1.375
+               y = 0 - 0 - 0 + (-0.625)  = -0.625
+               x2 = 1.890625   y2 = 0.390625   z = -2.0   w = 4.0
+before repetition 2:  x2 + y2 = 1.890625 + 0.390625 = 2.28125, at most 4
 
-rep 2: x = 1.890625 - 0.390625 - 1.375         = 0.125
-       y = 4.0 - 1.890625 - 0.390625 - 0.625   = 1.09375
-       x2 = 0.015625   y2 = 1.1962890625   z = 1.21875   w = 1.4853515625
-check before rep 3: 0.015625 + 1.1962890625 = 1.2119140625, at most 4</pre>
+repetition 2:  x = 1.890625 - 0.390625 - 1.375         = 0.125
+               y = 4.0 - 1.890625 - 0.390625 - 0.625   = 1.09375
+               x2 = 0.015625   y2 = 1.1962890625   z = 1.21875   w = 1.4853515625
+before repetition 3:  x2 + y2 = 0.015625 + 1.1962890625 = 1.2119140625, at most 4</pre>
 </details>
-<p class="do">Work repetition 3 from those values, write the check before repetition 4, and say what the loop does next, what iters is, and at which entry of out the count is stored. Then write the four checks, before repetitions 1 to 4, side by side.</p>
+<p class="do">Work repetition 3 from those values, write x2 + y2 before repetition 4, and say what the while loop does next, what iters is, and at which entry of out the count is stored. Then write x2 + y2 before repetitions 1 to 4 side by side.</p>
 <details><summary>CHECK</summary>
-<pre>rep 3: x = 0.015625 - 1.1962890625 - 1.375                   = -2.5556640625
-       y = 1.4853515625 - 0.015625 - 1.1962890625 - 0.625    = -0.3515625
-       x2 = 6.531419   y2 = 0.123596   (to 6 decimals)
-check before rep 4: 6.531419 + 0.123596 = 6.655015, above 4
-the while loop is left with iters = 3, stored at out[64 x 256 + 64] = out[16448]
+<pre>repetition 3:  x = 0.015625 - 1.1962890625 - 1.375                 = -2.5556640625
+               y = 1.4853515625 - 0.015625 - 1.1962890625 - 0.625  = -0.3515625
+               x2 = 6.531419   y2 = 0.123596   (to 6 decimals)
+before repetition 4:  x2 + y2 = 6.531419 + 0.123596 = 6.655015, above 4
+the while loop is left with iters = 3, stored at out[64 * 256 + 64] = out[16448]
 
-checks before repetitions 1 to 4:   0,   2.28125,   1.2119140625,   6.655015</pre>
-<p>Over repetition 2 the check went down, from 2.28125 to 1.2119140625, and one repetition later it read 6.655015, above 4, so the direction of the last change did not tell what the next check would be; at this place only working the repetitions gave the count, 3.</p>
+x2 + y2 before repetitions 1 to 4:   0,   2.28125,   1.2119140625,   6.655015</pre>
+<p>Over repetition 2, x2 + y2 went down, from 2.28125 to 1.2119140625, and one repetition later it was 6.655015, above 4, so the direction of the last change did not tell what came next; at this place only working the repetitions gave the count, 3.</p>
 </details>
 
 <h2 id="following-x-and-y-from-one-repetition-into-the-next">Following x and y from one repetition into the next</h2>
-<p>No line of the loop multiplies x by y. To see what one repetition does to the pair (x, y), call the x and y that lines A and B make in one repetition a and b. Lines C to F of that repetition then leave x2 = a times a, y2 = b times b, z = a + b and w = (a + b) times (a + b), and these are the values that the check and lines A and B of the next repetition read.</p>
-<p class="do">Multiply (a + b) times (a + b) term by term and add the four products. Put the result into line B of the next repetition, w - x2 - y2 + cy, and write line A of the next repetition, x2 - y2 + cx, in terms of a, b and cx. Then test both on place (64, 64): with a = 0.125 and b = 1.09375 from repetition 2, the two must give the x and y of repetition 3.</p>
+<p>Nothing in the loop multiplies x by y. To see what one repetition does to the pair (x, y), call the x and y that one repetition makes a and b. The rest of that repetition then leaves x2 = a times a, y2 = b times b, z = a + b and w = (a + b) times (a + b), and these are the values that the next repetition's test and its new x and y read.</p>
+<p class="do">Multiply (a + b) times (a + b) term by term and add the four products. Put the result into the next repetition's y, w - x2 - y2 + cy, and write its x, x2 - y2 + cx, in terms of a, b and cx. Then test both on place (64, 64): with a = 0.125 and b = 1.09375 from repetition 2, the two must give the x and y of repetition 3.</p>
 <details><summary>CHECK</summary>
-<pre>(a + b) x (a + b) = a x a + a x b + b x a + b x b
-                  = a x a + 2 x a x b + b x b
-next y = (a x a + 2 x a x b + b x b) - a x a - b x b + cy = 2 x a x b + cy
-next x = a x a - b x b + cx
+<pre>(a + b) * (a + b) = a * a + a * b + b * a + b * b
+                  = a * a + 2 * a * b + b * b
+next y = (a * a + 2 * a * b + b * b) - a * a - b * b + cy = 2 * a * b + cy
+next x = a * a - b * b + cx
 
-test:  2 x 0.125 x 1.09375 + (-0.625)    = 0.2734375 - 0.625 = -0.3515625
-       0.015625 - 1.1962890625 + (-1.375) = -2.5556640625
-both match repetition 3:  y = -0.3515625,  x = -2.5556640625</pre>
-<p>Each repetition turns (a, b) into (a x a - b x b + cx, 2 x a x b + cy). Line B gets 2 x a x b out of w by subtracting the two squares that lines C and D made, and the check before the next repetition reads the same two squares, x2 + y2 = a x a + b x b.</p>
+with a = 0.125 and b = 1.09375:
+next y = 2 * 0.125 * 1.09375 + (-0.625)     = 0.2734375 - 0.625 = -0.3515625
+next x = 0.015625 - 1.1962890625 + (-1.375) = -2.5556640625
+as repetition 3 gave:  y = -0.3515625,  x = -2.5556640625</pre>
+<p>Each repetition turns (a, b) into (a * a - b * b + cx, 2 * a * b + cy). The new y gets 2 * a * b out of w by subtracting the two squares x2 and y2, and the test before the next repetition reads the same two squares, x2 + y2 = a * a + b * b.</p>
 </details>
-<p>Written straight from those two formulas, with x and y kept between repetitions instead of x2, y2 and w, and with x and y both 0 before the first repetition, the loop would be this:</p>
+<p>Written straight from those two formulas, with x and y kept between repetitions instead of x2, y2 and w, and with x and y both 0 before the first repetition, the loop would be:</p>
 <pre>while (x * x + y * y &lt;= 4.0f &amp;&amp; iters &lt; max_iters) {
     float xt = x * x - y * y + cx;
     y = 2 * x * y + cy;
     x = xt;
     ++iters;
 }</pre>
-<p>Read in English, this loop tests x times x plus y times y against 4 and iters against max_iters before each repetition; it computes the next x into a temporary xt, because the next y still needs the old x; it computes the next y as 2 times x times y plus cy; it moves xt into x; and it adds 1 to iters.</p>
-<p class="do">Count, for one repetition of each loop as written, the float multiplies and the float adds or subtracts, with the check's addition included and its comparison with 4 left out.</p>
+<p>Before each repetition it tests x times x plus y times y against 4 and iters against max_iters; it computes the next x into a temporary, xt, because the next y still needs the old x; it computes the next y as 2 times x times y plus cy; it moves xt into x; and it adds 1 to iters.</p>
+<p class="do">Count, for one repetition of each loop as written, the float multiplies and the float adds or subtracts, with the addition in the test included and its comparison with 4 left out.</p>
 <details><summary>CHECK</summary>
-<pre>straight loop:   check   x * x, y * y      2 multiplies, 1 add
-                 xt      x * x, y * y      2 multiplies, 2 adds or subtracts
-                 y       2 * x, then * y   2 multiplies, 1 add
-                 total   6 multiplies + 4 adds or subtracts = 10
-
-reference loop:  check   x2 + y2           1 add
-                 line A                    2 adds or subtracts
-                 line B                    3 adds or subtracts
-                 line E                    1 add
-                 lines C, D, F             3 multiplies
-                 total   3 multiplies + 7 adds or subtracts = 10</pre>
-<p>Both loops do 10 float operations per repetition. The reference squares a and b once and reads the two squares three times, in the check, in line A and in line B, so it does 3 multiplies where the straight loop as written does 6, and 3 more adds and subtracts in their place.</p>
+<p>The loop written from the formulas multiplies x by x and y by y in its test and again for xt, and for the next y computes 2 times x and then times y: 6 multiplies. It adds once in its test, subtracts and adds for xt, and adds cy for the next y: 4 adds or subtracts, 10 operations in all.</p>
+<p>The starter's loop adds once in its test, x2 + y2; subtracts and adds for x; subtracts twice and adds once for y; and adds once for z: 7 adds or subtracts. It multiplies only for x2, y2 and w: 3 multiplies, again 10 operations in all.</p>
+<p>So both loops do 10 float operations per repetition. The starter's loop squares a and b once and reads the two squares three times, in its test, in x and in y, so it does 3 multiplies where the loop written from the formulas does 6, and 3 more adds and subtracts in their place.</p>
 </details>
 
 <h2 id="adding-up-the-repetitions-of-every-place">Adding up the repetitions of every place</h2>
-<p>The program begins in main, and the lines of main that matter here are these, from the starter:</p>
+<p>The program begins in main. Cut to what this lesson uses, main in the starter reads:</p>
 <pre>uint32_t img_size = 256;
 uint32_t max_iters = 1000;
 enum MandelbrotImpl impl = ALL;
@@ -155,28 +147,28 @@ if (impl == VECTOR || impl == ALL) {
     std::cout &lt;&lt; "  Correctness: average output difference from reference = "
               &lt;&lt; difference(img_size, max_iters, result, ref_result) &lt;&lt; std::endl;
 }</pre>
-<p>Read in English, main sets img_size to 256, max_iters to 1000 and impl, the choice of versions to time, to all of them. ParseArgsAndMakeSpec, defined in the same file, changes img_size when the program is given -r and a size, which must be a multiple of 32, changes max_iters when given -b and a cap, and changes impl when given -i scalar or -i vector; it then prints the line that begins Testing with image size. Main makes two arrays of img_size times img_size 32-bit whole numbers, result and ref_result, which a std::vector fills with 0, and computes the reference once into ref_result. Then, unless only the vector version was chosen, it sets result to 0 again and times the reference with the macro BENCHPRESS, which the same file defines: it calls the function 10 times, measures each call, sorts the 10 times and prints the smallest, in milliseconds. After that, dump_image writes the counts in result as a picture, out/mandelbrot_cpu_scalar.bmp. Unless only the reference was chosen, main does the same for mandelbrot_cpu_vector and then prints a number that the function difference, in the same file, computes from the gap between result and ref_result at every place.</p>
-<p>To see the work of the whole picture as one number, add lines of your own to main right after the reference is computed: a for loop that adds every entry of ref_result into a 64-bit whole number, uint64_t, and a std::cout line that prints the sum after a word such as CPU total. A 32-bit whole number holds at most 2 to the power 32 minus 1 = 4,294,967,295, and at -r 4096 the picture has 4096 x 4096 = 16,777,216 places, whose counts could add up to as much as 16,777,216 x 1000 = 16,777,216,000, so the sum needs 64 bits.</p>
+<p>main sets img_size to 256, max_iters to 1000 and impl, the choice of versions to time, to all of them. ParseArgsAndMakeSpec, defined in the same file, changes img_size when the program is given -r and a size, which must be a multiple of 32, changes max_iters when given -b and a cap, and changes impl when given -i scalar or -i vector; it then prints the size and the cap it ended with, as in <code>Testing with image size 256x256 and 1000 max iterations.</code> main makes two arrays of img_size times img_size 32-bit whole numbers, result and ref_result, which a std::vector fills with 0, and computes the reference once into ref_result. Then, unless only the vector version was chosen, it sets result to 0 again and times the reference with the macro BENCHPRESS, which the same file defines: it calls the function 10 times, measures each call, sorts the 10 times and prints the smallest, in milliseconds. dump_image then writes the counts in result as a picture, out/mandelbrot_cpu_scalar.bmp. Unless only the reference was chosen, main does the same for mandelbrot_cpu_vector and then prints a number that the function difference, in the same file, computes from the gap between result and ref_result at every place.</p>
+<p>To see the work of the whole picture as one number, add to main, right after the reference is computed, a for loop that adds every entry of ref_result into a 64-bit whole number, uint64_t, and a std::cout statement that prints the sum after a word such as CPU total. A 32-bit whole number holds at most 2 to the power 32 minus 1 = 4,294,967,295, and at -r 4096 the picture has 4096 * 4096 = 16,777,216 places, whose counts could add up to as much as 16,777,216 * 1000 = 16,777,216,000, so the sum needs 64 bits.</p>
 <pre>mkdir -p out
 g++ -O3 -march=native -std=c++17 mandelbrot_cpu.cpp -o mandelbrot_cpu
 ./mandelbrot_cpu</pre>
-<p>In the lab1 folder that git clone made, the first line makes the folder out, which dump_image writes into; writeBMP, which dump_image calls, opens the file with std::ofstream and never checks that the file opened, so without that folder the program finishes with no picture and no message. The second line compiles the file with full optimization, -O3, allowing every instruction this CPU has, -march=native, as 2017 C++, into the program mandelbrot_cpu. The third executes it with the defaults, 256 by 256 places and max_iters 1000: it computes the reference, prints your total, times the reference, and then times the still empty vector function as well, with a line about it that this lesson does not use.</p>
-<p class="do">Execute it and write your total and the time printed for mandelbrot_cpu_scalar.</p>
+<p>In the lab1 folder that git clone made, <code>mkdir -p out</code> makes the folder out, which dump_image writes into; writeBMP, which dump_image calls, opens the file with std::ofstream and never checks that the file opened, so without that folder the program finishes with no picture and no message. <code>g++ -O3 -march=native -std=c++17 mandelbrot_cpu.cpp -o mandelbrot_cpu</code> compiles the file with full optimization, -O3, allowing every instruction this CPU has, -march=native, as 2017 C++, into the program mandelbrot_cpu. <code>./mandelbrot_cpu</code> executes it with the defaults, 256 by 256 places and max_iters 1000: it computes the reference, prints your sum, times the reference, and then times the still empty vector function too, printing a number about it that this lesson does not use.</p>
+<p class="do">Execute it and write your sum and the time printed for mandelbrot_cpu_scalar.</p>
 <details><summary>CHECK</summary>
-<p>The laptop printed a total of 16,274,722 and a time of 61.6 ms. A different total means different counts at some places, so something in your build differs: a changed line of the reference, another img_size or max_iters, or a compiler that rounds some float step differently.</p>
+<p>The laptop printed a sum of 16,274,722 and a time of 61.6 ms. A different sum means different counts at some places, so something in your build differs: a change in the reference, another img_size or max_iters, or a compiler that rounds some float step differently.</p>
 </details>
-<p>Computed with the reference's own lines in 32-bit floats for all 256 x 256 = 65,536 places at max_iters 1000, the counts add up to 16,274,722, the laptop's printed total; 3,781 places have a count of 1, and 15,902 have a count of 1000.</p>
-<p class="do">A place stops after 1 repetition when the check before repetition 2 reads above 4, and after repetition 1, x = cx and y = cy, so that check reads cx x cx + cy x cy. Work it out at the corner place (0, 0) and at (64, 64).</p>
+<p>Computed by executing the reference's own arithmetic in 32-bit floats for all 256 * 256 = 65,536 places at max_iters 1000, the counts add up to 16,274,722, the laptop's printed sum; 3,781 places have a count of 1, and 15,902 have a count of 1000.</p>
+<p class="do">A place stops after 1 repetition when x2 + y2 before repetition 2 is above 4, and after repetition 1, x = cx and y = cy, so that sum is cx * cx + cy * cy. Work it out at the corner place (0, 0) and at (64, 64).</p>
 <details><summary>CHECK</summary>
-<pre>(0, 0):    cx = -2.0, cy = -1.25:   4.0 + 1.5625 = 5.5625, above 4   -&gt; count 1
-(64, 64):  1.890625 + 0.390625 = 2.28125, at most 4                -&gt; count at least 2</pre>
-<p>A count of 1 happens exactly where cx x cx + cy x cy is above 4, and the same computation counts 3,781 such places, the 3,781 with a count of 1.</p>
+<pre>at (0, 0):    cx = -2.0, cy = -1.25:   4.0 + 1.5625 = 5.5625, above 4   -&gt; count 1
+at (64, 64):  1.890625 + 0.390625 = 2.28125, at most 4                -&gt; count at least 2</pre>
+<p>A count of 1 happens exactly where cx * cx + cy * cy is above 4, and the same computation counts 3,781 such places, the 3,781 with a count of 1.</p>
 </details>
-<p class="do">Work out the average count per place, 16,274,722 / 65,536; the share of places that reach 1000, 15,902 / 65,536; and the share of all repetitions those places make, 15,902 x 1000 / 16,274,722.</p>
+<p class="do">Work out the average count per place, 16,274,722 / 65,536; the share of places that reach 1000, 15,902 / 65,536; and the share of all repetitions those places make, 15,902 * 1000 / 16,274,722.</p>
 <details><summary>CHECK</summary>
-<pre>average:            16,274,722 / 65,536      = 248.3 repetitions per place
-places at 1000:     15,902 / 65,536          = 24.3 percent of the places
-their repetitions:  15,902,000 / 16,274,722  = 97.7 percent of the repetitions</pre>
+<pre>16,274,722 / 65,536      = 248.3 repetitions per place on average
+15,902 / 65,536          = 24.3 percent of the places reach 1000
+15,902,000 / 16,274,722  = 97.7 percent of the repetitions are theirs</pre>
 </details>
 
 <h2 id="splitting-the-256-values-of-i-into-4-equal-parts">Splitting the 256 values of i into 4 equal parts</h2>
@@ -184,31 +176,31 @@ their repetitions:  15,902,000 / 16,274,722  = 97.7 percent of the repetitions</
 <p class="do">Check that the four bands add up to 16,274,722. Assume every repetition takes the same time, so a worker's time follows its repetitions and the job ends when the largest band ends. Call the speedup the time of 1 worker doing all of it divided by the time of the 4 together; work it out and set it beside 4. Then work out the first and the last band as shares of the largest.</p>
 <details><summary>CHECK</summary>
 <pre>462,567 + 7,558,684 + 7,747,009 + 506,462 = 16,274,722
-speedup = 16,274,722 / 7,747,009 = 2.10
-first band: 462,567 / 7,747,009 = 6.0 percent of the largest
-last band:  506,462 / 7,747,009 = 6.5 percent of the largest</pre>
+16,274,722 / 7,747,009 = 2.10, the speedup
+462,567 / 7,747,009 = 6.0 percent of the largest band, for the first
+506,462 / 7,747,009 = 6.5 percent of the largest band, for the last</pre>
 <p>The speedup is 2.10, not 4. The workers on the first and last bands finish after 6.0 and 6.5 percent of the time of the largest band and then wait, because the places with large counts sit together in the two middle bands.</p>
 </details>
-<p class="do">The laptop printed 61.6 ms for the reference, which makes all 16,274,722 repetitions in one call. Work out the time of one repetition, and yours from your own time and total.</p>
+<p class="do">The laptop printed 61.6 ms for the reference, which makes all 16,274,722 repetitions in one call. Work out the time of one repetition, and yours from your own time and sum.</p>
 <details><summary>CHECK</summary>
-<p>The time of one repetition is 0.0616 s / 16,274,722 = 3.79 ns on one core of the laptop. Dividing the whole time by the repetitions charges the rest of the function, the cx and cy lines and the stores, to the repetitions as well.</p>
+<p>The time of one repetition is 0.0616 s / 16,274,722 = 3.79 ns on one core of the laptop. Dividing the whole time by the repetitions charges the rest of the function, computing cx and cy and storing the counts, to the repetitions as well.</p>
 </details>
 
 <h2 id="gathering-what-the-numbers-say-about-the-work-per-place">Gathering what the numbers say about the work per place</h2>
-<p>Gathered together, at every img_size the places cover cx from -2.0 to below 0.5 and cy from -1.25 to below 1.25; every count lies between 1 and 1000; at (64, 64) the checks read 0, 2.28125, 1.2119140625 and 6.655015, so the direction of the last change before repetition 3 did not tell what came next; line B makes 2 x a x b out of w with 3 multiplies per repetition instead of 6, at the same 10 operations; 24.3 percent of the places make 97.7 percent of the 16,274,722 repetitions; 4 bands of 64 values of i give 2.10, not 4; and one repetition costs 3.79 ns on one core.</p>
+<p>At every img_size the places cover cx from -2.0 to below 0.5 and cy from -1.25 to below 1.25; every count lies between 1 and 1000; at (64, 64), x2 + y2 before repetitions 1 to 4 was 0, 2.28125, 1.2119140625 and 6.655015, so the direction of the last change before repetition 3 did not tell what came next; the new y gets 2 * a * b out of w, with 3 multiplies per repetition instead of 6, at the same 10 operations; 24.3 percent of the places make 97.7 percent of the 16,274,722 repetitions; 4 bands of 64 values of i give 2.10, not 4; and one repetition costs 3.79 ns on one core.</p>
 <p class="do">Write one sentence on what any faster version of this program has to respect about the work per place.</p>
 <details><summary>CHECK</summary>
 <p>A place's work ranges from 1 to 1000 repetitions, nothing on this page found a place's count without working its loop, and the places with large counts sit together, so a split of the picture between workers has to be judged by the repetitions each part carries, not by its number of places.</p>
 <p>The reading "65,536 equal tasks" fails on two numbers above: 24.3 percent of the places make 97.7 percent of the repetitions, and equal bands gave 2.10, not 4.</p>
 </details>
-<p>Some results look wrong and are not, or the other way round. A total of 0 means the added lines read result, which main has only filled with zeros at that point, instead of ref_result. A program that finishes without out/mandelbrot_cpu_scalar.bmp was executed without the folder out. A picture at -r 512 with the same shape as at 256 is correct, since cx and cy cover the same part of the graph paper at every img_size, only with more places.</p>
-<p>Without code, the program computes a picture of 65,536 places, and each place's number comes from a loop that reads only that place's own pair of fractions, so the places are separate calculations. They are far from equal: 24.3 percent of the places make 97.7 percent of the repetitions, the costly ones sit together, and splitting the picture into 4 equal bands gave 2.10 times the speed of one worker, not 4. For a manager, "we split the job into equal parts" says nothing until someone checks that the parts are equal in work, not only in size.</p>
-<p>The guess at the top has its answer: almost all, 97.7 percent of the 16,274,722 repetitions, come from the 15,902 places, 24.3 percent of the picture, that reach 1000.</p>
-<p class="do">A harder question to finish with. Without knowing any count in advance, how would you split the 256 values of i between 4 workers so that each carries about a quarter of the repetitions, and what speedup would that give?</p>
+<p>A sum of 0 means your added loop read result, which main has only filled with zeros at that point, instead of ref_result. A program that finishes without out/mandelbrot_cpu_scalar.bmp was executed without the folder out. A picture at -r 512 with the same shape as at 256 is correct, since cx and cy cover the same part of the graph paper at every img_size, only with more places.</p>
+<p>The program computes a picture of 65,536 places, and each place's number comes from a loop that reads only that place's own pair of fractions, so the places are separate calculations. They are far from equal: 24.3 percent of the places make 97.7 percent of the repetitions, the costly ones sit together, and splitting the picture into 4 equal bands gave 2.10 times the speed of one worker, not 4. "We split the job into equal parts" says nothing until someone checks that the parts are equal in work, not only in size.</p>
+<p>The share asked for before any arithmetic is almost all: 97.7 percent of the 16,274,722 repetitions come from the 15,902 places, 24.3 percent of the picture, that reach 1000.</p>
+<p class="do">Without knowing any count in advance, how would you split the 256 values of i between 4 workers so that each carries about a quarter of the repetitions, and what speedup would that give?</p>
 <details><summary>CHECK</summary>
-<p>Deal the values of i out in turns: worker k, for k = 0 to 3, takes i = k, k + 4, k + 8 and so on up to 252 + k, which is 16 values of i from each of the four bands, cheap and costly alike. Computed from the same counts, the workers then carry 4,095,090, 4,066,690, 4,047,903 and 4,065,039 repetitions, 25.2, 25.0, 24.9 and 25.0 percent, and the job ends with the largest: speedup = 16,274,722 / 4,095,090 = 3.97, out of 4. Dealing in turns used no count, only the fact found above that the places with large counts sit together.</p>
+<p>Deal the values of i out in turns: worker k, for k = 0 to 3, takes i = k, k + 4, k + 8 and so on up to 252 + k, which is 16 values of i from each of the four bands, cheap and costly alike. Computed from the same counts, the workers then carry 4,095,090, 4,066,690, 4,047,903 and 4,065,039 repetitions, 25.2, 25.0, 24.9 and 25.0 percent, and the job ends with the largest: 16,274,722 / 4,095,090 = 3.97, out of 4. Dealing in turns used no count, only the fact found above that the places with large counts sit together.</p>
 </details>
-<p>The lab pages <a href="../01-image-to-middleman.html">from (i, j) to the middleman pair</a>, <a href="../02-square-and-add.html">the while loop by hand</a> and <a href="../03-the-w-line.html">the w line</a> work the same ground at length, and the notes on <a href="middleman-pair.html">the middleman pair</a> and on <a href="iters.html">iters</a> hold the short versions.</p>
+<p>The lab pages <a href="../01-image-to-middleman.html">from (i, j) to the middleman pair</a>, <a href="../02-square-and-add.html">the while loop by hand</a> and <a href="../03-the-w-line.html">where the squaring went</a> work the same ground at length, and the notes on <a href="middleman-pair.html">the middleman pair</a> and on <a href="iters.html">iters</a> hold the short versions.</p>
 
 <nav class="pager"><a href="lesson-00-setup.html">&larr; Lesson 0. Set up your machine and read the starter program</a><a class="next" href="lesson-02-gpu-one-thread.html">Lesson 2. The picture on one GPU thread &rarr;</a></nav>
 </main>
