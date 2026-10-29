@@ -41,7 +41,7 @@ WARP_OK = {"11-program-counter.html", "12-the-48-trap.html", "13-the-864-cliff.h
            "notes/warp.html", "notes/filling-the-wait.html", "notes/register-budget.html", "notes/program-counter.html", "notes/index.html",
            "notes/lesson-04-gpu-32-threads.html", "notes/lesson-06-how-many-threads.html", "notes/lesson-08-independent-work.html",
            "notes/lesson-09-many-cores.html", "notes/lesson-10-many-threads.html"}
-OUTPUT_OK = re.compile(r"Latency of \w+ code snippet")
+OUTPUT_OK = re.compile(r"Latency of \w+ code snippet|\"Running \"|\"\s*Runtime: \"")  # strings printed by the starter code
 
 # Prose style of the tutorial (notes/MIT-6.S894.html, notes/lesson-*.html).
 TUTORIAL = re.compile(r"notes/(MIT-6\.S894|lesson-[^/]*)\.html$")
@@ -60,7 +60,8 @@ LABEL = re.compile(
 )
 LEFTOVER = re.compile(r"\bL\d\d\b|____")
 # Tutorial pages rebuilt under the axiom audit (see CLAUDE.md); a lesson joins this set once it is rebuilt.
-REBUILT = {"notes/MIT-6.S894.html", "notes/lesson-01-reference.html"}
+REBUILT = {"notes/MIT-6.S894.html", "notes/lesson-00-setup.html", "notes/lesson-01-reference.html", "notes/lesson-02-gpu-one-thread.html",
+           "notes/lesson-03-cpu-vector.html"}
 LABELLING = re.compile(
     r"\b(lines?|read in english|gathered together|without code|for a manager|the guess at the top|"
     r"a harder question to finish with)\b",

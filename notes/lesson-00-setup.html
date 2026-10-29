@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Get the Lab 1 and Lab 2 starter code, compile it on your own computer, and read what the untouched program prints, including the 0.248 that an empty function prints.">
+<meta name="description" content="Get the Lab 1 and Lab 2 starter code, ask your CPU which vector instructions it has and your GPU which -arch it needs, compile both Lab 1 files, and work out the 0.248 that an empty function prints.">
 <meta name="keywords" content="lesson">
 <title>Lesson 0: Setup</title>
 <link rel="stylesheet" href="../style.css">
@@ -16,89 +16,186 @@
 <main>
 <p class="crumbs"><a href="MIT-6.S894.html">MIT 6.S894 tutorial</a> / Lesson 0</p>
 <h1>Lesson 0. Set up your machine and read the starter program</h1>
-<p class="sub">This lesson comes before Lab 1 and builds nothing. It puts the starter code of both labs on your own computer, compiles it, and reads what the untouched program prints; it needs Linux or WSL2 on Windows, g++ and git, and for the GPU half an NVIDIA GPU with its driver and the CUDA toolkit. Paragraphs with a red rule beside them are for your pencil; work each one before opening its CHECK.</p>
-<p>Students enrolled in MIT 6.S894 send their code to the course's machines with a tool called telerun, which needs a course account. Without one, every lab here is compiled and timed on your own computer, and that changes three things at once: which CPU instructions exist, which GPU executes the kernels, and every number you measure. Every measured number on these pages comes from one laptop, a Ryzen 5 4600H CPU with a GTX 1650 GPU, so each of yours can be set beside it.</p>
+<p class="sub">This lesson comes before Lab 1 and builds nothing. It puts the starter code of both labs on your own computer, compiles it, and reads what the untouched programs print. You need Linux, or Windows with WSL2, with g++ and git, and for the GPU half an NVIDIA GPU with its driver and the CUDA toolkit. Paragraphs with a red rule beside them are for your pencil; work each one before opening its CHECK.</p>
+<p>Students enrolled in MIT 6.S894 send their code to the course's machines with a tool called telerun, as the course's handouts describe. This tutorial compiles and times every lab on your own computer instead, and that changes three things: which instructions your CPU has, which GPU executes your code, and every time you measure. The measured numbers on these pages come from one laptop, with a Ryzen 5 4600H CPU and a GTX 1650 GPU, so that yours can be set beside them. The Lab 1 starter program compiles and executes before you write anything: it holds a finished function, the reference, which every version you write is compared with, and empty functions for you to fill, and it prints a time and a comparison with the reference even for the empty ones. What does a function that does nothing print, and what does that number say about whether your setup works?</p>
 <p>The first question at this point, asked by the owner of that laptop, was whether any of this depends on installed software:</p>
 <p class="you">"Even if I don't install CUDA libraries, even if I don't even open NVIDIA website ever on my laptop, these things just remain, yes or no" / "A block need not exist at all. But wrap scheduler always exists. So why would a wrap scheduler even know about blocks" / "the total number of threads which I can run on my hardware is what? 14 times 4 times 32, is this true or false?"</p>
-<p>It does not. The instructions a CPU has and the generation a GPU belongs to are fixed in the chips, and both can be read off before a single line is compiled. The starter program, too, can be compiled and executed before you write a line of your own: it times the reference function, compares your function with it, and prints a result even while your function is still empty. What does a function that does nothing print, and how does that one number tell you whether your setup works?</p>
-<p class="do">Before compiling anything, write down a guess. The vector function in the Lab 1 starter is empty, yet the program still compares its output with the reference and prints an "average output difference". Is the printed number 0, 1, or something in between, and if in between, which value?</p>
+<p>It does not. The instructions a CPU has and the generation a GPU belongs to are built into the chips, software only reads them, and both can be read before anything is compiled.</p>
+<p class="do">Write a guess before compiling anything. The starter's vector function, <code>mandelbrot_cpu_vector</code>, is empty, yet the program still compares its answer with the reference's answer and prints a number it calls the average output difference. Is that number 0, 1 or something in between, and if in between, which value?</p>
 
-<h2 id="lab-1-assumes-16-floats-per-instruction-and-the-laptop-has-8">Lab 1 assumes 16 floats per instruction, and the laptop has 8</h2>
-<p>The Fall 2025 Lab 1 handout targets AVX-512, CPU instructions that act on 512 bits at once, and a float takes 32 bits. The Ryzen 5 4600H in the laptop has AVX2 instead, whose instructions act on 256 bits. On Linux or WSL2 the CPU lists the instruction sets it has in /proc/cpuinfo, and one command picks out the two that matter here.</p>
+<h2 id="asking-your-cpu-which-vector-instructions-it-has">Asking your CPU which vector instructions it has</h2>
+<p>The Fall 2025 Lab 1 handout's vector part uses AVX-512, CPU instructions that act on 512 bits at once, while a float is a fraction stored in 32 bits. The Ryzen 5 4600H in the laptop has AVX2 instead, whose instructions act on 256 bits. On Linux, and on WSL2, the file /proc/cpuinfo lists, among other things, the instruction sets the CPU has, and this command picks out the two that matter here:</p>
 <pre>grep -o -w -e avx2 -e avx512f /proc/cpuinfo | sort -u</pre>
-<p>Read in English, the command searches the CPU's own description for the words avx2 and avx512f and prints each word it finds, once.</p>
-<p class="do">Divide 512 by 32 and 256 by 32 to get the floats per instruction of each set. Then execute the command and note which of the two words your CPU printed, since that decides how many places your Lab 1 vector code can handle per instruction.</p>
+<p>grep searches /proc/cpuinfo for the whole words avx2 and avx512f, -o makes it print only each word it finds, and sort -u sorts what it printed and keeps each word once.</p>
+<p class="do">Divide 512 by 32 and 256 by 32 to get the floats each set holds in one instruction. Then execute the command and write which of the two words your CPU printed.</p>
 <details><summary>CHECK</summary>
-<p>AVX-512 holds 512 / 32 = 16 floats and AVX2 holds 256 / 32 = 8. The laptop prints only avx2, because its Zen 2 cores have no AVX-512, so its vector code works on 8 places per instruction.</p>
-<p>Code written with AVX-512 instructions stops on such a CPU with "Illegal instruction" at the first one it reaches.</p>
+<p>AVX-512 holds 512 / 32 = 16 floats per instruction and AVX2 holds 256 / 32 = 8. The laptop printed only avx2, because its cores, of the design AMD calls Zen 2, have no AVX-512, so vector code on it handles 8 floats per instruction.</p>
+<p>A CPU refuses an instruction it does not have, and Linux then stops the program with the message Illegal instruction, so code written with AVX-512 instructions stops on such a CPU at the first of them it reaches.</p>
 </details>
 
-<h2 id="your-gpu-s-generation-is-the-number-after-arch">Your GPU's generation is the number after -arch</h2>
-<p>An NVIDIA GPU belongs to a generation, named by a pair of numbers called its compute capability, which NVIDIA's CUDA programming guide lists for every GPU; the GTX 1650 is 7.5, the generation NVIDIA calls Turing. The nvcc flag -arch=sm_75 makes nvcc produce machine instructions for 7.5, so a listing of the compiled file shows exactly what that GPU executes. A value that does not match the GPU gives a program whose kernels never begin, and it reports "no kernel image is available for execution on the device". The driver and the toolkit report what is needed.</p>
+<h2 id="asking-your-gpu-which-arch-it-needs">Asking your GPU which -arch it needs</h2>
+<p>A function that executes on the GPU is called a kernel. An NVIDIA GPU belongs to a generation named by a pair of numbers, its compute capability, which NVIDIA's CUDA programming guide lists for every GPU; the GTX 1650 is 7.5, the generation NVIDIA calls Turing. The nvcc flag -arch=sm_75 makes nvcc produce machine instructions for compute capability 7.5, together with a portable form that a GPU of a later generation can translate, as nvcc's documentation describes. A program compiled with an -arch above your GPU's compute capability therefore cannot start its kernels there, and CUDA reports no kernel image is available for execution on the device as soon as the program launches one. The NVIDIA driver and the CUDA toolkit report what you have:</p>
 <pre>nvidia-smi --query-gpu=name,compute_cap --format=csv
 nvcc --version</pre>
-<p>The first line asks the NVIDIA driver for the GPU's name and compute capability, printed as comma-separated text; the second prints the version of the CUDA compiler.</p>
+<p>nvidia-smi asks the NVIDIA driver for the GPU's name and compute capability and prints them as comma-separated text, and nvcc --version prints the version of the CUDA compiler.</p>
 <p class="do">Write your GPU's name and compute capability, the -arch flag that follows from it, and your nvcc version.</p>
 <details><summary>CHECK</summary>
-<p>The laptop reports an NVIDIA GeForce GTX 1650 with compute capability 7.5, so its flag is -arch=sm_75, and its nvcc is release 12.4.</p>
-<p>If nvcc stops with "unsupported GNU version", your g++ is newer than your CUDA version accepts. NVIDIA's installation guide for your CUDA version lists the accepted ones, and nvcc's -ccbin option points it at an older g++ once one is installed.</p>
+<p>The laptop reported an NVIDIA GeForce GTX 1650 with compute capability 7.5, so its flag is -arch=sm_75, and its nvcc is release 12.4.</p>
+<p>If nvcc stops with unsupported GNU version, your g++ is newer than your CUDA version accepts. NVIDIA's installation guide for your CUDA version lists the g++ versions it accepts, and nvcc's -ccbin option points it at an accepted one once that is installed.</p>
 </details>
 
-<h2 id="fetching-the-labs-takes-four-commands-and-the-last-prevents">Fetching the labs takes four commands, and the last prevents a silent failure</h2>
+<h2 id="fetching-both-labs-and-reading-the-cpu-file-s-main">Fetching both labs and reading the CPU file's main</h2>
 <pre>git clone https://github.com/accelerated-computing-class/lab1.git
 git clone https://github.com/accelerated-computing-class/lab2.git
 cd lab1
 mkdir -p out</pre>
-<p>The first command copies the Lab 1 starter code from the course's public repository into a new folder named lab1, and the second does the same for Lab 2. The third moves into lab1. The fourth makes a folder named out, where the program writes its pictures; when that folder is missing the program writes none and reports nothing, so an execution that finishes without pictures is the first thing that can go wrong without any message.</p>
-<p>The file <code>mandelbrot_cpu.cpp</code> holds three things: <code>mandelbrot_cpu_scalar</code>, the reference, already written; <code>mandelbrot_cpu_vector</code>, empty, which part 2 of the lab asks you to write; and a main that computes the reference once, then times each version and prints its time, and for the vector version also its average output difference from the reference. The picture is 256 by 256 places with at most 1000 repetitions each, unless the flags -r and -b set other values.</p>
+<p>git clone copies the Lab 1 starter code from the course's public repository into a new folder named lab1, and the second git clone does the same for Lab 2, into lab2. cd lab1 moves into the Lab 1 folder, and mkdir -p out makes a folder named out, into which the programs write their pictures. The starter writes each picture through its function writeBMP, which opens the file with std::ofstream and never checks that the file opened, so without the folder out the program writes no picture and prints nothing about it.</p>
+<p>The file <code>mandelbrot_cpu.cpp</code> holds <code>mandelbrot_cpu_scalar</code>, the reference, already written; <code>mandelbrot_cpu_vector</code>, empty, which part 2 of the lab asks you to write; and main, the function where the program begins. Cut to what this lesson uses, main reads:</p>
+<pre>uint32_t img_size = 256;
+uint32_t max_iters = 1000;
+enum MandelbrotImpl impl = ALL;
+if (ParseArgsAndMakeSpec(argc, argv, &amp;img_size, &amp;max_iters, &amp;impl))
+    return -1;
+std::vector&lt;uint32_t&gt; result(img_size * img_size);
+std::vector&lt;uint32_t&gt; ref_result(img_size * img_size);
+mandelbrot_cpu_scalar(img_size, max_iters, ref_result.data());
+if (impl == SCALAR || impl == ALL) {
+    memset(result.data(), 0, sizeof(uint32_t) * img_size * img_size);
+    BENCHPRESS(mandelbrot_cpu_scalar, img_size, max_iters, result.data());
+    dump_image("out/mandelbrot_cpu_scalar.bmp", img_size, max_iters, result);
+}
+if (impl == VECTOR || impl == ALL) {
+    memset(result.data(), 0, sizeof(uint32_t) * img_size * img_size);
+    BENCHPRESS(mandelbrot_cpu_vector, img_size, max_iters, result.data());
+    dump_image("out/mandelbrot_cpu_vector.bmp", img_size, max_iters, result);
+    std::cout &lt;&lt; "  Correctness: average output difference from reference = "
+              &lt;&lt; difference(img_size, max_iters, result, ref_result) &lt;&lt; std::endl;
+}</pre>
+<p>main sets img_size to 256, max_iters to 1000 and impl, the choice of versions to time, to all of them. ParseArgsAndMakeSpec, defined in the same file, changes img_size when the program is given -r and a size, which must be a multiple of 32, changes max_iters when given -b and a number, and changes impl when given -i scalar or -i vector; it then prints the size and max_iters it ended with, as in <code>Testing with image size 256x256 and 1000 max iterations.</code> main makes two arrays of img_size times img_size 32-bit whole numbers, result and ref_result, and computes the reference once into ref_result: the reference stores one whole number for every pair (i, j), with i and j each from 0 to img_size - 1, at entry i times img_size plus j, as its code in the same file shows. Then, for each version chosen, main sets result to 0 with memset, times the version with the macro BENCHPRESS, whose calls of the version fill result, and writes result as a picture with dump_image; after the vector version it also prints the number that the function difference computes from result and ref_result.</p>
+<p>BENCHPRESS and difference are defined in the same file:</p>
+<pre>static constexpr size_t kNumOfOuterIterations = 10;
+static constexpr size_t kNumOfInnerIterations = 1;
+#define BENCHPRESS(func, ...) \
+    do { \
+        std::cout &lt;&lt; "Running " &lt;&lt; #func &lt;&lt; " ...\n"; \
+        std::vector&lt;double&gt; times(kNumOfOuterIterations); \
+        for (size_t i = 0; i &lt; kNumOfOuterIterations; ++i) { \
+            auto start = std::chrono::high_resolution_clock::now(); \
+            for (size_t j = 0; j &lt; kNumOfInnerIterations; ++j) { \
+                func(__VA_ARGS__); \
+            } \
+            auto end = std::chrono::high_resolution_clock::now(); \
+            times[i] = std::chrono::duration_cast&lt;std::chrono::nanoseconds&gt;(end - start) \
+                           .count() / \
+                kNumOfInnerIterations; \
+        } \
+        std::sort(times.begin(), times.end()); \
+        std::cout &lt;&lt; "  Runtime: " &lt;&lt; times[0] / 1'000'000 &lt;&lt; " ms" &lt;&lt; std::endl; \
+    } while (0)</pre>
+<p>kNumOfOuterIterations is 10 and kNumOfInnerIterations is 1. BENCHPRESS prints the name of the function, makes room for 10 times, and 10 times over reads the clock, calls the function once, reads the clock again and keeps the difference in nanoseconds. Then it sorts the 10 times and prints the smallest, times[0], divided by 1,000,000, so in milliseconds.</p>
+<pre>double difference(
+    uint32_t img_size,
+    uint32_t max_iters,
+    std::vector&lt;uint32_t&gt; &amp;result,
+    std::vector&lt;uint32_t&gt; &amp;ref_result) {
+    int64_t diff = 0;
+    for (uint32_t i = 0; i &lt; img_size; i++) {
+        for (uint32_t j = 0; j &lt; img_size; j++) {
+            diff +=
+                abs(int(result[i * img_size + j]) - int(ref_result[i * img_size + j]));
+        }
+    }
+    return diff / double(img_size * img_size * max_iters);
+}</pre>
+<p>difference adds up, over every pair (i, j), the size of the gap between result and ref_result, in a 64-bit whole number diff, and returns diff divided by img_size times img_size times max_iters.</p>
+
+<h2 id="compiling-and-executing-the-cpu-file">Compiling and executing the CPU file</h2>
 <pre>g++ -O3 -march=native -std=c++17 mandelbrot_cpu.cpp -o mandelbrot_cpu
 ./mandelbrot_cpu</pre>
-<p>In the first line, -O3 asks for full optimization, -march=native allows every instruction this CPU has, AVX2 included, -std=c++17 selects the 2017 C++ standard, and -o names the program mandelbrot_cpu. The second line executes it with the default picture.</p>
-<p>The starter times each version with a macro named BENCHPRESS, which calls the function 10 times, times each call, sorts the 10 times and prints the smallest.</p>
-<p class="do">The laptop printed 61.6 ms as the time of <code>mandelbrot_cpu_scalar</code>. Write your own time and divide it by 61.6. Then work out why the starter prints the smallest of its 10 calls rather than their average, given that another program on the machine can only ever make a call slower.</p>
+<p>g++ compiles the file with full optimization, -O3, allowing every instruction this CPU has, AVX2 included, -march=native, as 2017 C++, -std=c++17, into the program named by -o, mandelbrot_cpu. ./mandelbrot_cpu executes it with the defaults, 256 by 256 pairs and max_iters 1000: it computes the reference, times the reference with BENCHPRESS, then times the empty vector function and prints its average output difference.</p>
+<p class="do">The laptop printed 61.6 ms as the time of <code>mandelbrot_cpu_scalar</code>. Write your own time and divide it by 61.6. Then work out why BENCHPRESS prints the smallest of its 10 times rather than their average, given that another program on the machine can only ever make a call slower.</p>
 <details><summary>CHECK</summary>
-<p>A disturbance only adds time, so the smallest of the 10 calls is the one closest to what the code itself costs. The price is that the smallest hides how much the calls varied: the times 10, 11, 10, 30 and 14 ms print as 10.</p>
-<p>Your ratio to 61.6 is the factor to keep in mind whenever a later time of yours is set beside the laptop's.</p>
+<p>A disturbance only adds time, so the smallest of the 10 times is the one closest to what the code itself costs. The price is that the smallest hides how much the calls varied: times of 10, 11, 10, 30 and 14 ms print as 10.</p>
+<p>Your time divided by 61.6 is your machine's time for this function as a multiple of the laptop's.</p>
 </details>
 
-<h2 id="an-empty-function-prints-0-248-and-that-number-proves-the-ch">An empty function prints 0.248, and that number proves the check works</h2>
-<p>Before the vector version is timed, main fills its result array with 0. Afterwards it adds up, over every place, the gap between the result and the reference's count of repetitions, and divides the sum by img_size times img_size times max_iters. On the laptop, the reference's counts for the 256 by 256 picture add up to 16,274,722, a total that a few added lines of its main printed as the CPU total.</p>
-<p class="do">With <code>mandelbrot_cpu_vector</code> still empty, the result stays 0 at every place. Work out the printed difference, 16,274,722 divided by 256 times 256 times 1000. Then work it out a second way, as the average count per place, 16,274,722 / 65,536, divided by max_iters, 1000. What must a correct vector version print?</p>
+<h2 id="working-out-what-the-empty-vector-function-prints">Working out what the empty vector function prints</h2>
+<p>Before the vector version is timed, memset sets every entry of result to 0, and BENCHPRESS then calls <code>mandelbrot_cpu_vector</code>, which does nothing, so result is still 0 at every pair when difference reads it. On the laptop, the reference's numbers for the default picture, 256 by 256 pairs with max_iters 1000, add up to 16,274,722, a sum that a loop added to main computed and printed.</p>
+<p class="do">With result 0 at every pair, each gap that difference adds is the reference's own number. Work out what difference returns, 16,274,722 divided by 256 times 256 times 1000. Then work it out a second way, as the average number per pair, 16,274,722 / 65,536, divided by max_iters, 1000. What must a correct vector version print?</p>
 <details><summary>CHECK</summary>
-<pre>256 x 256 x 1000 = 65,536,000
+<pre>256 * 256 * 1000 = 65,536,000
 16,274,722 / 65,536,000 = 0.2483
 
-16,274,722 / 65,536 = 248.3 repetitions per place
+256 * 256 = 65,536 pairs
+16,274,722 / 65,536 = 248.3 per pair
 248.3 / 1000 = 0.2483</pre>
-<p>Both ways give 0.2483: an empty function is wrong by the whole picture, and a correct version prints exactly 0. If your machine prints about 0.248 now, both the reference and the check work.</p>
-</details>
-<p>The GPU file follows the same pattern; compile and execute it with your own number in place of 75.</p>
-<pre>nvcc -O3 -arch=sm_75 -std=c++17 mandelbrot_gpu.cu -o mandelbrot_gpu
-./mandelbrot_gpu</pre>
-<p>The first line compiles the CUDA file with full optimization, for compute capability 7.5, as 2017 C++, into the program mandelbrot_gpu. The second executes it: it computes the reference on the CPU, then times the two GPU versions.</p>
-<p>Its timing differs from the CPU file's. It repeats a measurement 5 times, and each time it calls the launch function 3 times, waits for the GPU to finish with <code>cudaDeviceSynchronize</code> and divides the time by 3; it prints the smallest of the 5 results. The launch functions in the starter are empty, so they start nothing on the GPU.</p>
-<p class="do">Write the difference you expect for each empty GPU version, and what the printed time of an empty launch function measures. Which of all your versions prints the shortest time?</p>
-<details><summary>CHECK</summary>
-<p>About 0.248 for both, for the reason computed above. The printed time is three calls of an empty CPU function plus a wait on an idle GPU, a few microseconds.</p>
-<p>The empty versions print the shortest times of all, so a short time next to 0.248 is a function that did nothing.</p>
+<p>Both ways give 0.2483: the empty function is wrong by the whole of every number. A correct version leaves result equal to ref_result at every pair, so every gap is 0 and it prints exactly 0. A machine that prints about 0.248 now has a reference that produced about the laptop's sum and a difference function that computed it.</p>
 </details>
 
-<h2 id="a-time-printed-without-its-difference-proves-nothing">A time printed without its difference proves nothing</h2>
-<p>This page has produced the numbers every later lesson is measured against: how many floats your vector instructions hold, 8 on the laptop or 16 with AVX-512; the -arch value of your GPU; your scalar time beside the laptop's 61.6 ms; and the 0.248 that an empty function prints, together with the fact that the empty functions also print the shortest times.</p>
-<p class="do">Write those three reference numbers on one line, and under them one sentence on why a printed time without the printed difference proves nothing.</p>
+<h2 id="compiling-the-gpu-file-and-reading-its-timing">Compiling the GPU file and reading its timing</h2>
+<p>The GPU file, <code>mandelbrot_gpu.cu</code>, holds the same reference, computed on the CPU, and for each GPU version a pair of empty functions: the kernel and a launch function that executes on the CPU and is meant to start it.</p>
+<pre>__global__ void mandelbrot_gpu_scalar(
+    uint32_t img_size,
+    uint32_t max_iters,
+    uint32_t *out /* pointer to GPU memory */
+) {
+    /* your (GPU) code here... */
+}
+
+void launch_mandelbrot_gpu_scalar(
+    uint32_t img_size,
+    uint32_t max_iters,
+    uint32_t *out /* pointer to GPU memory */
+) {
+    /* your (CPU) code here... */
+}</pre>
+<p>__global__ marks mandelbrot_gpu_scalar as a kernel; it receives img_size, max_iters and out, an address in the graphics card's memory, and its body is left for you. launch_mandelbrot_gpu_scalar is an ordinary function that executes on the CPU, receives the same three values and is meant to start the kernel; its body is empty too, so as given it starts nothing on the GPU.</p>
+<pre>static constexpr size_t kNumOfOuterIterations = 5;
+static constexpr size_t kNumOfInnerIterations = 3;
+#define BENCHPRESS(func, ...) \
+    do { \
+        std::cout &lt;&lt; "Running " &lt;&lt; #func &lt;&lt; " ...\n"; \
+        std::vector&lt;double&gt; times(kNumOfOuterIterations); \
+        for (size_t i = 0; i &lt; kNumOfOuterIterations; ++i) { \
+            auto start = std::chrono::high_resolution_clock::now(); \
+            for (size_t j = 0; j &lt; kNumOfInnerIterations; ++j) { \
+                func(__VA_ARGS__); \
+            } \
+            CUDA_CHECK(cudaDeviceSynchronize()); \
+            auto end = std::chrono::high_resolution_clock::now(); \
+            times[i] = std::chrono::duration_cast&lt;std::chrono::nanoseconds&gt;(end - start) \
+                           .count() / \
+                kNumOfInnerIterations; \
+        } \
+        std::sort(times.begin(), times.end()); \
+        std::cout &lt;&lt; "  Runtime: " &lt;&lt; times[0] / 1'000'000 &lt;&lt; " ms" &lt;&lt; std::endl; \
+    } while (0)</pre>
+<p>Here kNumOfOuterIterations is 5 and kNumOfInnerIterations is 3. Over 5 measurements, BENCHPRESS reads the clock, calls the launch function 3 times, waits with cudaDeviceSynchronize until the GPU has finished everything sent to it, reads the clock again and divides the time by 3; it prints the smallest of the 5 results, in milliseconds. Before timing, the GPU file's main sets the GPU's copy of the result to 0 with cudaMemset, and afterwards it copies the result back to the CPU with cudaMemcpy and prints its average output difference from the reference.</p>
+<pre>nvcc -O3 -arch=sm_75 -std=c++17 mandelbrot_gpu.cu -o mandelbrot_gpu
+./mandelbrot_gpu</pre>
+<p>nvcc compiles the CUDA file with full optimization for compute capability 7.5, as 2017 C++, into the program mandelbrot_gpu; put your own number in place of 75. ./mandelbrot_gpu computes the reference on the CPU and then times both GPU versions.</p>
+<p class="do">Write the average output difference you expect for each empty GPU version, and what the printed time of an empty launch function measures. Then execute the program and write which of all your versions printed the shortest time.</p>
 <details><summary>CHECK</summary>
-<p>Your floats per instruction, your scalar time, which is the baseline of every later speedup, and the difference, 0.248 for an empty function and exactly 0 for a correct one.</p>
-<p>A time says how long something took, not what it computed, and the empty functions print the shortest times of all. So the reading "it compiled, finished and printed a time, so the setup works" does not survive this page: an empty function also compiles, finishes and prints a time.</p>
+<p>Both print about 0.248: the GPU's result stays 0 at every pair, and the reference is the same, so difference returns 16,274,722 / 65,536,000 again. The printed time is 3 calls of an empty CPU function plus one cudaDeviceSynchronize on an idle GPU, divided by 3, so it is tiny.</p>
+<p>The empty versions print the shortest times of all, since they do nothing, so a short time next to 0.248 is a function that did nothing.</p>
 </details>
-<p>Before any of this, the setup can stop with a message. "Illegal instruction" as soon as a vector version begins means AVX-512 code on a CPU that has only AVX2; "unsupported GNU version" from nvcc means a g++ newer than your CUDA version accepts; "no kernel image is available for execution on the device" means an -arch value that does not match the GPU. The silent failures are worse: a missing out folder leaves no pictures and no message, and an empty or missing launch leaves 0.248 and a tiny time.</p>
-<p>Without any code, the point of this lesson is that two instruments come before any speed-up, a clock and a check that the output is right. A function that does nothing tests both at once, because the clock must show it as fast and the check must show it as completely wrong, and a report that shows only times can rank such a function first.</p>
-<p>The guess at the top has its answer now: the empty function prints about 0.248, which is 16,274,722 / 65,536,000, the average of 248.3 repetitions per place divided by 1000.</p>
-<p class="do">A harder question to finish with. The GPU file prints a few microseconds for the empty launch function, and a colleague calls that the cost of one kernel launch and subtracts it from every later GPU time. What is wrong with that, and what would measure the cost of a launch?</p>
+
+<h2 id="gathering-the-numbers-your-setup-produced">Gathering the numbers your setup produced</h2>
+<p>Your CPU's vector instructions hold 8 floats with AVX2 or 16 with AVX-512; your GPU's compute capability gives your -arch; the reference took 61.6 ms on the laptop, with your own time beside it; and an empty function prints an average output difference of 0.2483 while printing the shortest time of all.</p>
+<p class="do">Write your floats per instruction, your -arch and your time for the reference, then one sentence on why a printed time without the printed difference proves nothing.</p>
 <details><summary>CHECK</summary>
-<p>The empty launch function launches nothing, so its time is three calls of an empty CPU function plus <code>cudaDeviceSynchronize</code> on an idle GPU. A real launch also hands a kernel to the GPU and waits for it to begin and end.</p>
-<p>Timing an empty __global__ kernel launched &lt;&lt;&lt;1, 1&gt;&gt;&gt;, 3 times followed by one <code>cudaDeviceSynchronize</code>, exactly as the starter times the real kernels, measures that cost, and only measurements taken the same way may be subtracted from each other.</p>
+<p>A time says how long something took, not what it computed, and the empty functions printed the shortest times of all.</p>
+<p>The reading "it compiled, finished and printed a time, so the setup works" fails, because an empty function also compiles, finishes and prints a time, next to a difference of 0.2483.</p>
 </details>
-<p>Page 00 of the lab pages, <a href="../00-what-a-gpu-is.html">what a GPU is, measured on one laptop</a>, sets the laptop's CPU and GPU side by side in full, and page 15, <a href="../15-trusting-a-number.html">what the two printed numbers can hide</a>, takes the printed difference apart. The short notes on <a href="sm.html">the block of hardware a GPU chip is built from</a> and on <a href="checking-the-output.html">what the printed difference can hide</a> cover the same ground in a minute each.</p>
+<p>Illegal instruction as soon as a vector version begins means AVX-512 code on a CPU that has only AVX2. unsupported GNU version from nvcc means a g++ newer than your CUDA version accepts. no kernel image is available for execution on the device means an -arch above your GPU's compute capability. The quiet failures are worse: a missing out folder leaves no pictures and no message, and an empty launch function leaves 0.248 and a tiny time.</p>
+<p>Before a program can be made faster, two instruments are needed: a clock, and a check that the output is right. A function that does nothing tests both at once, because the clock must show it as fast and the check must show it as completely wrong. A speed number means nothing without the correctness number next to it, and a report that shows only times can rank a function that does nothing first.</p>
+<p>The number asked for before compiling is in between: about 0.248, which is 16,274,722 / 65,536,000, the average of 248.3 per pair divided by 1000.</p>
+<p class="do">The GPU file prints a tiny time for the empty launch function, and a colleague calls it the cost of one kernel launch and subtracts it from every later GPU time. What is wrong with that, and what would measure the cost of a launch?</p>
+<details><summary>CHECK</summary>
+<p>The empty launch function launches nothing, so its time is 3 calls of an empty CPU function plus cudaDeviceSynchronize on an idle GPU. A real launch also hands a kernel to the GPU and waits for it to begin and end.</p>
+<p>Timing a launch function that does start a kernel, one whose body is empty, called 3 times and followed by one cudaDeviceSynchronize, exactly as BENCHPRESS times the real versions, measures that cost, and only measurements taken the same way may be subtracted from each other.</p>
+</details>
+<p>The lab pages <a href="../00-what-a-gpu-is.html">what a GPU is, measured on one laptop</a> and <a href="../15-trusting-a-number.html">what the two printed numbers can hide</a> set out the laptop's hardware and take the printed difference apart at length, and the notes on <a href="sm.html">the block of hardware a GPU chip is built from</a> and on <a href="checking-the-output.html">what the printed difference can hide</a> hold the short versions.</p>
 
 <nav class="pager"><a href="MIT-6.S894.html">&larr; Course page</a><a class="next" href="lesson-01-reference.html">Lesson 1. The reference program, by hand &rarr;</a></nav>
 </main>

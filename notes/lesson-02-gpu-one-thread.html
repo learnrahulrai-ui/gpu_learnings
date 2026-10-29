@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Write the first kernel and its launch, check that it prints exactly 0, and work out why one GPU thread took 403 ms against 61.6 ms on one CPU core.">
+<meta name="description" content="Write the first kernel and its launch, check that it prints exactly 0, and time one GPU thread against one CPU core on the same 16,274,722 repetitions.">
 <meta name="keywords" content="lesson">
 <title>Lesson 2: One GPU Thread</title>
 <link rel="stylesheet" href="../style.css">
@@ -16,13 +16,39 @@
 <main>
 <p class="crumbs"><a href="MIT-6.S894.html">MIT 6.S894 tutorial</a> / Lesson 2</p>
 <h1>Lesson 2. The picture on one GPU thread</h1>
-<p class="sub">This lesson covers Lab 1, part 1, on the GPU, where you write mandelbrot_gpu_scalar and launch_mandelbrot_gpu_scalar. It needs an NVIDIA GPU and the Lab 1 folder compiled. Paragraphs with a red rule beside them are for your pencil; work each one before opening its CHECK.</p>
-<p>The first GPU task of Lab 1 moves the reference loop onto the GPU unchanged, executed by a single GPU thread. It needs a pair of functions: the kernel, which executes on the GPU, and the launch function, which executes on the CPU and starts the kernel. The result surprises most people, because a graphics card with hundreds of arithmetic circuits, given the whole picture, takes several times longer than one CPU core, and the Fall 2025 handout's first question asks for exactly that comparison and its causes. What does one GPU thread have, compared with one CPU core, and which measured number shows it?</p>
-<p>The question underneath it, in the words of the owner of the laptop, is what the step from definitions to a working kernel consists of:</p>
+<p class="sub">This lesson covers Lab 1, part 1, on the GPU, where you write <code>mandelbrot_gpu_scalar</code> and <code>launch_mandelbrot_gpu_scalar</code> in the starter file <code>mandelbrot_gpu.cu</code>. You need an NVIDIA GPU with its driver, the CUDA toolkit, and the Lab 1 starter folder, fetched with <code>git clone https://github.com/accelerated-computing-class/lab1.git</code>. Paragraphs with a red rule beside them are for your pencil; work each one before opening its CHECK.</p>
+<p>The first GPU task of Lab 1 moves the reference function, <code>mandelbrot_cpu_scalar</code>, onto the GPU unchanged and has a single GPU thread execute all of it. It needs a pair of functions: a kernel, which executes on the GPU, and a launch function, which executes on the CPU and starts the kernel. The Fall 2025 handout's first question asks how the time of this GPU version compares with the time of the reference on one CPU core, and what explains each. What does one GPU thread have, compared with one CPU core, and which measured number shows it?</p>
+<p>The question underneath it, in the words of the owner of the laptop these pages measure, was what the step from definitions to a working kernel consists of:</p>
 <p class="you">"I know what is GPU and I know what is threadIdx ... But what is the exact intellectual step I have to do?" / "any idiot can say we will put all the things in parallel because they all work on the GPU"</p>
-<p class="do">Write a guess. On one CPU core the 256 by 256 picture took 61.6 ms. How long does one GPU thread on the GTX 1650 take for the same loop: less, about the same, or more? Write a number.</p>
+<p class="do">Write a guess. Measured on the laptop's Ryzen 5 4600H, one CPU core computed the starter's default picture, 256 by 256 places, in 61.6 ms. How long does one thread of the laptop's GTX 1650 take for the same work: less, about the same, or more? Write a number.</p>
 
-<h2 id="a-kernel-is-started-from-the-cpu-and-writes-into-the-graphic">A kernel is started from the CPU and writes into the graphics card's memory</h2>
+<h2 id="reading-the-reference-that-the-kernel-has-to-repeat">Reading the reference that the kernel has to repeat</h2>
+<pre>void mandelbrot_cpu_scalar(uint32_t img_size, uint32_t max_iters, uint32_t *out) {
+    for (uint64_t i = 0; i &lt; img_size; ++i) {
+        for (uint64_t j = 0; j &lt; img_size; ++j) {
+            float cx = (float(j) / float(img_size)) * 2.5f - 2.0f;
+            float cy = (float(i) / float(img_size)) * 2.5f - 1.25f;
+            float x2 = 0.0f;
+            float y2 = 0.0f;
+            float w = 0.0f;
+            uint32_t iters = 0;
+            while (x2 + y2 &lt;= 4.0f &amp;&amp; iters &lt; max_iters) {
+                float x = x2 - y2 + cx;
+                float y = w - x2 - y2 + cy;
+                x2 = x * x;
+                y2 = y * y;
+                float z = x + y;
+                w = z * z;
+                ++iters;
+            }
+            out[i * img_size + j] = iters;
+        }
+    }
+}</pre>
+<p>This is the reference as the starter has it in both Lab 1 files, with its comments left out. It takes img_size and max_iters, two 32-bit whole numbers, and out, the address in memory where the answers go, one 32-bit whole number after another. The outer for loop gives i every value from 0 to img_size - 1 and, for each i, the inner for loop gives j every value from 0 to img_size - 1, so everything inside executes once for every pair (i, j), each pair being one place of the picture. For each place, cx is j divided by img_size, times 2.5, minus 2.0, and cy is i treated the same way but minus 1.25, as 32-bit fractions, which C++ calls floats. Then x2, y2 and w start out as 0 and iters as 0. Before each trip through its braces, the while loop tests whether x2 + y2 is at most 4 and iters is below max_iters, and makes the trip only when both hold. In the trip, x becomes x2 minus y2 plus cx; y becomes w minus x2, minus y2, plus cy; x2 becomes x times x and y2 becomes y times y; z becomes x plus y; w becomes z times z; and iters goes up by 1. Once the while loop is left, iters is stored in out at entry i times img_size plus j.</p>
+<p>Call one trip through the braces of the while loop a repetition, so iters counts the repetitions at a place. Nothing inside the while loop reads another place's values, so every place can be computed on its own.</p>
+
+<h2 id="reading-the-gpu-starter-s-empty-kernel-and-launch-function">Reading the GPU starter's empty kernel and launch function</h2>
 <pre>__global__ void mandelbrot_gpu_scalar(
     uint32_t img_size,
     uint32_t max_iters,
@@ -38,48 +64,76 @@ void launch_mandelbrot_gpu_scalar(
 ) {
     /* your (CPU) code here... */
 }</pre>
-<p>These are the two empty functions of the GPU starter. The first begins with __global__, which marks a kernel, a function that executes on the GPU and hands nothing back; it receives the picture size, the cap on repetitions, and out, an address in the graphics card's memory, and its body is left for you. The second is an ordinary function that executes on the CPU, receives the same three values, and is meant to start the kernel.</p>
-<p>A kernel is started from the CPU with <code>kernel&lt;&lt;&lt;B, T&gt;&gt;&gt;(arguments)</code>, which, as NVIDIA's CUDA programming guide defines it, makes B blocks of T threads, every thread executing the whole kernel. The address out points to memory on the graphics card, reserved by main with <code>cudaMalloc</code>; the CPU cannot read it directly, which is why main copies it back with <code>cudaMemcpy</code> before the check. What you write follows from that: the kernel body is the reference loop nest unchanged, both for loops, cx and cy, the while loop and the store to <code>out[i * img_size + j]</code>, and the launch function makes one block of one thread, <code>&lt;&lt;&lt;1, 1&gt;&gt;&gt;</code>, passing its three arguments on.</p>
-<p class="do">Compile and execute as in the setup lesson, nvcc with your -arch, and write the difference printed for mandelbrot_gpu_scalar. What does about 0.248 mean here, and what does a value between 0 and 0.248 mean?</p>
+<p>__global__ marks mandelbrot_gpu_scalar as a kernel. It receives img_size, max_iters and out, which the comment says is an address in the graphics card's memory, and its body is left for you. launch_mandelbrot_gpu_scalar is an ordinary function that executes on the CPU and receives the same three values; its body is left for you too, and it is meant to start the kernel.</p>
+<p>A kernel is started from the CPU with <code>kernel&lt;&lt;&lt;B, T&gt;&gt;&gt;(arguments)</code>, which, as NVIDIA's CUDA programming guide defines it, starts B blocks of T threads each, a thread being one execution of the kernel's instructions from its beginning; every thread executes the whole kernel. The GPU file's main uses the launch function like this:</p>
+<pre>uint32_t *result_device;
+CUDA_CHECK(cudaMalloc(&amp;result_device, img_size * img_size * sizeof(uint32_t)));
+if (impl == SCALAR || impl == ALL) {
+    CUDA_CHECK(cudaMemset(result_device, 0, img_size * img_size * sizeof(uint32_t)));
+    BENCHPRESS(launch_mandelbrot_gpu_scalar, img_size, max_iters, result_device);
+    CUDA_CHECK(cudaMemcpy(
+        result_host.data(),
+        result_device,
+        img_size * img_size * sizeof(uint32_t),
+        cudaMemcpyDeviceToHost));
+    dump_image("out/mandelbrot_gpu_scalar.bmp", img_size, max_iters, result_host);
+    std::cout &lt;&lt; "  Correctness: average output difference from reference = "
+              &lt;&lt; difference(img_size, max_iters, result_host, ref_result)
+              &lt;&lt; std::endl;
+}</pre>
+<p>After computing the reference into ref_result on the CPU, as the CPU file does, main reserves img_size times img_size 32-bit whole numbers in the graphics card's memory with cudaMalloc and keeps their address in result_device. For the scalar version it sets that memory to 0 with cudaMemset and times launch_mandelbrot_gpu_scalar with BENCHPRESS, defined in the same file, which over 5 measurements calls the launch function 3 times, waits with cudaDeviceSynchronize until the GPU has finished, and prints the smallest measurement divided by 3, in milliseconds. Since the CPU cannot read the graphics card's memory directly, main then copies it into result_host with cudaMemcpy, writes it as a picture, and prints the average output difference, which the function difference computes as the sum over every place of the gap between result_host and ref_result, divided by img_size times img_size times max_iters.</p>
+<p>What you write follows from those pieces. The kernel's body is the reference's body unchanged: both for loops, cx and cy, the while loop and the store into out at entry i times img_size plus j. The launch function starts the kernel with &lt;&lt;&lt;1, 1&gt;&gt;&gt;, 1 block of 1 thread, handing on its three inputs.</p>
+<pre>nvcc -O3 -arch=sm_75 -std=c++17 mandelbrot_gpu.cu -o mandelbrot_gpu
+./mandelbrot_gpu -i scalar</pre>
+<p>nvcc compiles the CUDA file with full optimization for compute capability 7.5, which is the GTX 1650's, as 2017 C++, into the program mandelbrot_gpu; put your own GPU's compute capability in place of 75. ./mandelbrot_gpu -i scalar computes the reference on the CPU and times only the scalar GPU version.</p>
+<p class="do">Write the average output difference printed for <code>mandelbrot_gpu_scalar</code>. Computed with the reference's own arithmetic, the counts of the default picture add up to 16,274,722; work out what the program prints when the kernel writes nothing, 16,274,722 / (256 * 256 * 1000), and say what a value between that and 0 would mean.</p>
 <details><summary>CHECK</summary>
-<p>A correct port prints exactly 0. About 0.248 means the kernel wrote nothing: the launch line is missing, or the kernel never executed.</p>
-<p>A value between the two means some places are wrong, and a constant typed as 2.5, a double, instead of 2.5f is enough to cause it, because it changes the rounding of cx at many places.</p>
+<p>A correct port prints exactly 0. A kernel that writes nothing leaves the 0 that cudaMemset put everywhere, so every gap is the reference's own count and the program prints 16,274,722 / 65,536,000 = 0.2483: the launch is missing, or the kernel never executed.</p>
+<p>A value between 0 and 0.2483 means some places are wrong, so the kernel's body differs from the reference somewhere. Typing 2.5 as a double, 2.5 instead of 2.5f, is not enough at the default size: computed with C++'s rules for mixing 32-bit and 64-bit fractions, j / 256 times 2.5 minus 2.0 comes out the same either way for all 256 values of j. At -r 384 the same change alters 51,456 of the 384 * 384 = 147,456 values of cx and the counts at 372 places, printing 0.000228.</p>
 </details>
 
-<h2 id="a-single-gpu-thread-took-403-ms-6-55-times-one-cpu-core">A single GPU thread took 403 ms, 6.55 times one CPU core</h2>
-<p>Measured on the laptop for the 256 by 256 picture at max_iters 1000, the CPU reference on one core took 61.6 ms and the GPU with one thread, <code>&lt;&lt;&lt;1, 1&gt;&gt;&gt;</code>, took 403.435 ms.</p>
-<p class="do">Divide 403.435 by 61.6. Then divide each time by the 16,274,722 repetitions of this picture to get the time of one repetition on each chip.</p>
+<h2 id="timing-one-gpu-thread-against-one-cpu-core">Timing one GPU thread against one CPU core</h2>
+<p>Measured on the laptop for the default picture, the reference on one CPU core took 61.6 ms and the GPU version with 1 block of 1 thread took 403.435 ms. Both make the same 16,274,722 repetitions, since the kernel's body is the reference's.</p>
+<p class="do">Divide 403.435 by 61.6. Then divide each time by the 16,274,722 repetitions to get the time of one repetition on each chip.</p>
 <details><summary>CHECK</summary>
-<pre>403.435 / 61.6 = 6.55 times slower
-CPU: 61.6 ms / 16,274,722 = 3.79 ns per repetition
+<pre>403.435 / 61.6 = 6.55 times longer on one GPU thread
+CPU: 61.6 ms / 16,274,722    = 3.79 ns per repetition
 GPU: 403.435 ms / 16,274,722 = 24.79 ns per repetition</pre>
 </details>
 
-<h2 id="a-chain-of-5-operations-explains-the-cpu-s-time-and-half-of">A chain of 5 operations explains the CPU's time and half of the GPU's</h2>
-<p>Inside one repetition some lines need the value of the line before them, and a list of such operations, each waiting for the previous one, is a chain. In the reference, the longest chain from one repetition into the next has 5 operations: w - x2, then - y2, then + cy, which make line B, then z = x + y, then w = z times z, whose w the next repetition needs first.</p>
-<p>Published figures give the wait at each operation of the chain. For the laptop's CPU, whose cores are of the design AMD calls Zen 2, Agner Fog's instruction tables give a wait of 3 cycles for an add or multiply that needs the previous result, and AMD's specification of the Ryzen 5 4600H gives one busy core up to 4.0 billion cycles per second. On the GTX 1650 the same wait is 4 cycles, as the Lab 2 prelab measures on this very GPU; its clock during these measurements was not recorded, so this lesson assumes 1.5 billion cycles per second, and <code>nvidia-smi -q -d CLOCK</code> reads yours.</p>
-<p class="do">Work out the chain's time per repetition on each chip, 5 x 3 cycles at 4.0 billion per second and 5 x 4 cycles at 1.5 billion per second, and set each beside the measured 3.79 and 24.79 ns. Which chip does the chain alone explain?</p>
+<h2 id="following-the-longest-chain-through-one-repetition">Following the longest chain through one repetition</h2>
+<p>Inside a repetition, some operations need the value of an operation before them. Call a list of operations in which each one waits for the previous one a chain.</p>
+<p class="do">Begin at w, made by the last operation of one repetition, and follow it into the next repetition: the new y needs w minus x2, minus y2, plus cy; z needs x plus y; and the new w needs z times z. Count the operations from one w to the next. Then count the operations from one x2 to the next, through x = x2 - y2 + cx and x2 = x * x, and from one y2 to the next, through y2 = y * y and the subtraction of y2 and addition of cy inside the new y.</p>
 <details><summary>CHECK</summary>
-<pre>CPU: 15 cycles / 4.0e9 = 3.75 ns, measured 3.79 ns
-GPU: 20 cycles / 1.5e9 = 13.3 ns, measured 24.79 ns</pre>
-<p>The chain explains nearly all of the CPU's time and about half of the GPU's. The CPU core guesses which way the loop's branch goes and works ahead, so the check and the count overlap the chain. A single GPU thread executes its instructions in order and waits for the branch before the next repetition begins, so the compare and the branch add to the chain.</p>
+<p>From one w to the next: w - x2, then - y2, then + cy make y, 3 operations; z = x + y, 1; w = z * z, 1; so 5. From one x2 to the next: x2 - y2, + cx, x * x, so 3. From one y2 to the next: y * y, then - y2 and + cy inside the next y, so 3. The longest chain that repeats from one repetition into the next is the 5 through w.</p>
+</details>
+<p>Published figures give the wait at each operation of that chain, in cycles, a cycle being one tick of a chip's clock. For the laptop's CPU, whose cores are of the design AMD calls Zen 2, Agner Fog's instruction tables give a wait of 3 cycles for a float add or multiply that needs the previous result, and AMD's specification of the Ryzen 5 4600H gives one busy core up to 4.0 billion cycles per second. On the GTX 1650 the same wait is 4 cycles, as the Lab 2 prelab measured on this GPU; the GPU's clock during these measurements was not recorded, so this lesson assumes 1.5 billion cycles per second, and nvidia-smi -q -d CLOCK reads yours.</p>
+<p class="do">Work out the chain's time per repetition on each chip, 5 * 3 cycles at 4.0 billion per second and 5 * 4 cycles at 1.5 billion per second, and set each beside the measured 3.79 and 24.79 ns. How much of each chip's time does the chain explain?</p>
+<details><summary>CHECK</summary>
+<pre>CPU: 15 cycles / 4.0e9 per second = 3.75 ns,  measured 3.79 ns
+GPU: 20 cycles / 1.5e9 per second = 13.3 ns,  measured 24.79 ns</pre>
+<p>The chain explains nearly all of the CPU's time and about half of the GPU's. Agner Fog's microarchitecture manual describes Zen 2 cores as predicting which way a branch goes and executing ahead, out of order, so on the CPU the comparison with 4 and the count can overlap the chain. NVIDIA's CUDA programming guide says a GPU thread's instructions are issued in order, with no branch prediction, so on the GPU the comparison and the branch add to the chain. This page measures neither.</p>
 </details>
 
-<h2 id="a-single-gpu-thread-uses-1-of-the-chip-s-896-arithmetic-circ">A single GPU thread uses 1 of the chip's 896 arithmetic circuits</h2>
-<p>NVIDIA's specification of the GTX 1650 lists 896 circuits that each do a float multiply-add for one thread, which it calls CUDA cores, and a single thread can use one of them at a time. Together with the numbers above, one GPU thread is 6.55 times slower than one CPU core, its repetition takes 24.79 ns against 3.79, and the 5-operation chain explains the CPU's time and only half of the GPU's.</p>
-<p class="do">Write one sentence that answers the lab's first question: what makes one GPU thread slower than one CPU core, and what does that say about how a GPU has to be used?</p>
+<h2 id="counting-the-arithmetic-circuits-one-thread-can-use">Counting the arithmetic circuits one thread can use</h2>
+<p>NVIDIA's specification of the GTX 1650 lists 896 circuits that each do a float multiply-add for one thread, which it calls CUDA cores. Each float operation of a thread is done by one such circuit, and a single thread issues its instructions in order, one after another, so it keeps at most 1 of the 896 busy at a time and the others have nothing to do.</p>
+
+<h2 id="gathering-what-one-gpu-thread-showed">Gathering what one GPU thread showed</h2>
+<p>A single GPU thread took 403.435 ms against 61.6 ms on one CPU core, 6.55 times longer; a repetition took 24.79 ns against 3.79 ns; the 5-operation chain explains 3.75 of the CPU's 3.79 ns and 13.3 of the GPU's 24.79 ns at the assumed clock; and the thread keeps at most 1 of the GTX 1650's 896 float circuits busy.</p>
+<p class="do">Write one sentence that answers the handout's first question: what makes one GPU thread slower than one CPU core, and what does that say about how a GPU has to be used?</p>
 <details><summary>CHECK</summary>
-<p>A single GPU thread is a slow, simple processor, with a lower clock, no working ahead past the loop's branch, the same 5-operation chain to wait through, and 1 of 896 arithmetic circuits; a GPU is fast only when thousands of threads keep those circuits busy at once.</p>
+<p>A single GPU thread is a slow, simple processor, with a lower clock, no working ahead past the loop's branch, the same 5-operation chain to wait through and at most 1 of 896 float circuits; a GPU is fast only when many threads keep those circuits busy at once.</p>
 <p>The reading "GPUs are slower than CPUs" fails, because the comparison sets 1 of 896 circuits against a whole core and says nothing about the chip.</p>
 </details>
-<p>The handout's first question asks how the scalar GPU version's time compares with the scalar CPU version's and what might explain each, and the three parts of the answer are above: the ratio of 6.55, the two times per repetition, and the chain calculation on each chip. A time of your own far from 403 ms points to a different GPU or clock, and the comparison that still holds is your time per repetition against the chain calculation at your clock.</p>
-<p>Without code, a graphics card is not one fast processor but hundreds of slow, simple ones that are fast together, so moving work onto it without splitting the work into many independent pieces makes it slower, and the hardware alone buys nothing.</p>
-<p>The guess at the top has its answer: more, 403.435 ms, which is 6.55 times the 61.6 ms of one CPU core.</p>
-<p class="do">A harder question to finish with. The CPU's time per repetition matches its chain calculation within about 1 percent, and the GPU thread's does not. Name a measurement that would tell whether the missing half on the GPU comes from the clock or from the instructions outside the chain.</p>
+<p>The Fall 2025 handout's first question asks how the scalar GPU version's time compares with the scalar CPU version's and what might explain each, and the ratio of 6.55, the two times per repetition and the chain on each chip answer it.</p>
+<p>An average output difference of about 0.248 with a tiny time means the launch is missing or the kernel never executed. A difference between 0 and 0.248 means the kernel's body differs from the reference somewhere. A GPU time far from 403 ms means a different GPU or clock, and the comparison that still holds is your time per repetition against the chain at your own clock.</p>
+<p>A graphics card is not one fast processor but hundreds of simple circuits that are fast together, and given to a single one of its threads, the whole picture took 6.55 times longer than on one ordinary CPU core. Moving work onto a GPU without splitting it into many independent pieces makes it slower, and the hardware alone buys nothing.</p>
+<p>The time asked for at the start is more: 403.435 ms, 6.55 times the 61.6 ms of one CPU core.</p>
+<p class="do">The CPU's time per repetition matches its chain within about 1 percent, 3.75 against 3.79 ns, and the GPU thread's does not, 13.3 against 24.79 ns. Name measurements that would tell whether the missing part on the GPU comes from the clock or from the instructions outside the chain.</p>
 <details><summary>CHECK</summary>
-<p>Fix the clock first: read it during the measurement with <code>nvidia-smi -q -d CLOCK</code>, or compare differences of <code>clock64()</code> inside the kernel with wall time. Then count cycles per repetition directly, by reading <code>clock64()</code> before and after the while loop for one place with a known count, 1000 for example, and dividing by that count. The excess over 20 cycles is the instructions outside the chain; a lower clock shows only in the first measurement.</p>
+<p>Fix the clock first: read it during the measurement with nvidia-smi -q -d CLOCK. Then count cycles per repetition directly with clock64(), a CUDA function that returns the GPU's cycle counter: read it before and after the while loop for one place with a known count, 1000 for example, and divide by that count. Cycles above 20 per repetition come from instructions outside the chain, while a clock below 1.5 billion per second would show in the first measurement and not in the second.</p>
 </details>
-<p>Page 00 of the lab pages, <a href="../00-what-a-gpu-is.html">what a GPU is, measured on one laptop</a>, and page 07, <a href="../07-waiting-chain.html">which line waits for which line</a>, work these numbers out at length, and the notes on <a href="sm.html">the block of hardware a GPU chip is built from</a> and on <a href="independent-chains.html">independent chains inside one thread</a> hold the short versions.</p>
+<p>The lab pages <a href="../00-what-a-gpu-is.html">what a GPU is, measured on one laptop</a> and <a href="../07-waiting-chain.html">which operation waits for which</a> work these numbers out at length, and the notes on <a href="sm.html">the block of hardware a GPU chip is built from</a> and on <a href="independent-chains.html">independent chains inside one thread</a> hold the short versions.</p>
 
 <nav class="pager"><a href="lesson-01-reference.html">&larr; Lesson 1. The reference program, by hand</a><a class="next" href="lesson-03-cpu-vector.html">Lesson 3. Vector code on the CPU: 8 places per instruction &rarr;</a></nav>
 </main>
