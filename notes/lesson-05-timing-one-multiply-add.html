@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Time chains of multiply-adds with the GPU&#x27;s cycle counter: what sits between the clock reads, why 281 / 64 is not the answer, and how 4 cycles become 2 with a second chain.">
+<meta name="keywords" content="lesson">
+<title>Lesson 5: Timing a Multiply-Add</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="site">
+<a class="brand" href="MIT-6.S894.html">6.S894 self-study</a>
+<nav><a href="MIT-6.S894.html#syllabus">Lessons</a><a href="index.html">Notes</a><a href="../index.html">Lab pages</a><a href="../words.html">Words</a></nav>
+</header>
+<main>
+<p class="crumbs"><a href="MIT-6.S894.html">MIT 6.S894 tutorial</a> / Lab 2, part 0 (prelab: fma_latency.cu) / Lesson 5</p>
+<h1>Lesson 5. Timing one multiply-add</h1>
+<p class="meta"><span>Lab 2, part 0 (prelab: fma_latency.cu)</span><span>you build: the three timed kernels of fma_latency.cu</span><span>you need: an NVIDIA GPU; cuobjdump, which comes with the CUDA toolkit</span></p>
+<p class="sub">Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+
+<p class="label">In this lesson</p>
+<ol class="toc">
+<li><a href="#story">The story</a></li>
+<li><a href="#work">Work it out</a></li>
+<li><a href="#build">Build it</a></li>
+<li><a href="#measure">Measure it</a></li>
+<li><a href="#connect">Connect the numbers</a></li>
+<li><a href="#wrong">When it goes wrong</a></li>
+<li><a href="#questions">The lab's questions</a></li>
+<li><a href="#plain">In plain words</a></li>
+<li><a href="#deeper">Go deeper</a></li>
+</ol>
+
+<h2 id="story">The story</h2>
+<div class="story">
+<p>Lab 2 begins with a prelab that measures one number: how many cycles a multiply-add takes on the GPU when it needs the result of the one before. The starter file fma_latency.cu provides a clock read and three kernels to fill: one chain of multiply-adds, two chains interleaved, and two chains written one after the other.</p>
+<p>The learner wrote the kernels and got numbers, then found that the numbers depended on things the source code did not show: where the compiler had moved an add, which constant had silently become exactly 1.0, and whether two loops written one after the other stayed that way.</p>
+<p>What exactly lies between the two clock reads, and how do you get one honest number out of them?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>On the GTX 1650, guess the cycles from one multiply-add to the next when each needs the previous result: 1, 4 or 20?</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "Okay, now I am seeing this data type, start and clock time ... I see a thread fence ... What code I should write and what should I think to finish this function?" / "I am confused with all these things, right? So can you clearly tell me what line of code I have to write and why?"</p>
+
+<h2 id="work">Work it out</h2>
+<p class="ln"><b>L01</b> The starter's clock read in fma_latency.cu, copied from page 09: <span class="from">from: Lab 2 starter code</span></p>
+<pre>#define clock_cycle() \
+    ({ \
+        unsigned long long ret; \
+        asm volatile("mov.u64 %0, %%clock64;" : "=l"(ret)); \
+        ret; \
+    })</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>#define clock_cycle() \</code><span>Define a shorthand named clock_cycle(). The backslash at the end continues the definition on the next line.</span></li>
+<li><code>({ \</code><span>Begin a block whose last value becomes the value of the shorthand.</span></li>
+<li><code>unsigned long long ret; \</code><span>Make a 64-bit whole number named ret.</span></li>
+<li><code>asm volatile("mov.u64 %0, %%clock64;" : "=l"(ret)); \</code><span>Insert one GPU instruction by hand: copy the 64-bit clock counter into ret. volatile tells the compiler not to delete it. Nothing is listed as an input.</span></li>
+<li><code>ret; \</code><span>The value of the block is ret.</span></li>
+<li><code>})</code><span>End of the block.</span></li>
+</ol>
+</div>
+<p class="ln"><b>L02</b> <code>%clock64</code> is a 64-bit counter inside the GPU chip that goes up by 1 at every tick of the GPU clock; a tick is a cycle. A kernel reads it before and after the timed code, and main prints the difference, for example <code>Latency of fma_latency code snippet = 281 cycles</code>. <span class="from">from: L01, PTX definition, your output</span></p>
+<p class="ln"><b>L03</b> The prelab (Fall 2025 handout): fill three kernels, each launched with <code>&lt;&lt;&lt;1, 1&gt;&gt;&gt;</code>: <code>fma_latency</code> (one chain of multiply-adds), <code>fma_latency_interleaved</code> (two chains whose steps alternate) and <code>fma_latency_no_interleave</code> (two chains, one written after the other); report the cycles per multiply-add, an FFMA instruction in the machine listing, for each. <span class="from">from: Lab 2 handout (Fall 2025), Lab 2 starter code</span></p>
+<p class="ln"><b>L04</b> The learner's timed loop, copied from page 10: <span class="from">from: your code</span></p>
+<pre>#pragma unroll
+for (int i = 0; i &lt; 64; ++i)
+    x = x * 1.0000001f + 0.00000001f;</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>#pragma unroll</code><span>Tell the compiler to write the loop out as separate copies of its line instead of a loop that jumps back.</span></li>
+<li><code>for (int i = 0; i &lt; 64; ++i)</code><span>Repeat the next line 64 times.</span></li>
+<li><code>x = x * 1.0000001f + 0.00000001f;</code><span>Multiply x by 1.0000001, add 0.00000001, and put the result back into x. The next copy uses this new x.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> A float holds 1.0 plus multiples of 2 to the power -23 = 0.00000011920929 between 1 and 2, and a typed constant becomes the nearest such value. Which of 1.00000001f, 1.0000001f and 1.0000002f becomes exactly 1.0? ____ . Why does that matter for a timed chain? ____ . <span class="from">from: IEEE 754 float32</span></p>
+<details><summary>CHECK</summary>
+<pre>half the spacing = 0.0000000596; 0.00000001 is below it -&gt; 1.00000001f becomes exactly 1.0
+1.0000001f = 1 + 1 step (0x3f800001); 1.0000002f = 1 + 2 steps (0x3f800002)
+A chain that multiplies by exactly 1.0 may be simplified by the compiler, so the timed code is
+not the chain you wrote.</pre>
+</details>
+<p class="ln"><b>L06</b> The learner's fma_latency kernel, the lines that matter, copied from page 09: <span class="from">from: your code</span></p>
+<pre>data_type x = *n;                  // data_type is float (using data_type = float;)
+__threadfence();
+x = x + 3;
+start_time = clock_cycle();
+#pragma unroll
+for (int i = 0; i &lt; 64; ++i)
+    x = x * 1.0000001f + 0.00000001f;
+end_time = clock_cycle();</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>data_type x = *n;                  // data_type is float (using data_type = float;)</code><span>Read the fraction stored at address n in the graphics card's memory and keep it in x. data_type is another name for float, set by the line using data_type = float;.</span></li>
+<li><code>__threadfence();</code><span>A memory fence. The starter file's own note says it is there to make sure the read of *n is done.</span></li>
+<li><code>x = x + 3;</code><span>Add 3 to x.</span></li>
+<li><code>start_time = clock_cycle();</code><span>Read the clock counter into start_time.</span></li>
+<li><code>#pragma unroll</code><span>Tell the compiler to write the loop out as separate copies of its line instead of a loop that jumps back.</span></li>
+<li><code>for (int i = 0; i &lt; 64; ++i)</code><span>Repeat the next line 64 times.</span></li>
+<li><code>x = x * 1.0000001f + 0.00000001f;</code><span>Multiply x by 1.0000001, add 0.00000001, and put the result back into x. The next copy uses this new x.</span></li>
+<li><code>end_time = clock_cycle();</code><span>Read the clock counter into end_time.</span></li>
+</ol>
+</div>
+<p class="ln"><b>L07</b> Facts: <code>*n</code> lives in DRAM, the memory chips outside the GPU chip, so <code>x = *n</code> becomes a load instruction, LDG in the listing. The chip begins the next instruction without waiting for the load; an instruction that reads the loaded register is held until the value arrives. So <code>x = x + 3</code> pays the wait before the first clock read; that is its only job. <span class="from">from: L06, Jia et al. 2019, Dissecting the NVIDIA Turing T4 GPU</span></p>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> In the learner's interleaved kernel x and y both came from that load, and <code>x = x + 3.0f; y = y + 4.0f;</code> sat above the first clock read. The listing showed the clock read (CS2R at 0060) before both FADDs (0080, 0090). Which waits fall inside the timed window? ____ . What in L01 allowed the move? ____ . Fix: give the clock read inputs. If only x is given, which add may still move inside? ____ . <span class="from">from: L01, L07, your listing</span></p>
+<details><summary>CHECK</summary>
+<pre>inside: the DRAM wait and both FADDs
+allowed by: L01's asm lists no input, so nothing ties it to the adds
+only x given: the add on y is tied to nothing and may move after the read (your report showed it)</pre>
+</details>
+<p class="ln"><b>L09</b> A clock read with inputs, the form the learner wrote; the starter has none, so this is your own addition: <span class="from">from: your code</span></p>
+<pre>#define clock_cycle_dep2(a, b) \
+    ({ \
+        unsigned long long ret; \
+        asm volatile("mov.u64 %0, %%clock64;" : "=l"(ret) : "f"(a), "f"(b)); \
+        ret; \
+    })
+start_time = clock_cycle_dep2(x, y);</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>#define clock_cycle_dep2(a, b) \</code><span>Define a shorthand named clock_cycle_dep2 that takes two values, a and b.</span></li>
+<li><code>({ \</code><span>Begin a block whose last value becomes the value of the shorthand.</span></li>
+<li><code>unsigned long long ret; \</code><span>Make a 64-bit whole number named ret.</span></li>
+<li><code>asm volatile("mov.u64 %0, %%clock64;" : "=l"(ret) : "f"(a), "f"(b)); \</code><span>Same clock copy, but after the second colon a and b are listed as float inputs, so the instruction cannot begin before a and b have values.</span></li>
+<li><code>ret; \</code><span>The value of the block is ret.</span></li>
+<li><code>})</code><span>End of the block.</span></li>
+<li><code>start_time = clock_cycle_dep2(x, y);</code><span>Read the clock into start_time, tied to x and y.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> An end read with no input: can it begin before the last FFMA has its value? ____ . Then the printed cycles are too ____ . What should the end read take as inputs? ____ . <span class="from">from: L07, L09</span></p>
+<details><summary>CHECK</summary>
+<pre>yes: it reads no register that the last FFMA writes
+too small: the wait for the last value is left out
+the chain's final values: end_time = clock_cycle_dep2(x, y)</pre>
+</details>
+
+<h2 id="build">Build it</h2>
+<p class="ln"><b>L11</b> Compile, execute, and read the machine listing: <span class="from">from: the learner's commands, CUDA toolkit</span></p>
+<pre>nvcc -O3 -arch=sm_75 -std=c++17 fma_latency.cu -o fma_latency
+./fma_latency
+nvcc -O3 -arch=sm_75 -cubin fma_latency.cu -o fma_latency.cubin
+cuobjdump --dump-sass fma_latency.cubin | grep -e CS2R -e LDG -e FADD -e FFMA</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>nvcc -O3 -arch=sm_75 -std=c++17 fma_latency.cu -o fma_latency</code><span>Compile the prelab file for compute capability 7.5.</span></li>
+<li><code>./fma_latency</code><span>Execute it: each kernel prints its cycles.</span></li>
+<li><code>nvcc -O3 -arch=sm_75 -cubin fma_latency.cu -o fma_latency.cubin</code><span>Compile only the GPU part, into a file of machine code.</span></li>
+<li><code>cuobjdump --dump-sass fma_latency.cubin | grep -e CS2R -e LDG -e FADD -e FFMA</code><span>Print the machine instructions and keep only the clock reads, the loads, the adds and the multiply-adds.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L12</b> <b class="x">DO</b> In your listing of fma_latency, FFMAs between the two CS2R clock reads = ____ ; FADDs between them = ____ . For a correct single chain of 64: ____ and ____ . <span class="from">from: L08, L10, L11, your listing</span></p>
+<details><summary>CHECK</summary>
+<pre>64 FFMAs and 0 FADDs between the reads
+more FADDs inside: the start read is not pinned (L08)
+fewer FFMAs: the compiler simplified the chain, often because a constant became 1.0 (L05)</pre>
+</details>
+
+<h2 id="measure">Measure it</h2>
+<p class="ln"><b>L13</b> The laptop's six measurements: one chain of 64 FFMAs, 281 cycles; one chain of 256 (the copy-paste bug kernel), 1055; two chains, 128 FFMAs in all 295, 256 in all 551; four chains, 256 in all 519, 512 in all 1031. <span class="from">from: your output</span></p>
+<p class="ln do"><b>L14</b> <b class="x">DO</b> Dividing one measurement: 281 / 64 = ____ . Subtracting two lengths: one chain (1055 - 281) / (256 - 64) = ____ ; two chains (551 - 295) / (256 - 128) = ____ ; four chains (1031 - 519) / (512 - 256) = ____ . <span class="from">from: L13</span></p>
+<details><summary>CHECK</summary>
+<pre>281 / 64 = 4.39: it spreads the fixed part over 64 FFMAs
+one chain: 774 / 192 = 4.03 -&gt; 4 cycles from one FFMA to the next
+two chains: 256 / 128 = 2; four chains: 512 / 256 = 2</pre>
+</details>
+<p class="ln do"><b>L15</b> <b class="x">DO</b> Competing guesses for the 2: A, an FFMA can begin every cycle, so k chains give 4 / k, never below 1; B, an FFMA keeps the FP32 units busy for 2 cycles, never below 2. For four chains A predicts ____ , B predicts ____ , measured ____ . Turing layout: 64 FP32 units and 4 schedulers per SM, so units per scheduler = ____ and cycles to feed 32 threads = ____ . <span class="from">from: L14, NVIDIA Turing Tuning Guide</span></p>
+<details><summary>CHECK</summary>
+<pre>A: 4 / 4 = 1; B: 2; measured 2 -&gt; A fails, B survives
+64 / 4 = 16 units per scheduler; 32 / 16 = 2 cycles
+With two chains both guesses give 2; only the four-chain kernel tells them apart.</pre>
+</details>
+<p class="ln do"><b>L16</b> <b class="x">DO</b> Outside part = measured - (N - 1) x r: the cycles not explained by N FFMAs at r cycles each. For one chain: 281 - 63 x 4 = ____ ; bug kernel: 1055 - 255 x 4 = ____ ; two chains: 295 - 127 x 2 = ____ , 551 - 255 x 2 = ____ ; four chains: 519 - 255 x 2 = ____ , 1031 - 511 x 2 = ____ . <span class="from">from: L13, L14</span></p>
+<details><summary>CHECK</summary>
+<pre>29, 35, 41, 41, 9, 9
+same kernel, same outside part (41 and 41, 9 and 9); different kernels, different parts
+(29 against 35): that is why L14's one-chain answer is 4.03, not 4.00: (35 - 29) / 192 = 0.03</pre>
+</details>
+<p class="ln do"><b>L17</b> <b class="x">DO</b> After the bug was fixed, fma_latency_no_interleave had all 128 FFMAs of x, then all 128 of y, in the source. It printed 551 cycles, and its listing alternated the registers of x and y. The chip begins instructions in listing order. Who interleaved the chains? ____ . Does the no-interleave version show the same cycles as the interleaved one, and why? ____ . <span class="from">from: L13, L14, your output, your listing</span></p>
+<details><summary>CHECK</summary>
+<pre>the compiler: it reordered the two independent loops into one alternating stream
+yes, 551 and 551, because the listings are the same: the source order of independent work does
+not survive -O3</pre>
+</details>
+
+<div class="connect" id="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L18</b> <b class="x">DO</b> Collect L05 (a constant that becomes 1.0), L08 (the add moved inside), L12 (the listing as the judge), L14 (4.39 against 4.03 and 2), L15, L16 (outside parts 29, 35, 41, 9), L17. Write one sentence on how to get one honest cycle count from a GPU clock. <span class="from">from: L05, L08, L12, L14, L15, L16, L17</span></p>
+<details><summary>CHECK</summary>
+<pre>Pin both clock reads to the chain's values, check in the machine listing that exactly the chain
+sits between them and that no constant became 1.0, then subtract two lengths of the SAME kernel;
+never divide one measurement, and never subtract two different kernels.
+
+Tempting answer that fails: "the clock reads cost the same everywhere, so subtract any two".
+L16 measures the outside part at 29, 35, 41 and 9.</pre>
+</details>
+</div>
+
+<h2 id="wrong">When it goes wrong</h2>
+<ul class="pitfalls">
+<li><b>The cycles barely change when you double the chain.</b> The compiler simplified the chain: a constant became exactly 1.0 (L05), or two chains with the same constants were merged into one.</li>
+<li><b>The cycles change when you move setup lines.</b> The clock read has no inputs, so setup slid inside the window (L08).</li>
+<li><b>4.39 instead of 4.</b> A single measurement divided by a count (L14).</li>
+<li><b>The no-interleave and interleaved kernels print the same number.</b> Correct: the compiler interleaved them for you (L17).</li>
+</ul>
+
+<h2 id="questions">The lab's questions</h2>
+<p>Paraphrased from the Fall 2025 handout. Write your own answers from the lines named; the numbers are yours to measure.</p>
+<ul class="related">
+<li><b>Prelab question 1: how many cycles does an FFMA that needs the previous one take?</b> L14: 4, by subtracting two lengths.</li>
+<li><b>Prelab question 2: what do two interleaved chains show, and does it contradict question 1?</b> L14 and L15: 2 cycles per FFMA; no contradiction, since 4 is a wait and 2 is the time to begin.</li>
+<li><b>Prelab question 3: does the no-interleave version show the same cycles, and why?</b> L17.</li>
+</ul>
+
+<div class="plain" id="plain">
+<p class="label">In plain words</p>
+<p>A stopwatch inside a chip measures whatever the compiler placed between its two readings, which is not always what the source code shows. The honest method is to check the machine instructions, then time the same thing at two lengths and subtract.</p>
+<p>For a manager: a measurement taken without checking what was actually measured can be wrong by a large factor while looking precise to three digits.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>4 cycles, by subtraction: (1055 - 281) / (256 - 64) = 4.03, and 4.00 within one kernel at
+three lengths (281, 537 and 793 cycles, reported in the chat).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>The outside part was 41 cycles with two chains but 9 with four chains. Propose a reason, and a measurement that would test it.</p>
+<details><summary>CHECK</summary>
+<pre>A hypothesis, not a measured fact: with more chains, more of the final multiply-adds are under
+way together, so the wait after the last one begins overlaps more of the others.
+Test: measure 1, 2, 3 and 4 chains at two lengths each, compute the outside part for each, and
+see whether it shrinks steadily with the number of chains.</pre>
+</details>
+</div>
+
+<h2 id="deeper">Go deeper</h2>
+<ul class="related">
+<li><a href="../09-clock-read-trap.html">09. Lab 2 prelab: what sits between the clock reads</a></li>
+<li><a href="../10-cycles-per-ffma.html">10. Lab 2 prelab: cycles per FFMA from your own measurements</a></li>
+<li><a href="clock-reads.html">What sits between two clock reads</a></li>
+<li><a href="subtract-two-lengths.html">Measuring by subtracting two lengths</a></li>
+<li><a href="independent-chains.html">Independent chains inside one thread</a></li>
+</ul>
+
+<nav class="pager"><a href="lesson-04-gpu-32-threads.html"><small>previous</small>Lesson 4. The picture on 32 GPU threads</a><a class="next" href="lesson-06-how-many-threads.html"><small>next</small>Lesson 6. How many threads keep the GPU busy</a></nav>
+</main>
+<footer class="site">
+<p>Independent self-study material for MIT 6.S894 Accelerated Computing, written from one learner's work. Not affiliated with or endorsed by MIT or the course staff. Course pages: <a href="https://accelerated-computing.academy/fall25/">accelerated-computing.academy/fall25</a>. Starter code: <a href="https://github.com/accelerated-computing-class">github.com/accelerated-computing-class</a>. Every measured number comes from one laptop (Ryzen 5 4600H, GTX 1650) unless a line says otherwise.</p>
+</footer>
+</body>
+</html>

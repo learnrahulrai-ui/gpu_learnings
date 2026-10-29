@@ -80,3 +80,28 @@ ul.related li { margin-bottom: 8px; }
 ol.toc { margin: 0 0 12px; padding-left: 26px; }
 .full { color: var(--dim); }
 .backlinks { margin-top: 28px; }
+/* Site chrome and lesson layout for the notes/ section */
+header.site, footer.site { max-width: 860px; margin-left: auto; margin-right: auto; }
+header.site { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 20px; padding-bottom: 12px; margin-bottom: 28px; border-bottom: 1px solid var(--line); }
+header.site .brand { font: bold 15px "DejaVu Sans Mono", Menlo, Consolas, monospace; text-decoration: none; letter-spacing: .02em; }
+header.site nav { margin: 0; padding: 0; border: 0; gap: 4px 18px; flex-wrap: wrap; justify-content: flex-end; font: 14px "DejaVu Sans Mono", Menlo, Consolas, monospace; }
+footer.site { margin-top: 48px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--dim); font-size: 14px; line-height: 1.55; }
+p.meta { display: flex; flex-wrap: wrap; gap: 6px 8px; margin: 6px 0 16px; }
+p.meta span { font: 13px "DejaVu Sans Mono", Menlo, Consolas, monospace; color: var(--dim); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; }
+.hero h1 { font-size: 32px; }
+.hero .lead { font-size: 20px; line-height: 1.6; margin: 10px 0 18px; }
+a.button { display: inline-block; padding: 8px 16px; border: 2px solid var(--fg); border-radius: 6px; text-decoration: none; font-weight: bold; margin: 0 8px 8px 0; }
+.need { border-left: 4px solid var(--ok); background: var(--box); border-radius: 0 8px 8px 0; padding: 12px 16px 4px; margin: 16px 0; }
+.need > .label { margin-top: 0; }
+ul.pitfalls { padding-left: 22px; }
+ul.pitfalls li { margin-bottom: 10px; }
+.table { overflow-x: auto; margin: 0 0 16px; }
+table.syllabus { border-collapse: collapse; width: 100%; font-size: 16px; }
+table.syllabus th, table.syllabus td { border-bottom: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+table.syllabus th { font: bold 12px "DejaVu Sans Mono", Menlo, Consolas, monospace; text-transform: uppercase; letter-spacing: .05em; color: var(--dim); }
+table.syllabus td:first-child { min-width: 11em; }
+table.syllabus td:nth-child(2) { white-space: nowrap; color: var(--dim); }
+nav.pager { gap: 12px; }
+nav.pager a { display: block; max-width: 48%; border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; text-decoration: none; }
+nav.pager a.next { margin-left: auto; text-align: right; }
+nav.pager small { display: block; color: var(--dim); font: 12px "DejaVu Sans Mono", Menlo, Consolas, monospace; text-transform: uppercase; letter-spacing: .05em; }

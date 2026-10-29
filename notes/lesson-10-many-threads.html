@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="More threads per core and more sets of 32 threads per scheduler fill the same waiting as independent work inside a thread: how to find the number that is enough, why speedups do not multiply, and when registers matter.">
+<meta name="keywords" content="lesson">
+<title>Lesson 10: Many Threads</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="site">
+<a class="brand" href="MIT-6.S894.html">6.S894 self-study</a>
+<nav><a href="MIT-6.S894.html#syllabus">Lessons</a><a href="index.html">Notes</a><a href="../index.html">Lab pages</a><a href="../words.html">Words</a></nav>
+</header>
+<main>
+<p class="crumbs"><a href="MIT-6.S894.html">MIT 6.S894 tutorial</a> / Lab 2, parts 3 and 4 / Lesson 10</p>
+<h1>Lesson 10. Many threads per core, then everything together</h1>
+<p class="meta"><span>Lab 2, parts 3 and 4</span><span>you build: the multithread and full versions, then the _ilp versions</span><span>you need: your part 1 and part 2 versions</span></p>
+<p class="sub">Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+
+<p class="label">In this lesson</p>
+<ol class="toc">
+<li><a href="#story">The story</a></li>
+<li><a href="#work">Work it out</a></li>
+<li><a href="#build">Build it</a></li>
+<li><a href="#measure">Measure it</a></li>
+<li><a href="#connect">Connect the numbers</a></li>
+<li><a href="#wrong">When it goes wrong</a></li>
+<li><a href="#questions">The lab's questions</a></li>
+<li><a href="#plain">In plain words</a></li>
+<li><a href="#deeper">Go deeper</a></li>
+</ol>
+
+<h2 id="story">The story</h2>
+<div class="story">
+<p>Part 3 of Lab 2 puts more than one thread on each CPU core and more than one set of 32 threads on each GPU scheduler; part 4 adds the independent sets of part 1 back in. The lab asks how much each step helps, which number of threads is best, and what decides it.</p>
+<p>Each technique, tried alone, gives a speedup, and the natural expectation is that the speedups multiply. The learner asked what would make someone who had memorized everything still fail at this point.</p>
+<p>What do the three techniques have in common, and how do you know when adding more of one stops paying?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>On the laptop's GPU, the Lab 2 loop with one set of 32 threads per scheduler: guess how many sets per scheduler are worth having before more stop helping: 1, about 2, or 8 or more?</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "What will make a student fail in each of the parts of the assignment due to memorization? Let's say there is somebody who has memorized all the things but still cannot reason it out."</p>
+
+<h2 id="work">Work it out</h2>
+<p class="ln"><b>L01</b> Laptop facts: the CPU has 6 cores with 2 hardware threads each, 12 in all; the GPU has 56 schedulers, each holding up to 8 warps (NVIDIA's name for a set of 32 consecutive threads), 448 in all. A scheduler begins at most one instruction per cycle; a 32-thread FP32 instruction takes 2 cycles to begin; an FP32 operation that needs the previous result waits 4 cycles. <span class="from">from: your hardware table, NVIDIA Turing Tuning Guide, your output (Lab 2 prelab)</span></p>
+<p class="ln"><b>L02</b> The Lab 2 loop has 9 FP32 instructions per repetition and a repeating chain of 4 operations, 16 cycles. Measured on the laptop: the baseline, one block of 32 threads and so one warp, took about 208 ms for 8,792,320 warp-repetitions (one repetition of the loop by the whole warp). <span class="from">from: Lab 2 starter code, your listing, your output, computation on the Lab 2 iters</span></p>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> Time per warp-repetition = 208 ms / 8,792,320 = ____ ns. At an assumed 1.5 billion cycles per second = ____ cycles. FP32 begins per repetition = 9 x 2 = ____ cycles; chain = ____ cycles. Cycles in which the scheduler begins no FP32 instruction, at least = ____ . <span class="from">from: L01, L02, assumption</span></p>
+<details><summary>CHECK</summary>
+<pre>208e-3 / 8,792,320 = 23.7 ns, x 1.5 = 35.5 cycles per repetition
+begins 18 cycles, chain 16: neither explains 35.5
+about 35.5 - 18 = 17.5 cycles per repetition with no FP32 begin: the compare, the branch, the
+count, and the waits around them</pre>
+</details>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> A second warp on the same scheduler can begin its instructions in those idle cycles. Warps per scheduler before the FP32 begins fill every cycle = 35.5 / ____ = ____ . Cycles of the scheduler per warp-repetition, with 1, 2 and 4 warps per scheduler, at best = ____ , ____ , ____ . <span class="from">from: L03</span></p>
+<details><summary>CHECK</summary>
+<pre>35.5 / 18 = about 2 warps per scheduler
+1 warp: 35.5; 2 warps: max(35.5, 36) / 2 = 18 each; 4 warps: max(35.5, 72) / 4 = 18 each
+Past about 2 warps per scheduler the FP32 begins are the limit, and more warps add nothing.
+This rests on the assumed clock: measure it.</pre>
+</details>
+<p class="ln"><b>L05</b> The same mechanism on the CPU: the 2 hardware threads of one core share its arithmetic circuits, and either can begin instructions while the other waits. For one 8-place set, the core's chain takes 4 x 3 = 12 cycles per repetition and its 9 vector instructions take about 4.5 cycles to begin (published Zen 2 figures: a 3-cycle wait, at least 2 vector FP32 instructions begun per cycle). <span class="from">from: AMD SMT description, Agner Fog's instruction tables (Zen 2)</span></p>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> If one CPU thread already carries 2 or 3 independent sets that fill the 12-cycle chain, what can a second hardware thread on the same core still fill? ____ . If each thread carries only one set, what does the second thread fill? ____ . <span class="from">from: L05</span></p>
+<details><summary>CHECK</summary>
+<pre>little: both threads then compete for the same begins
+with one set per thread, the second thread fills the waiting that a second set would have filled:
+the two techniques fill the same idle cycles</pre>
+</details>
+<p class="ln"><b>L07</b> Illustrative times from the Lab 2 tutor file, not measured: B (baseline) = 120 ms; I (B plus independent sets inside each thread) = 60; C (many SMs) = 24; T (many SMs and more threads per SM) = 12; F (T plus independent sets) = 10. <span class="from">from: Lab 2 tutor file</span></p>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> (B / C) x (C / T) x (T / F) = ____ ; B / F = ____ . With any other times, B = 97, C = 41, T = 13, F = 7: product = ____ , B / F = ____ . Gain of the independent sets alone = B / I = ____ ; on top of T = T / F = ____ . <span class="from">from: L07</span></p>
+<details><summary>CHECK</summary>
+<pre>5 x 2 x 1.2 = 12 = B / F; 97/41 x 41/13 x 13/7 = 97/7 = 13.86 = B / F: C and T cancel for any
+times, so the product cannot fail as a check
+alone 2; on top of T 1.2: the gain shrank, because T had already filled the same waiting</pre>
+</details>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> Registers: an SM has 65,536. A kernel with 72 registers per thread fits 65,536 / (72 x 32) = ____ warps per SM, ____ per scheduler. With L04's need of about 2 per scheduler, are registers the limit? ____ . At 128 registers: ____ per scheduler; the limit? ____ . <span class="from">from: L01, L04, NVIDIA Turing Tuning Guide</span></p>
+<details><summary>CHECK</summary>
+<pre>28.4 -&gt; 28 warps, 7 per scheduler: no
+128 registers: 65,536 / 4,096 = 16 warps, 4 per scheduler: still no
+Registers limit a kernel only when the work needs more warps per scheduler than fit; read your
+kernel's use with -Xptxas -v.</pre>
+</details>
+
+<h2 id="build">Build it</h2>
+<p class="ln"><b>L10</b> What to write: part 3 on the CPU, <code>mandelbrot_cpu_vector_multicore_multithread</code>: the part 2 version with a thread count you can change, tried at 6, 12, 18 and 24 on the laptop. Part 3 on the GPU: <code>mandelbrot_gpu_vector_multicore_multithread_single_sm</code> with one block of up to 32 warps, then <code>mandelbrot_gpu_vector_multicore_multithread_full</code> with any number of blocks and warps. Part 4: the <code>_ilp</code> versions, with 2 or 3 independent sets per thread added on top. <span class="from">from: Lab 2 handout (parts 3 and 4), Lab 2 starter code</span></p>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> For the single-SM version, sweep warps per block 1, 2, 4, 8, 16, 32 and write the times: ____ . From L04, where should the times stop falling? ____ . <span class="from">from: L04, L10, your output</span></p>
+<details><summary>CHECK</summary>
+<pre>Prediction from L04, under the assumed clock: falling from 1 to 4 warps (one per scheduler),
+falling again up to 8 (two per scheduler, up to 2 times), then flat to 32. The laptop's sweep was
+not recorded in the chats; yours is the first.</pre>
+</details>
+
+<h2 id="measure">Measure it</h2>
+<p class="ln do"><b>L12</b> <b class="x">DO</b> Your best CPU thread count = ____ (time ____ ms) and best GPU warps per scheduler = ____ (time ____ ms). Gain of the independent sets alone, your part 1 = ____ ; gain of the same sets on top of your best part 3 version, part 4 against part 3 = ____ . <span class="from">from: L08, L11, your output</span></p>
+<details><summary>CHECK</summary>
+<pre>Compare the last two as in L08: a gain on top near 1 means part 3 had already filled the waiting
+that the sets fill; a gain on top near the gain alone means they filled different idle cycles.</pre>
+</details>
+
+<div class="connect" id="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L13</b> <b class="x">DO</b> Collect L03 (17.5 idle cycles per repetition), L04 (about 2 warps per scheduler, then flat), L06 (a second hardware thread fills the same waiting as a second set), L08 (the product always matches; 2 alone, 1.2 on top), L09 (registers are not the limit at 7 or 4 per scheduler). Write one sentence answering the lab's last question: why do techniques that each help alone gain little together, and how many threads are enough? <span class="from">from: L03, L04, L06, L08, L09</span></p>
+<details><summary>CHECK</summary>
+<pre>Independent sets inside a thread, more threads per core and more warps per scheduler all fill
+the same idle cycles; enough is the count at which the begins fill them (here about 2 warps per
+scheduler), and past it every technique adds work, not speed. Test combining with the gain on top
+(T / F), never with the step-by-step product.
+
+Tempting answer that fails: "use the most threads the hardware allows". L04 puts the useful
+number near 2 per scheduler, against 8 held.</pre>
+</details>
+</div>
+
+<h2 id="wrong">When it goes wrong</h2>
+<ul class="pitfalls">
+<li><b>More threads per core made the CPU version slower.</b> The threads compete for the same begins, and start-up costs grow with their number (L06).</li>
+<li><b>The GPU stops improving at about 8 warps per block.</b> Expected: about 2 per scheduler (L04).</li>
+<li><b>The ILP version gains less on top of multithreading than alone.</b> Both fill the same idle cycles (L08).</li>
+<li><b>The "speedups multiply" check succeeds.</b> It always succeeds, for any times (L08).</li>
+</ul>
+
+<h2 id="questions">The lab's questions</h2>
+<p>Paraphrased from the Fall 2025 handout. Write your own answers from the lines named; the numbers are yours to measure.</p>
+<ul class="related">
+<li><b>Question 5: how much does multithreading per core speed up the CPU version, which thread count is best, and why?</b> L06 and L12.</li>
+<li><b>Question 6: in one block, how does the time change with the number of warps beyond 4, up to the limit of 32?</b> L04 and L11.</li>
+<li><b>Question 7: how much does multithreading per scheduler speed up the GPU version, which warp count is best, and why?</b> L04 and L12.</li>
+<li><b>Question 8: how much does adding the independent sets back on top of multicore and multithreading gain, and with how many sets?</b> L08, L12 and the connect line.</li>
+</ul>
+
+<div class="plain" id="plain">
+<p class="label">In plain words</p>
+<p>The three techniques, more work inside each thread, more threads per core and more sets of threads per scheduler, sound different but solve the same problem: hardware waiting for results. Once the waiting is filled, none of them can help further, so combining them gives much less than multiplying their separate gains.</p>
+<p>For a manager: when two optimizations each give 2 times, budget for far less than 4 until someone measures one on top of the other.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>About 2: with one warp per scheduler about 17.5 of 35.5 cycles per repetition are idle (at the
+assumed clock), and 2 warps fill them; past that the FP32 begins are the limit.</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>Your measurements show the single-SM time still falling from 8 to 16 warps per block. Which assumption of L03 and L04 is the most likely to be wrong, and how do you check it?</p>
+<details><summary>CHECK</summary>
+<pre>The clock, or the count of instructions. A higher clock than 1.5 GHz means more cycles per
+repetition and more idle cycles to fill; instructions other than FP32 (compares, integer adds,
+branches) also take begins, so the true limit is lower than 18 cycles. Check the first by reading
+the clock during the measurement (nvidia-smi -q -d CLOCK) and the second by counting every
+instruction of the loop in the listing (cuobjdump), not only the FP32 ones.</pre>
+</details>
+</div>
+
+<h2 id="deeper">Go deeper</h2>
+<ul class="related">
+<li><a href="../16-combining-speedups.html">16. Lab 2: do speedups multiply?</a></li>
+<li><a href="../17-hardware-or-launch.html">17. Fixed by the chip, or made by the launch?</a></li>
+<li><a href="../18-two-places-per-thread.html">18. Lab 2 on the GPU: two places per thread, 461 ms and 231 ms</a></li>
+<li><a href="combining-speedups.html">Combining speedups</a></li>
+<li><a href="register-budget.html">The register budget</a></li>
+</ul>
+
+<nav class="pager"><a href="lesson-09-many-cores.html"><small>previous</small>Lesson 9. Many CPU cores, many SMs</a><a class="next" href="index.html"><small>next</small>All notes</a></nav>
+</main>
+<footer class="site">
+<p>Independent self-study material for MIT 6.S894 Accelerated Computing, written from one learner's work. Not affiliated with or endorsed by MIT or the course staff. Course pages: <a href="https://accelerated-computing.academy/fall25/">accelerated-computing.academy/fall25</a>. Starter code: <a href="https://github.com/accelerated-computing-class">github.com/accelerated-computing-class</a>. Every measured number comes from one laptop (Ryzen 5 4600H, GTX 1650) unless a line says otherwise.</p>
+</footer>
+</body>
+</html>

@@ -38,8 +38,23 @@
 <li>"Each technique helped alone, but together they gain much less than the product." <a href="16-combining-speedups.html">page 16</a>.</li>
 <li>"I cannot tell which of SM, block, scheduler and the 32-thread unit are hardware and which only exist in my program", or "is 14 x 4 x 32 the most threads my GPU holds?" <a href="17-hardware-or-launch.html">page 17</a>.</li>
 <li>"Giving each GPU thread two places made it slower, or no faster", or "my two-places indexing misses or repeats places." <a href="18-two-places-per-thread.html">page 18</a>.</li>
-<li>"My result looks fine but I am not sure it measures what I think." <a href="failures.html">the failure list</a>, 36 ways a clean-looking number goes wrong.</li>
+<li>"My result looks fine but I am not sure it measures what I think." <a href="failures.html">the failure list</a>, 41 ways a clean-looking number goes wrong.</li>
 <li>"A table printed by a course file looks wrong on my GPU." <a href="12-the-48-trap.html">page 12</a>.</li>
+</ol>
+
+<p class="label">Following the MIT 6.S894 self-study tutorial?</p>
+<ol class="topics" start="0">
+<li>"The starter will not compile on my machine", or "my empty version prints about 0.248 and a tiny time." <a href="notes/lesson-00-setup.html">Lesson 0</a>.</li>
+<li>"I cannot tell whether my total of all iters is right, or why some places cost 1000 times more than others." <a href="notes/lesson-01-reference.html">Lesson 1</a>.</li>
+<li>"My one-thread GPU version is several times slower than one CPU core." <a href="notes/lesson-02-gpu-one-thread.html">Lesson 2</a>.</li>
+<li>"My CPU has no AVX-512", or "my vector version is mirror-reversed, or crashes at the store." <a href="notes/lesson-03-cpu-vector.html">Lesson 3</a>.</li>
+<li>"My 32-thread version is correct but nowhere near 32 times faster", or "it is correct but as slow as one thread." <a href="notes/lesson-04-gpu-32-threads.html">Lesson 4</a>.</li>
+<li>"My prelab cycles change when I move setup lines", or "the no-interleave kernel prints the same as the interleaved one." <a href="notes/lesson-05-timing-one-multiply-add.html">Lesson 5</a>.</li>
+<li>"The sweep of warp_scheduler.cu peaks somewhere other than the handout says." <a href="notes/lesson-06-how-many-threads.html">Lesson 6</a>.</li>
+<li>"My Lab 2 port prints a small difference instead of 0." <a href="notes/lesson-07-lab2-picture.html">Lesson 7</a>.</li>
+<li>"My version with independent sets is correct but no faster on the GPU", or "one of the two sets gets wrong counts." <a href="notes/lesson-08-independent-work.html">Lesson 8</a>.</li>
+<li>"My multicore version is correct but well short of the number of cores", or "some lines of the picture stay 0." <a href="notes/lesson-09-many-cores.html">Lesson 9</a>.</li>
+<li>"More threads or more independent sets stopped helping, and the gains do not multiply." <a href="notes/lesson-10-many-threads.html">Lesson 10</a>.</li>
 </ol>
 
 <nav><a href="index.html">index</a><a href="words.html">words used on this site</a></nav>

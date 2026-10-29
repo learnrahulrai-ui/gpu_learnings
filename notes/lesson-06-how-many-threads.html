@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Read warp_scheduler.cu&#x27;s sweep: why the course GPU peaks at 768 sets of 32 threads, why the laptop needs only 112, what the literal 48 does on 14 SMs, and what 12.5 percent more work costing 87 percent more time means.">
+<meta name="keywords" content="lesson">
+<title>Lesson 6: How Many Threads</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="site">
+<a class="brand" href="MIT-6.S894.html">6.S894 self-study</a>
+<nav><a href="MIT-6.S894.html#syllabus">Lessons</a><a href="index.html">Notes</a><a href="../index.html">Lab pages</a><a href="../words.html">Words</a></nav>
+</header>
+<main>
+<p class="crumbs"><a href="MIT-6.S894.html">MIT 6.S894 tutorial</a> / Lab 2, part 0 (prelab: warp_scheduler.cu) / Lesson 6</p>
+<h1>Lesson 6. How many threads keep the GPU busy</h1>
+<p class="meta"><span>Lab 2, part 0 (prelab: warp_scheduler.cu)</span><span>you build: nothing new: execute the sweep and read it</span><span>you need: an NVIDIA GPU</span></p>
+<p class="sub">Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+
+<p class="label">In this lesson</p>
+<ol class="toc">
+<li><a href="#story">The story</a></li>
+<li><a href="#work">Work it out</a></li>
+<li><a href="#build">Build it</a></li>
+<li><a href="#connect">Connect the numbers</a></li>
+<li><a href="#wrong">When it goes wrong</a></li>
+<li><a href="#questions">The lab's questions</a></li>
+<li><a href="#plain">In plain words</a></li>
+<li><a href="#deeper">Go deeper</a></li>
+</ol>
+
+<h2 id="story">The story</h2>
+<div class="story">
+<p>The second prelab file, warp_scheduler.cu, launches more and more threads, each doing one long chain of multiply-adds, and prints operations per second for each launch. The lab asks when the GPU reaches its largest rate, and what the multiply-add's wait says about it.</p>
+<p>The file was written for the course GPU, with that GPU's SM count typed in as the number 48. On a laptop with 14 SMs it still compiles and executes, and prints a table that looks just as clean.</p>
+<p>How many threads does a GPU need to stay busy, and how does that differ from how many it can hold?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>The GTX 1650 has 14 SMs with 4 schedulers each. Guess how many sets of 32 threads it needs to keep every FP32 unit busy with chains of multiply-adds: 56, 112 or 448?</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "Confirm me this part, okay? I have 14 SMs. Yes or no?" / "just because I have SMs doesn't mean I know how many threads or schedulers you run. That is a different piece of information, yes or no?" / "Okay, so now what exactly I have to do?"</p>
+
+<h2 id="work">Work it out</h2>
+<p class="ln"><b>L01</b> Course machine for Lab 2 (Fall 2025 handout): an NVIDIA RTX 4000 Ada at 2.175 GHz with 48 SMs; each SM has 4 warp schedulers (192 in all), and each scheduler holds up to 12 warps, a warp being NVIDIA's name for a set of 32 consecutive threads of a block. Each SM has 128 FP32 units. <span class="from">from: Lab 2 handout (Fall 2025), NVIDIA Ada specification</span></p>
+<p class="ln"><b>L02</b> The laptop's GTX 1650 (Turing): 14 SMs with 4 schedulers each (56 in all) and 64 FP32 units per SM; an SM holds at most 32 warps and 16 blocks. <span class="from">from: your hardware table, NVIDIA Turing Tuning Guide</span></p>
+<p class="ln"><b>L03</b> The lines of warp_scheduler.cu that build the launch and the printed numbers, copied from page 12: <span class="from">from: Lab 2 starter code</span></p>
+<pre>uint32_t block_size = default_tile_size * num_threads_per_block;
+dim3 grid(N / block_size);
+tail_latency_fma&lt;default_num_ops, default_tile_size&gt;&lt;&lt;&lt;grid, block&gt;&gt;&gt;(in, out, N);
+int N = block_size * 48 * multiplier;
+double flops = ((double)N * default_num_ops * 2) / time_in_seconds;
+uint32_t warps = (N / block_size) * (num_threads_per_block / 32);</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>uint32_t block_size = default_tile_size * num_threads_per_block;</code><span>Numbers handled per block: the default tile size (32) times the threads per block (64 by default), 2048.</span></li>
+<li><code>dim3 grid(N / block_size);</code><span>Blocks to launch: N divided by 2048, in whole-number division.</span></li>
+<li><code>tail_latency_fma&lt;default_num_ops, default_tile_size&gt;&lt;&lt;&lt;grid, block&gt;&gt;&gt;(in, out, N);</code><span>Launch the kernel with the default tile size and number of updates fixed in; the tile size handed to this launcher is never used.</span></li>
+<li><code>int N = block_size * 48 * multiplier;</code><span>Total numbers for one setting of the sweep: 2048 times 48 times the multiplier. The 48 is typed in.</span></li>
+<li><code>double flops = ((double)N * default_num_ops * 2) / time_in_seconds;</code><span>Operations per second: every number gets 5260 multiply-adds, each counted as 2 operations, divided by the measured time.</span></li>
+<li><code>uint32_t warps = (N / block_size) * (num_threads_per_block / 32);</code><span>The printed warps: blocks times warps per block.</span></li>
+</ol>
+</div>
+<p class="ln"><b>L04</b> From the starter: 64 threads per block, each handling 32 numbers, so 2,048 numbers per block; each number goes through <code>tmp += tmp * 3.0f</code> 263 x 20 = 5,260 times, each step needing the one before; N = 2,048 x 48 x m numbers for m = 1 to 48; it prints warps = blocks x 2 and operations per second = N x 5,260 x 2 / time. <span class="from">from: Lab 2 starter code, L03</span></p>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> For multiplier m: blocks = ____ , warps = ____ . For m = 8: ____ blocks, ____ warps, ____ warps per scheduler on the course GPU. <span class="from">from: L01, L04</span></p>
+<details><summary>CHECK</summary>
+<pre>blocks = 48m, warps = 96m
+m = 8: 384 blocks, 768 warps, 768 / 192 = 4 per scheduler</pre>
+</details>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> Every warp is one chain of FFMAs, and an FFMA that needs the previous one waits 4 cycles (measured on Turing; assume the same on Ada). Course GPU: FP32 units per scheduler = 128 / 4 = ____ , so a 32-thread FFMA begins in ____ cycle(s), and warps per scheduler that keep the units busy = 4 / ____ = ____ ; whole GPU ____ . Laptop: units per scheduler ____ , begin time ____ cycles (measured: 2), warps needed per scheduler ____ , whole GPU ____ . <span class="from">from: L01, L02, your output (Lab 2 prelab)</span></p>
+<details><summary>CHECK</summary>
+<pre>course: 32 units, 1 cycle, 4 / 1 = 4 per scheduler, 192 x 4 = 768 warps
+laptop: 16 units, 2 cycles, 4 / 2 = 2 per scheduler, 56 x 2 = 112 warps</pre>
+</details>
+<p class="ln do"><b>L07</b> <b class="x">DO</b> Held at most: course 192 x 12 = ____ warps; laptop 14 x 32 = ____ . Needed for this work (L06): ____ and ____ . Needed as a share of held: ____ and ____ percent. <span class="from">from: L01, L02, L06</span></p>
+<details><summary>CHECK</summary>
+<pre>course holds 2,304 and needs 768: 33 percent
+laptop holds 448 and needs 112: 25 percent
+The ceiling is not the target; the target comes from the wait and the begin time.</pre>
+</details>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> Reported for the course GPU in the learner's notes: m = 8 gave 26.4575 x 10^12 operations per second, m = 9 gave 15.9401 x 10^12. Operations per block = 2 x 2,048 x 5,260 = ____ . Time at m = 8 = 384 x that / rate = ____ ms; at m = 9, ____ ms. Full rate = 6,144 FP32 units x 2 x 2.175 billion = ____ ; share reached at m = 8 = ____ percent. <span class="from">from: L01, L04, L05, your Lab 2 notes</span></p>
+<details><summary>CHECK</summary>
+<pre>21,544,960 operations per block
+m = 8: 8,273,264,640 / 26.4575e12 = 0.3127 ms; m = 9: 9,307,422,720 / 15.9401e12 = 0.5839 ms
+full rate 26.73e12; 26.4575 / 26.73 = 99 percent at m = 8</pre>
+</details>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> Work ratio of m = 9 to m = 8 = ____ ; time ratio = ____ . Hypothesis, not a measured fact: an SM holds at most 8 blocks of this kernel at once, so 384 blocks are held and the 48 extra wait for a second round. Predicted time = 2 x 0.3127 = ____ ms against 0.5839, a gap of ____ percent. <span class="from">from: L08</span></p>
+<details><summary>CHECK</summary>
+<pre>work 1.125, time 1.867
+0.6254 ms predicted, 6.6 percent from 0.5839: suggestive, not proof
+Test: cudaOccupancyMaxActiveBlocksPerMultiprocessor for this kernel at 64 threads per block.</pre>
+</details>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> On the laptop the file still multiplies by 48. For m = 1, 48 blocks on 14 SMs: 48 = 3 x 14 + ____ , so ____ SMs get 4 blocks and ____ get 3. The printed "96 warps" means ____ per scheduler on the laptop against ____ on the course GPU. <span class="from">from: L02, L04, L05</span></p>
+<details><summary>CHECK</summary>
+<pre>48 = 3 x 14 + 6: 6 SMs hold 4 blocks (8 warps), 8 SMs hold 3 (6 warps)
+96 / 56 = 1.71 per scheduler on the laptop; 96 / 192 = 0.5 on the course GPU
+The same printed line describes a different point of each GPU's curve.</pre>
+</details>
+
+<h2 id="build">Build it</h2>
+<p class="ln"><b>L11</b> In the lab2 folder, compile the sweep and keep its table: <span class="from">from: Lab 2 starter code</span></p>
+<pre>nvcc -O3 -arch=sm_75 -std=c++17 warp_scheduler.cu -o warp_scheduler
+./warp_scheduler &gt; sweep.csv</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>nvcc -O3 -arch=sm_75 -std=c++17 warp_scheduler.cu -o warp_scheduler</code><span>Compile the sweep for compute capability 7.5.</span></li>
+<li><code>./warp_scheduler &gt; sweep.csv</code><span>Execute it and save its table, one line per multiplier: warps, then operations per second.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L12</b> <b class="x">DO</b> From L06 the laptop's units are all busy from about 112 warps, which the file's steps of 96 warps reach between m = 1 (96) and m = 2 (192). In your sweep, the first line within 5 percent of the largest rate: warps = ____ . Largest rate = ____ . Full rate of your GPU = 896 x 2 x your clock = ____ . <span class="from">from: L06, L11, your output</span></p>
+<details><summary>CHECK</summary>
+<pre>Expected on the laptop: the rate stops growing near the m = 2 line (192 warps), since 96 is below
+the 112 needed and 192 above it. The laptop's sweep was not recorded in the chats; yours is the
+first. At an assumed 1.5 GHz the full rate is 896 x 2 x 1.5e9 = 2.69 x 10^12.</pre>
+</details>
+<p class="ln do"><b>L13</b> <b class="x">DO</b> Optional fix: replace the 48 by the SM count the GPU reports (<code>cudaGetDeviceProperties</code>, field multiProcessorCount). With 14, blocks = 14m and warps = 28m. The m that first reaches L06's 112 = ____ . <span class="from">from: L06, CUDA programming guide</span></p>
+<details><summary>CHECK</summary>
+<pre>28m &gt;= 112 -&gt; m = 4: every SM then holds 4 blocks = 8 warps = 2 per scheduler</pre>
+</details>
+
+<div class="connect" id="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L14</b> <b class="x">DO</b> Collect L06 (768 and 112 needed), L07 (2,304 and 448 held), L08 (99 percent at 768), L09 (12.5 percent more work, 87 percent more time), L10 (the 48 on 14 SMs). Answer the prelab's fourth question in one sentence: when does the sweep reach its largest rate, and what does the FFMA's wait say about it? <span class="from">from: L06, L07, L08, L09, L10</span></p>
+<details><summary>CHECK</summary>
+<pre>The rate peaks once each scheduler has enough independent warps to begin an FFMA at every chance
+during the 4-cycle wait: 4 per scheduler (768 warps) on the course GPU, 2 per scheduler (112) on
+the laptop; past that, extra warps add nothing and can add a round of waiting.
+
+Tempting answer that fails: "fill every SM to its maximum of warps". L07 and L09 refute it: the
+target is a third of the ceiling, and going past it cost 87 percent more time.</pre>
+</details>
+</div>
+
+<h2 id="wrong">When it goes wrong</h2>
+<ul class="pitfalls">
+<li><b>The laptop's table has no clean peak.</b> The 48 spreads blocks unevenly over 14 SMs (L10); use the SM count the GPU reports (L13).</li>
+<li><b>The laptop peaks at a different warp count than the course GPU.</b> Correct: it needs 2 warps per scheduler, not 4 (L06).</li>
+<li><b>A small step up in warps costs far more time.</b> A second round of blocks (L09).</li>
+</ul>
+
+<h2 id="questions">The lab's questions</h2>
+<p>Paraphrased from the Fall 2025 handout. Write your own answers from the lines named; the numbers are yours to measure.</p>
+<ul class="related">
+<li><b>Prelab question 4: when does the benchmark reach its largest rate, and what does the FFMA's wait suggest about it?</b> L06, L08 and L14.</li>
+</ul>
+
+<div class="plain" id="plain">
+<p class="label">In plain words</p>
+<p>A GPU hides waiting by switching between many independent sets of threads. It needs only enough of them to cover each wait, here a third or a quarter of what it can hold. Past that point more threads add nothing, and a launch slightly too large can add a whole extra round of time.</p>
+<p>For a manager: "the hardware supports N" is a ceiling, not a target. The right number comes from how long each step of the work waits, and it differs between machines.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>112: 56 schedulers x 2 each, because a multiply-add waits 4 cycles and a 32-thread multiply-add
+takes 2 cycles to begin on this GPU.</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>How would you test, on the course GPU, that the jump from 768 to 864 warps is a second round of blocks and not something else?</p>
+<details><summary>CHECK</summary>
+<pre>Compile with -Xptxas -v to see registers per thread for this kernel; call
+cudaOccupancyMaxActiveBlocksPerMultiprocessor for the real kernel at 64 threads per block to get
+the blocks one SM holds at once. If it says 8, sweep the block count in steps of 1 just below and
+above 384 = 48 x 8: a second round predicts a step exactly after 384, not a gradual slope.</pre>
+</details>
+</div>
+
+<h2 id="deeper">Go deeper</h2>
+<ul class="related">
+<li><a href="../12-the-48-trap.html">12. Lab 2 prelab: the 48 in warp_scheduler.cu</a></li>
+<li><a href="../13-the-864-cliff.html">13. Lab 2: 12.5 percent more work, 87 percent more time</a></li>
+<li><a href="../17-hardware-or-launch.html">17. Fixed by the chip, or made by the launch?</a></li>
+<li><a href="filling-the-wait.html">Filling the 4-cycle wait: needed against held</a></li>
+<li><a href="second-round.html">A second round of blocks</a></li>
+</ul>
+
+<nav class="pager"><a href="lesson-05-timing-one-multiply-add.html"><small>previous</small>Lesson 5. Timing one multiply-add</a><a class="next" href="lesson-07-lab2-picture.html"><small>next</small>Lesson 7. The Lab 2 picture: port, check, time</a></nav>
+</main>
+<footer class="site">
+<p>Independent self-study material for MIT 6.S894 Accelerated Computing, written from one learner's work. Not affiliated with or endorsed by MIT or the course staff. Course pages: <a href="https://accelerated-computing.academy/fall25/">accelerated-computing.academy/fall25</a>. Starter code: <a href="https://github.com/accelerated-computing-class">github.com/accelerated-computing-class</a>. Every measured number comes from one laptop (Ryzen 5 4600H, GTX 1650) unless a line says otherwise.</p>
+</footer>
+</body>
+</html>

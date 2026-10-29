@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Move your Lab 1 code into the Lab 2 files: the new window constants, the changed line, and why only an exact 0 counts: 0.045 for a sign error, 0.00756 for a harmless rounding change, 0.0000448 for a missing line.">
+<meta name="keywords" content="lesson">
+<title>Lesson 7: Lab 2 Port</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="site">
+<a class="brand" href="MIT-6.S894.html">6.S894 self-study</a>
+<nav><a href="MIT-6.S894.html#syllabus">Lessons</a><a href="index.html">Notes</a><a href="../index.html">Lab pages</a><a href="../words.html">Words</a></nav>
+</header>
+<main>
+<p class="crumbs"><a href="MIT-6.S894.html">MIT 6.S894 tutorial</a> / Lab 2, setup / Lesson 7</p>
+<h1>Lesson 7. The Lab 2 picture: port, check, time</h1>
+<p class="meta"><span>Lab 2, setup</span><span>you build: your Lab 1 vector versions, moved into the Lab 2 files</span><span>you need: your Lab 1 vector code, CPU and GPU</span></p>
+<p class="sub">Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+
+<p class="label">In this lesson</p>
+<ol class="toc">
+<li><a href="#story">The story</a></li>
+<li><a href="#work">Work it out</a></li>
+<li><a href="#build">Build it</a></li>
+<li><a href="#check">Check it</a></li>
+<li><a href="#measure">Measure it</a></li>
+<li><a href="#connect">Connect the numbers</a></li>
+<li><a href="#wrong">When it goes wrong</a></li>
+<li><a href="#plain">In plain words</a></li>
+<li><a href="#deeper">Go deeper</a></li>
+</ol>
+
+<h2 id="story">The story</h2>
+<div class="story">
+<p>Lab 2 computes a bigger and deeper picture: 1024 by 1024 places, up to 2000 repetitions each, inside a window one ten-thousandth across. Its files invite you to paste in your Lab 1 vector code for comparison, updated to the new window constants.</p>
+<p>The move brings two small changes. The window is set by window_zoom, window_x and window_y instead of 2.5, 2.0 and 1.25. And one line of the loop is written differently, w - (x2 + y2) + cy instead of w - x2 - y2 + cy, which is the same in exact arithmetic.</p>
+<p>When your port prints a small difference instead of 0, is it a bug or rounding, and how can you tell?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>Lab 2 prints one wrong place as 1 / (1024 x 1024 x 2000). A first version forgets a whole value of i (1024 places); a second only changes rounding. Guess which prints the smaller number.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "Let's say somebody in an interview, instead of asking me to memorize, gives me this program, and they don't like guesswork. They want me to prove using debugger tools ... why is it slow, where it is going slowness."</p>
+
+<h2 id="work">Work it out</h2>
+<p class="ln"><b>L01</b> The window of the Lab 2 starter (mandelbrot_cpu_2.cpp; the GPU file has the same lines): <span class="from">from: Lab 2 starter code</span></p>
+<pre>constexpr float window_zoom = 1.0 / 10000.0f;
+constexpr float window_x = -0.743643887 - 0.5 * window_zoom;
+constexpr float window_y = 0.131825904 - 0.5 * window_zoom;
+constexpr uint32_t default_max_iters = 2000;
+float cx = (float(j) / float(img_size)) * window_zoom + window_x;
+float cy = (float(i) / float(img_size)) * window_zoom + window_y;</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>constexpr float window_zoom = 1.0 / 10000.0f;</code><span>The part of the graph paper shown is 1 / 10000 = 0.0001 across.</span></li>
+<li><code>constexpr float window_x = -0.743643887 - 0.5 * window_zoom;</code><span>Its left edge: -0.743643887 minus half of 0.0001.</span></li>
+<li><code>constexpr float window_y = 0.131825904 - 0.5 * window_zoom;</code><span>Its top edge: 0.131825904 minus half of 0.0001.</span></li>
+<li><code>constexpr uint32_t default_max_iters = 2000;</code><span>At most 2000 repetitions per place.</span></li>
+<li><code>float cx = (float(j) / float(img_size)) * window_zoom + window_x;</code><span>cx: j divided by img_size, times 0.0001, plus the left edge.</span></li>
+<li><code>float cy = (float(i) / float(img_size)) * window_zoom + window_y;</code><span>cy: i divided by img_size, times 0.0001, plus the top edge.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L02</b> <b class="x">DO</b> window_x = ____ ; window_y = ____ . With img_size = 1024: cx at j = 0 = ____ ; at j = 1023 = ____ . Lab 1 covered 2.5 across; Lab 2 covers ____ , which is ____ times less. <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>window_x = -0.743643887 - 0.00005 = -0.743693887
+window_y = 0.131825904 - 0.00005 = 0.131775904
+j = 0: -0.743693887; j = 1023: 1023 / 1024 x 0.0001 - 0.743693887 = -0.743593985
+0.0001 across, 25,000 times less than Lab 1's 2.5</pre>
+</details>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> Float fact: between 0.5 and 1, floats are 2 to the power -24 = 0.0000000596 apart. Step between neighbouring cx = 0.0001 / 1024 = ____ . In float steps: ____ / 0.0000000596 = ____ . <span class="from">from: L01, L02, IEEE 754 float32</span></p>
+<details><summary>CHECK</summary>
+<pre>0.0000000977 per place
+0.0000000977 / 0.0000000596 = 1.64 float steps
+Neighbouring places are only 1 or 2 float steps apart: a rounding of one step anywhere in a
+repetition moves a point by more than half the distance to its neighbour.</pre>
+</details>
+<p class="ln"><b>L04</b> The Lab 2 form of line B, copied from page 07; Lab 1 had <code>float y = w - x2 - y2 + cy;</code>: <span class="from">from: Lab 2 starter code</span></p>
+<pre>float y = w - (x2 + y2) + cy;</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>float y = w - (x2 + y2) + cy;</code><span>First add x2 and y2, then subtract that sum from w, then add cy, and keep the result in y.</span></li>
+</ol>
+</div>
+<p class="ln"><b>L05</b> Real data, computed in 32-bit fractions from the starter's constants: the Lab 1 and Lab 2 forms of line B give different iters at 249,479 of the 1,048,576 places, a total difference of 15,852,362 repetitions, although the two forms are equal in exact arithmetic. Every place needs between 69 and 2000 repetitions; they add up to 138,219,822. <span class="from">from: float32 computation on the starter's constants</span></p>
+<p class="ln"><b>L06</b> The Lab 2 starter's check, copied from page 15: <span class="from">from: Lab 2 starter code</span></p>
+<pre>int64_t diff = 0;
+for (uint32_t i = 0; i &lt; img_size; i++) {
+    for (uint32_t j = 0; j &lt; img_size; j++) {
+        diff +=
+            abs(int(result[i * img_size + j]) - int(ref_result[i * img_size + j]));
+    }
+}
+return diff / double(img_size * img_size * max_iters);</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>int64_t diff = 0;</code><span>Make a 64-bit whole number diff holding 0.</span></li>
+<li><code>for (uint32_t i = 0; i &lt; img_size; i++) {</code><span>For every i,</span></li>
+<li><code>for (uint32_t j = 0; j &lt; img_size; j++) {</code><span>and every j,</span></li>
+<li><code>diff +=</code><span>add to diff</span></li>
+<li><code>abs(int(result[i * img_size + j]) - int(ref_result[i * img_size + j]));</code><span>the size of the gap between this version's iters and the reference iters at that place.</span></li>
+<li><code>}</code><span>End of the j loop.</span></li>
+<li><code>}</code><span>End of the i loop.</span></li>
+<li><code>return diff / double(img_size * img_size * max_iters);</code><span>Divide the total gap by the number of places times max_iters, and hand that fraction back.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L07</b> <b class="x">DO</b> Divisor = 1024 x 1024 x 2000 = ____ . A single place wrong by 1 prints ____ . The line B change of L05 prints 15,852,362 / divisor = ____ . A version that forgets the cheapest value of i leaves 1024 places at 0, total 93,904, and prints ____ . Which looks better, and by how much? ____ . <span class="from">from: L05, L06, computation on the starter's constants</span></p>
+<details><summary>CHECK</summary>
+<pre>2,097,152,000; 1 / that = 0.000000000477
+line B change: 0.00756; missing line: 0.0000448
+the broken version prints 169 times less than the harmless rounding change</pre>
+</details>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> The learner's first port had the sign of window_y wrong and printed 0.045. Total gap = 0.045 x 2,097,152,000 = ____ repetitions; per place = ____ . The fixed version printed exactly 0, at 221.97 ms on the GPU with one block of 32 threads. <span class="from">from: L07, the learner's chat</span></p>
+<details><summary>CHECK</summary>
+<pre>94,371,840 repetitions, 90 per place: a wrong window moves the whole picture, so the number is
+large and obvious; the dangerous bugs move a few places and print tiny numbers (L07)</pre>
+</details>
+
+<h2 id="build">Build it</h2>
+<p class="ln"><b>L09</b> What to do: in both Lab 2 files, uncomment the optional vector block (it keeps <code>#define HAS_VECTOR_IMPL</code>), paste your Lab 1 vector functions into it, replace 2.5, 2.0 and 1.25 by window_zoom, window_x and window_y, write line B in the Lab 2 form, and in the CPU version make the cx step window_zoom / img_size. <span class="from">from: Lab 2 starter code, L01, L04</span></p>
+<p class="ln"><b>L10</b> In the lab2 folder: <span class="from">from: the learner's compile commands, Lab 2 starter code</span></p>
+<pre>mkdir -p out
+g++ -O3 -march=native -std=c++17 -pthread mandelbrot_cpu_2.cpp -o mandelbrot_cpu_2
+nvcc -O3 -arch=sm_75 -std=c++17 mandelbrot_gpu_2.cu -o mandelbrot_gpu_2
+./mandelbrot_cpu_2 &amp;&amp; ./mandelbrot_gpu_2</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>mkdir -p out</code><span>Make the folder for the pictures, as in Lab 1.</span></li>
+<li><code>g++ -O3 -march=native -std=c++17 -pthread mandelbrot_cpu_2.cpp -o mandelbrot_cpu_2</code><span>Compile the Lab 2 CPU file; -pthread adds the POSIX threads library that its later parts use.</span></li>
+<li><code>nvcc -O3 -arch=sm_75 -std=c++17 mandelbrot_gpu_2.cu -o mandelbrot_gpu_2</code><span>Compile the Lab 2 GPU file for compute capability 7.5.</span></li>
+<li><code>./mandelbrot_cpu_2 &amp;&amp; ./mandelbrot_gpu_2</code><span>Execute both; each times every version it has and prints its difference.</span></li>
+</ol>
+</div>
+
+<h2 id="check">Check it</h2>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> Your printed differences: CPU vector ____ , GPU vector ____ . Each must be exactly 0. If not, which case of L07 and L08 does the size suggest? ____ . <span class="from">from: L07, L08, your output</span></p>
+<details><summary>CHECK</summary>
+<pre>exactly 0 for both
+around 0.045: the window (a sign or an edge)
+around 0.0076: line B in the Lab 1 form
+below 0.0001: a few places, or a whole line of the picture, missing
+Add your own count of differing places and the first (i, j) that differs: the average alone
+cannot tell these apart.</pre>
+</details>
+
+<h2 id="measure">Measure it</h2>
+<p class="ln"><b>L12</b> The Lab 2 starter's timing: the CPU file times each version 10 times, 1 call each, and prints the smallest; the GPU file times the vector baseline 1 time of 4 launches, the ILP version 1 time of 2, and every later version 3 times of 5. <span class="from">from: Lab 2 starter code</span></p>
+<p class="ln do"><b>L13</b> <b class="x">DO</b> The laptop's GPU vector baseline in seven separate executions: 221.97, 222.90, 207.55, 208.67, 221.11, 207.87, 207.82 ms. Spread = (222.90 - 207.55) / 207.55 = ____ percent. The baseline is timed ____ time(s), so its "smallest" is chosen from ____ number(s). Your executions: ____ . <span class="from">from: L12, your output</span></p>
+<details><summary>CHECK</summary>
+<pre>7.4 percent between executions
+1 time: the smallest of one number is just that number
+Compare versions only across several executions each, and say which numbers you compare.</pre>
+</details>
+
+<div class="connect" id="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L14</b> <b class="x">DO</b> Collect L02 (0.0001 across), L03 (1.64 float steps per place), L05 (23.8 percent of places changed by a rewrite that is exact in arithmetic), L07 (169 times), L08 (90 per place), L13 (7.4 percent between executions). Write one sentence on what "correct" and "faster" must mean before any Lab 2 version is compared with another. <span class="from">from: L02, L03, L05, L07, L08, L13</span></p>
+<details><summary>CHECK</summary>
+<pre>In a picture this zoomed, neighbouring places are a float step or two apart, so any change in
+rounding changes counts across a quarter of the picture; correct must mean exactly 0 against the
+reference's own line forms, confirmed by a count of differing places, and faster must mean a gap
+larger than the 7 percent that separate executions already show.
+
+Tempting answer that fails: "a tiny average difference is close enough". L07 refutes it: a missing
+line of the picture prints 169 times less than a harmless rounding change.</pre>
+</details>
+</div>
+
+<h2 id="wrong">When it goes wrong</h2>
+<ul class="pitfalls">
+<li><b>Difference about 0.045.</b> The window constants are wrong, often a sign (L08).</li>
+<li><b>Difference about 0.0076.</b> Line B is still in the Lab 1 form (L04, L05).</li>
+<li><b>Difference below 0.0001 but not 0.</b> Places are missing, such as one whole value of i (L07).</li>
+<li><b>Your speedup changes from one execution to the next.</b> Executions differ by 7 percent on their own (L13); compare several of each.</li>
+</ul>
+
+<div class="plain" id="plain">
+<p class="label">In plain words</p>
+<p>Lab 2 zooms 25,000 times deeper into the same picture. At that depth, neighbouring points differ by only one or two steps of the computer's number format, so a harmless-looking rewrite of one line changes the result at a quarter of the places. Only an exact match counts as correct.</p>
+<p>For a manager: a summary error figure can rank a seriously broken version above a harmless one. Ask how many results differ, not only by how much on average.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>The version missing a line of the picture: 0.0000448, 169 times smaller than the rounding
+change's 0.00756.</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>Your port prints 0.000000000477. Is it correct, and what do you do next?</p>
+<details><summary>CHECK</summary>
+<pre>No: 4.77e-10 is exactly one place wrong by 1, so the new version is not correct yet. Add a count
+of mismatched places, and print the first one's i, j and both values. Then find the cause: a real
+bug, or a rounding difference such as a reordered line B, which must be matched to the reference
+before any speed comparison.</pre>
+</details>
+</div>
+
+<h2 id="deeper">Go deeper</h2>
+<ul class="related">
+<li><a href="../15-trusting-a-number.html">15. Lab 2: what the two printed numbers can hide</a></li>
+<li><a href="../07-waiting-chain.html">07. Lab 2: which line waits for which line</a></li>
+<li><a href="checking-the-output.html">What the printed difference can hide</a></li>
+<li><a href="owner.html">Owner: exactly one writer per place</a></li>
+</ul>
+
+<nav class="pager"><a href="lesson-06-how-many-threads.html"><small>previous</small>Lesson 6. How many threads keep the GPU busy</a><a class="next" href="lesson-08-independent-work.html"><small>next</small>Lesson 8. Independent work inside one thread</a></nav>
+</main>
+<footer class="site">
+<p>Independent self-study material for MIT 6.S894 Accelerated Computing, written from one learner's work. Not affiliated with or endorsed by MIT or the course staff. Course pages: <a href="https://accelerated-computing.academy/fall25/">accelerated-computing.academy/fall25</a>. Starter code: <a href="https://github.com/accelerated-computing-class">github.com/accelerated-computing-class</a>. Every measured number comes from one laptop (Ryzen 5 4600H, GTX 1650) unless a line says otherwise.</p>
+</footer>
+</body>
+</html>

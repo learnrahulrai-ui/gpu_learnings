@@ -57,6 +57,11 @@
 <li><b>F34. Doubling only the first place or only the step when each thread takes two places.</b> The first repeats 992 of 1024 places; the second leaves 496 unowned. Worked out: <a href="18-two-places-per-thread.html">page 18</a>, L04.</li>
 <li><b>F35. A per-cycle count taken as a held-at-once count.</b> At most 14 x 4 x 32 = 1,792 threads can begin an instruction per cycle; 14,336 can be held. Worked out: <a href="17-hardware-or-launch.html">page 17</a>, L05 and L06.</li>
 <li><b>F36. Different data taken as different instructions.</b> The threads of one 32-thread set, each on its own place, all wait on the same instruction; only another set of 32 or another independent instruction fills the wait. Worked out: <a href="18-two-places-per-thread.html">page 18</a>, L15.</li>
+<li><b>F37. A function that does nothing ranked fastest.</b> An empty vector function prints the shortest time of all next to an average difference of 0.248, the whole picture wrong. Worked out: <a href="notes/lesson-00-setup.html">Lesson 0</a>, L14 and L17.</li>
+<li><b>F38. Pictures silently not written.</b> Without the folder out/, the starter writes no picture files and reports nothing. Worked out: <a href="notes/lesson-00-setup.html">Lesson 0</a>, L07.</li>
+<li><b>F39. Blocks of 1 thread instead of 1 block of 32 threads.</b> <code>&lt;&lt;&lt;32, 1&gt;&gt;&gt;</code> prints difference 0 and a time close to one thread's: every block computes the whole picture. Worked out: <a href="notes/lesson-04-gpu-32-threads.html">Lesson 4</a>, When it goes wrong.</li>
+<li><b>F40. Rounding taken as harmless in a zoomed picture.</b> Neighbouring cx values of the Lab 2 picture are only 1.64 float steps apart, so a rewrite that is exact in arithmetic changes 23.8 percent of the counts. Worked out: <a href="notes/lesson-07-lab2-picture.html">Lesson 7</a>, L03 and L05.</li>
+<li><b>F41. The time of an empty launch function taken as the cost of a kernel launch.</b> The empty function launches nothing; it times CPU calls and a wait on an idle GPU. Worked out: <a href="notes/lesson-00-setup.html">Lesson 0</a>, the interviewer's next question.</li>
 </ol>
 
 <nav><a href="index.html">index</a><a href="symptoms.html">start from your symptom</a></nav>

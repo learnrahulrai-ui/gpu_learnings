@@ -81,7 +81,8 @@ Prefer the learner's own invented words: image paper, graph paper, middleman pai
 - Page structure, in order: The story (plain English for anyone, ends on an open question, never previews a result) -> Guess first -> Your words (learner quotes) -> Work it out (L-lines, DO blanks, CHECK) -> Connect the numbers (5 to 10 earlier results, one meaning, the tempting answer that fails and the line that refutes it) -> In plain words (non-coder, plus one line for a manager) -> Your guess against the machine -> The interviewer's next question -> navigation.
 - Every code block gets a "Read the code in English, line by line" panel under it.
 - Every technical word goes into `words.html`. Every new page gets a line in `symptoms.html`.
-- The notes section (`notes/`) uses the shorter note format described in `CLAUDE.md`: one idea, "The idea", L-lines with DO and CHECK, the lab pages that work it out, related notes, and a generated list of the notes that point to it. The axiom rule and the banned words apply there too.
+- The notes section (`notes/`) uses the shorter note format described in `CLAUDE.md`: one idea, "The idea", L-lines with DO and CHECK, the lab pages that work it out, related notes, and a generated list of the pages that point to it. The axiom rule and the banned words apply there too.
+- The tutorial lessons (`notes/lesson-*.html`) keep the full page structure and add Build it, Check it, Measure it, When it goes wrong and The lab's questions (see `CLAUDE.md`). Paraphrase the course handouts, never quote them (their wording contains banned words); describe what to write, never hand over finished lab code; mark every number as measured on the laptop, computed, assumed or not recorded.
 
 ## The method behind every page ("derive the need")
 

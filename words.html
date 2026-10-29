@@ -15,6 +15,7 @@
 <dt>address</dt><dd>The number that says where a value sits in memory. Memory is a long list of bytes, numbered from 0; an address is one of those numbers.</dd>
 <dt>array</dt><dd>Many values of the same kind stored one after another in memory, reached by their place number: <code>out[5]</code> is the value at place 5 of the array <code>out</code>.</dd>
 <dt>AVX2</dt><dd>A set of instructions in the laptop's Ryzen processor that act on 256 bits at once, which is 8 fractions of 32 bits each.</dd>
+<dt>AVX-512</dt><dd>A larger set of such instructions, acting on 512 bits at once: 16 fractions of 32 bits. The Lab 1 handout targets it; the laptop's Ryzen 5 4600H does not have it.</dd>
 <dt>BRA, BSSY, BSYNC</dt><dd>GPU machine instructions that control where execution goes: BRA jumps to another instruction; BSSY and BSYNC mark where threads that took different paths meet again.</dd>
 <dt>bit, byte</dt><dd>A bit holds 0 or 1. A byte is 8 bits. A float or a <code>uint32_t</code> takes 32 bits, which is 4 bytes.</dd>
 <dt>block (CUDA)</dt><dd>A set of GPU threads started together. The launch <code>&lt;&lt;&lt;B, T&gt;&gt;&gt;</code> starts B blocks of T threads each. Each block executes on one SM.</dd>
@@ -23,20 +24,25 @@
 <dt>cache</dt><dd>Small, fast memory that keeps recently read values so a second read of the same value does not go back to the slow memory chips. The program does not control it directly.</dd>
 <dt>CHECK</dt><dd>On this site, the fold-out box under each exercise that holds the worked answer. Open it only after writing your own.</dd>
 <dt>compiler</dt><dd>The program (here <code>g++</code> for the CPU and <code>nvcc</code> for the GPU) that turns source code into machine instructions. It may reorder instructions when nothing forbids it.</dd>
+<dt>compiler flags: -O3, -march=native, -arch=sm_75, -ccbin, -pthread</dt><dd>Options on the compile line. -O3: optimize fully. -march=native: allow every instruction this CPU has, such as AVX2. -arch=sm_75: make nvcc produce machine instructions for compute capability 7.5. -ccbin: tell nvcc which g++ to use. -pthread: add the POSIX threads library.</dd>
+<dt>compute capability</dt><dd>A pair of numbers that names an NVIDIA GPU's generation and what it can execute. The GTX 1650 is 7.5; <code>nvidia-smi --query-gpu=compute_cap --format=csv</code> prints yours.</dd>
 <dt>core</dt><dd>A part of a CPU that executes its own sequence of instructions. The Ryzen 5 4600H has 6.</dd>
 <dt>CPU</dt><dd>The central processor of a computer, built to finish one sequence of instructions as fast as possible.</dd>
 <dt>CS2R, LDG</dt><dd>GPU machine instructions: LDG copies a value from the graphics card's memory into a register; CS2R copies a special register, such as the cycle counter, into an ordinary one.</dd>
+<dt>cudaMalloc, cudaMemcpy, cudaDeviceSynchronize</dt><dd>CUDA calls made from the CPU: the first reserves memory on the graphics card, the second copies between CPU memory and the graphics card's memory, the third waits until everything sent to the GPU has finished.</dd>
 <dt>cycle</dt><dd>A single tick of a processor's clock. Times inside the GPU are counted in cycles.</dd>
 <dt>DRAM</dt><dd>The memory chips. On a graphics card they sit outside the GPU chip, so reading from them takes many cycles.</dd>
-<dt>FFMA, FADD</dt><dd>Names of GPU machine instructions: FFMA multiplies two fractions and adds a third in one step; FADD adds two fractions.</dd>
+<dt>FFMA, FADD, FMUL</dt><dd>Names of GPU machine instructions: FFMA multiplies two fractions and adds a third in one step; FADD adds two fractions; FMUL multiplies two.</dd>
 <dt>float</dt><dd>A fraction stored in 32 bits. It can only hold certain values; a typed number becomes the nearest one it can hold.</dd>
 <dt>fmadd (fused multiply-add)</dt><dd>A single instruction that computes a times b plus c. On the CPU, <code>_mm256_fmadd_ps</code> does it at 8 indexes at once.</dd>
 <dt>FP32 unit</dt><dd>A circuit in the GPU that does one 32-bit multiply-add for one thread. The GTX 1650 has 896 of them.</dd>
+<dt>hardware thread (SMT)</dt><dd>An instruction sequence that a CPU core keeps going alongside others. The laptop's cores keep 2 each, sharing the core's arithmetic circuits, so either can begin instructions while the other waits.</dd>
 <dt>GDDR5, GDDR6</dt><dd>Kinds of memory chips used on graphics cards. GDDR6 moves more bytes per second over the same wires.</dd>
 <dt>GPU</dt><dd>A graphics processor: thousands of simple arithmetic circuits that are fast when many of them do the same instruction at the same moment.</dd>
 <dt>graph paper</dt><dd>The learner's word for the mathematical plane with (0, 0) at its center, where the middleman pairs live.</dd>
 <dt>image paper</dt><dd>The learner's word for the 256 by 256 sheet of results, the array <code>out</code>, with i counting down and j counting right.</dd>
 <dt>IEEE 754</dt><dd>The standard that fixes how floats are stored and how a result that falls between two floats is rounded.</dd>
+<dt>ILP (instruction-level parallelism)</dt><dd>Independent instructions inside one thread, which the processor can begin while earlier ones still wait for their results. Lab 2, part 1 creates it by giving each loop several independent sets of places.</dd>
 <dt>index-repetition</dt><dd>On this site: one index of an 8-float AVX2 variable doing one repetition of the loop. A repetition of the vector loop costs 8 of them, useful or not.</dd>
 <dt>index 0 to 7</dt><dd>The place of one of the 8 values held in a 256-bit AVX2 variable.</dd>
 <dt>instruction</dt><dd>A basic step a processor executes: add, multiply, compare, copy, jump.</dd>
@@ -50,10 +56,12 @@
 <dt>memory bus</dt><dd>The wires between the GPU chip and its memory chips. On the GTX 1650 it is 128 bits, so 16 bytes move per transfer.</dd>
 <dt>middleman pair</dt><dd>The learner's word for (cx, cy), the two fractions computed from (i, j) that the Mandelbrot loop actually works on.</dd>
 <dt>notes (this site)</dt><dd>The short pages in the notes section: one idea each, a few lines to calculate, and the notes that point to each one.</dd>
+<dt>ncu (Nsight Compute)</dt><dd>NVIDIA's profiler for single kernels, used from the command line as <code>ncu --metrics ... ./program</code>. On many machines it needs administrator rights to read the GPU's counters.</dd>
 <dt>nsys (Nsight Systems)</dt><dd>NVIDIA's tool that times what the CPU and the GPU did, kernel by kernel. <code>nsys profile --stats=true ./program</code> prints the time of each kernel.</dd>
 <dt>profiler</dt><dd>A tool (here NVIDIA Nsight Compute) that counts what the GPU did, such as memory requests and sectors.</dd>
 <dt>operations per byte</dt><dd>How many arithmetic operations a program does for each byte it moves to or from memory. Below what the hardware needs to stay busy, memory sets the time.</dd>
 <dt>operations per second (FLOP/s)</dt><dd>Arithmetic operations completed per second. A multiply-add counts as 2: one multiply and one add.</dd>
+<dt>outside part (this site)</dt><dd>The cycles of a timing that the timed operations do not explain: measured cycles minus (number of operations - 1) times the cycles per operation. Equal only between two lengths of the same kernel.</dd>
 <dt>owner</dt><dd>On this site: the worker (CPU thread or GPU thread) responsible for writing a given place of the output. A correct split gives every place exactly one owner.</dd>
 <dt>median</dt><dd>The middle value of a list once it is sorted. Of 10, 10, 11, 14, 30 it is 11.</dd>
 <dt>predication</dt><dd>An instruction that is executed for every thread but has effect only where a stated condition is true, so no jump is needed. Shown in a listing with a prefix such as <code>@!P2</code>.</dd>
@@ -69,13 +77,17 @@
 <dt>significant bits</dt><dd>The bits of a float that hold its digits, as opposed to the bits that say how large it is. A float has 24, so above 16,777,216 it cannot hold every whole number.</dd>
 <dt>SIMD</dt><dd>Single instruction, multiple data: one instruction acting on several values at once, as AVX2 does with 8.</dd>
 <dt>SM</dt><dd>Each of the identical blocks of hardware an NVIDIA GPU chip is built from. The GTX 1650 has 14, each with 64 FP32 units.</dd>
+<dt>telerun</dt><dd>The course's tool for sending code to its own machines. It needs a course account, so self-learners compile and time on their own computer instead.</dd>
+<dt>threadIdx.x, blockIdx.x, blockDim.x</dt><dd>Numbers every GPU thread can read: its own number inside its block, its block's number, and the number of threads per block.</dd>
 <dt>tile</dt><dd>A small square piece of a large table, copied into shared memory so many threads can use each value without fetching it again.</dd>
 <dt>thread</dt><dd>A sequence of instructions being executed. On a GPU, thousands can exist at once, each with its own values.</dd>
-<dt>thread-instruction, thread-repetition</dt><dd>On this site: one GPU thread doing one instruction, or one repetition of a loop. An instruction that begins for a warp has room for 32 thread-instructions, whether or not every thread has work.</dd>
+<dt>thread-instruction, thread-repetition, warp-repetition</dt><dd>On this site: one GPU thread doing one instruction, or one repetition of a loop; and one repetition of the loop by a whole warp of 32 threads. An instruction that begins for a warp has room for 32 thread-instructions, whether or not every thread has work.</dd>
 <dt>Turing, Volta, Ada</dt><dd>Names of NVIDIA GPU generations. The GTX 1650 is Turing; Volta came just before it; the course GPU, an RTX 4000 Ada, is a later generation.</dd>
 <dt>warp scheduler</dt><dd>A circuit in each SM that, every cycle, picks which warp's next instruction begins. Turing and Ada GPUs have 4 per SM.</dd>
 <dt>wave (second round)</dt><dd>When a launch has more blocks than the SMs can hold at once, the extra blocks wait until earlier ones finish and then execute as a further round.</dd>
 <dt>warp</dt><dd>NVIDIA's name for 32 consecutive threads of a block that the hardware handles together, one instruction at a time.</dd>
+<dt>WSL2</dt><dd>Windows Subsystem for Linux: a Linux system inside Windows, enough to follow the lessons on a Windows laptop.</dd>
+<dt>Zen 2</dt><dd>AMD's CPU design used in the Ryzen 5 4600H. Published figures: an add or multiply that needs the previous result waits 3 cycles.</dd>
 </dl>
 
 <nav><a href="index.html">index</a><a href="00-what-a-gpu-is.html">start: 00 what a GPU is</a></nav>

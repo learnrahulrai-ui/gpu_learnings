@@ -3,13 +3,16 @@
 Usage, from the repository root:  python3 tools/build_notes.py
 Needs: beautifulsoup4.  Exit code 1 if a note points to a file or #id that does not exist.
 
-It rewrites only the text between these markers, so run it after adding or editing any note:
-  <!-- backlinks:begin --> ... <!-- backlinks:end -->   in every note (not course pages): the notes that point to it
+It rewrites only the text between these markers, so run it after adding or editing any page there:
+  <!-- backlinks:begin --> ... <!-- backlinks:end -->   in every note: the lessons and notes that point to it
+  <!-- lessons:begin --> ... <!-- lessons:end -->       in notes/index.html: every lesson, in order
   <!-- all:begin --> ... <!-- all:end -->               in notes/index.html: every note, A to Z
   <!-- topics:begin --> ... <!-- topics:end -->         in notes/index.html: notes by topic
-A note's title is its <h1>, its one-line summary is <meta name="description">, its topics are
-<meta name="keywords">. Addresses inside <nav>, the crumbs line and the backlinks block itself
-are not counted as a note pointing to another note.
+A page's title is its <h1>, its one-line summary is <meta name="description">, its topics are
+<meta name="keywords">; the topic "course" marks the course page and "lesson" marks a lesson,
+and neither is listed as a note. Addresses inside <nav>, <header>, <footer>, the crumbs line and
+the backlinks block are not counted as one page pointing to another. It also fails when a lesson
+is missing from the course page.
 """
 import glob
 import html
@@ -51,8 +54,7 @@ def main():
     problems = []
     pointed = {name: set() for name in pages}
     for name, page in pages.items():
-        main_el = page["soup"].main
-        for a in main_el.find_all("a", href=True):
+        for a in page["soup"].find_all("a", href=True):
             href = a["href"]
             if re.match(r"[a-z]+:", href):
                 continue
@@ -66,7 +68,8 @@ def main():
                 tsoup = pages[tname]["soup"] if tname in pages else bs4.BeautifulSoup(read(path), "html.parser")
                 if not tsoup.find(id=anchor):
                     problems.append(f"{name}: points to missing #{anchor} in {target or name}")
-            skip = a.find_parent("nav") or a.find_parent(class_="crumbs") or a.find_parent(class_="backlinks")
+            skip = (a.find_parent("nav") or a.find_parent("header") or a.find_parent("footer")
+                    or a.find_parent(class_="crumbs") or a.find_parent(class_="backlinks"))
             if not skip and target in pages and target not in (name, "index.html") and name != "index.html":
                 pointed[target].add(name)
 
@@ -75,8 +78,11 @@ def main():
         tail = f": {html.escape(p['desc'], quote=False)}" if with_desc and p["desc"] else ""
         return f'<li><a href="{name}">{html.escape(p["title"], quote=False)}</a>{tail}</li>\n'
 
+    def is_note(name):
+        return name != "index.html" and not {"course", "lesson"} & set(pages[name]["topics"])
+
     for name in pages:
-        if name == "index.html" or "course" in pages[name]["topics"]:
+        if not is_note(name):
             continue
         sources = sorted(pointed[name], key=lambda n: pages[n]["title"].casefold())
         body = "<ul class=\"related\">\n" + "".join(item(n, False) for n in sources) + "</ul>\n" if sources else "<p>None yet.</p>\n"
@@ -84,7 +90,13 @@ def main():
         text = fill(read(path), "backlinks", body)
         open(path, "w", encoding="utf-8").write(text)
 
-    notes = [n for n in pages if n != "index.html" and "course" not in pages[n]["topics"]]
+    notes = [n for n in pages if is_note(n)]
+    lessons = sorted(n for n in pages if "lesson" in pages[n]["topics"])
+    courses = [n for n in pages if "course" in pages[n]["topics"]]
+    for lesson in lessons:
+        for course in courses:
+            if not pages[course]["soup"].find("a", href=lesson):
+                problems.append(f"{course}: does not list {lesson}")
     notes.sort(key=lambda n: pages[n]["title"].casefold())
     all_body = '<ul class="related">\n' + "".join(item(n, True) for n in notes) + "</ul>\n"
     topics = sorted({t for n in notes for t in pages[n]["topics"]}, key=str.casefold)
@@ -95,12 +107,13 @@ def main():
         for t in topics
     )
     index = os.path.join(NOTES, "index.html")
-    text = fill(fill(read(index), "all", all_body), "topics", topic_body)
+    lesson_body = '<ul class="related">\n' + "".join(item(n, True) for n in lessons) + "</ul>\n"
+    text = fill(fill(fill(read(index), "lessons", lesson_body), "all", all_body), "topics", topic_body)
     open(index, "w", encoding="utf-8").write(text)
 
     for p in problems:
         print(p)
-    print(f"{len(notes)} notes, {len(topics)} topics, {len(problems)} problem(s)")
+    print(f"{len(lessons)} lessons, {len(notes)} notes, {len(topics)} topics, {len(problems)} problem(s)")
     return 1 if problems else 0
 
 

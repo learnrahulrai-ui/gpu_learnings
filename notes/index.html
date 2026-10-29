@@ -3,20 +3,41 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Short GPU notes for self-learners, one idea each, with numbers to calculate.">
-<title>All Notes</title>
+<meta name="description" content="The lessons of the MIT 6.S894 self-study tutorial and the short notes behind them, one idea each, with numbers to calculate.">
+<title>Lessons and Notes</title>
 <link rel="stylesheet" href="../style.css">
 </head>
 <body>
+<header class="site">
+<a class="brand" href="MIT-6.S894.html">6.S894 self-study</a>
+<nav><a href="MIT-6.S894.html#syllabus">Lessons</a><a href="index.html">Notes</a><a href="../index.html">Lab pages</a><a href="../words.html">Words</a></nav>
+</header>
 <main>
 <p class="crumbs"><a href="../index.html">GPU Learnings</a> / notes</p>
-<h1>Notes</h1>
-<p class="sub">Short notes for self-learners, one idea each: a few plain sentences, then numbered lines to calculate with real numbers. These are plain pages with no scripts, so there is no search box: press Ctrl+F (Cmd+F on a Mac) on this page to find a word.</p>
+<h1>Lessons and notes</h1>
+<p class="sub">The lessons are the tutorial: done in order, they take you through Labs 1 and 2 of MIT 6.S894 on your own machine. The notes are short reference pages, one idea each, for looking things up. These are plain pages with no scripts, so there is no search box: press Ctrl+F (Cmd+F on a Mac) on this page to find a word.</p>
 
 <p class="label">Course pages</p>
 <ul class="related">
-<li><a href="MIT-6.S894.html">MIT 6.S894 Accelerated Computing</a>: Labs 1 and 2, note by note, in course order.</li>
+<li><a href="MIT-6.S894.html">MIT 6.S894 Accelerated Computing</a>: the tutorial's front page: what you need, the syllabus, and the notes by lab part.</li>
 </ul>
+
+<p class="label">Lessons, in order</p>
+<!-- lessons:begin -->
+<ul class="related">
+<li><a href="lesson-00-setup.html">Lesson 0. Set up your machine and read the starter program</a>: Get the Lab 1 and Lab 2 starter code, compile it on your own computer, and read what the untouched program prints, including the 0.248 that an empty function prints.</li>
+<li><a href="lesson-01-reference.html">Lesson 1. The reference program, by hand</a>: Read mandelbrot_cpu_scalar line by line: where (cx, cy) comes from, one place worked by hand, why the loop has a w and no 2xy, and why a quarter of the places do 97.7 percent of the work.</li>
+<li><a href="lesson-02-gpu-one-thread.html">Lesson 2. The picture on one GPU thread</a>: Write the first kernel and its launch, check that it prints exactly 0, and work out why one GPU thread took 403 ms against 61.6 ms on one CPU core.</li>
+<li><a href="lesson-03-cpu-vector.html">Lesson 3. Vector code on the CPU: 8 places per instruction</a>: Write the vector version with AVX2 (8 floats) or AVX-512 (16): the cx of 8 places from one number, a loop that 8 places leave at different times, and why the result was 7.07 times, not 8.</li>
+<li><a href="lesson-04-gpu-32-threads.html">Lesson 4. The picture on 32 GPU threads</a>: Split the places between 32 threads with threadIdx.x, prove with the profiler's own counts that each store instruction lands in 4 blocks of 32 bytes, and explain 22.75 times instead of 32.</li>
+<li><a href="lesson-05-timing-one-multiply-add.html">Lesson 5. Timing one multiply-add</a>: Time chains of multiply-adds with the GPU's cycle counter: what sits between the clock reads, why 281 / 64 is not the answer, and how 4 cycles become 2 with a second chain.</li>
+<li><a href="lesson-06-how-many-threads.html">Lesson 6. How many threads keep the GPU busy</a>: Read warp_scheduler.cu's sweep: why the course GPU peaks at 768 sets of 32 threads, why the laptop needs only 112, what the literal 48 does on 14 SMs, and what 12.5 percent more work costing 87 percent more time means.</li>
+<li><a href="lesson-07-lab2-picture.html">Lesson 7. The Lab 2 picture: port, check, time</a>: Move your Lab 1 code into the Lab 2 files: the new window constants, the changed line, and why only an exact 0 counts: 0.045 for a sign error, 0.00756 for a harmless rounding change, 0.0000448 for a missing line.</li>
+<li><a href="lesson-08-independent-work.html">Lesson 8. Independent work inside one thread</a>: Put a second independent set of places in each loop: which line waits, when the fat while loop may stop, and why the CPU should gain while the GPU at one block of 32 threads did not: 461 ms, 231 ms, 208 ms.</li>
+<li><a href="lesson-09-many-cores.html">Lesson 9. Many CPU cores, many SMs</a>: Split the picture between CPU threads and GPU blocks so that every place has one owner and every owner similar work: 4.72 in bands against 5.98 in turns, blockIdx.x, and launches that use only 7 of 14 SMs.</li>
+<li><a href="lesson-10-many-threads.html">Lesson 10. Many threads per core, then everything together</a>: More threads per core and more sets of 32 threads per scheduler fill the same waiting as independent work inside a thread: how to find the number that is enough, why speedups do not multiply, and when registers matter.</li>
+</ul>
+<!-- lessons:end -->
 
 <p class="label">All notes, A to Z</p>
 <!-- all:begin -->
@@ -102,5 +123,8 @@
 
 <nav><a href="../index.html">site index</a><a href="MIT-6.S894.html">MIT 6.S894 course page</a></nav>
 </main>
+<footer class="site">
+<p>Independent self-study material for MIT 6.S894 Accelerated Computing, written from one learner's work. Not affiliated with or endorsed by MIT or the course staff. Course pages: <a href="https://accelerated-computing.academy/fall25/">accelerated-computing.academy/fall25</a>. Starter code: <a href="https://github.com/accelerated-computing-class">github.com/accelerated-computing-class</a>. Every measured number comes from one laptop (Ryzen 5 4600H, GTX 1650) unless a line says otherwise.</p>
+</footer>
 </body>
 </html>

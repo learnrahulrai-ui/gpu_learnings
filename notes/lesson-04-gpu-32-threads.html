@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Split the places between 32 threads with threadIdx.x, prove with the profiler&#x27;s own counts that each store instruction lands in 4 blocks of 32 bytes, and explain 22.75 times instead of 32.">
+<meta name="keywords" content="lesson">
+<title>Lesson 4: 32 GPU Threads</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="site">
+<a class="brand" href="MIT-6.S894.html">6.S894 self-study</a>
+<nav><a href="MIT-6.S894.html#syllabus">Lessons</a><a href="index.html">Notes</a><a href="../index.html">Lab pages</a><a href="../words.html">Words</a></nav>
+</header>
+<main>
+<p class="crumbs"><a href="MIT-6.S894.html">MIT 6.S894 tutorial</a> / Lab 1, part 2 (GPU vector) / Lesson 4</p>
+<h1>Lesson 4. The picture on 32 GPU threads</h1>
+<p class="meta"><span>Lab 1, part 2 (GPU vector)</span><span>you build: mandelbrot_gpu_vector and launch_mandelbrot_gpu_vector</span><span>you need: an NVIDIA GPU; Nsight Compute (ncu) for the profiler step</span></p>
+<p class="sub">Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+
+<p class="label">In this lesson</p>
+<ol class="toc">
+<li><a href="#story">The story</a></li>
+<li><a href="#work">Work it out</a></li>
+<li><a href="#build">Build it</a></li>
+<li><a href="#check">Check it</a></li>
+<li><a href="#measure">Measure it</a></li>
+<li><a href="#connect">Connect the numbers</a></li>
+<li><a href="#wrong">When it goes wrong</a></li>
+<li><a href="#questions">The lab's questions</a></li>
+<li><a href="#plain">In plain words</a></li>
+<li><a href="#deeper">Go deeper</a></li>
+</ol>
+
+<h2 id="story">The story</h2>
+<div class="story">
+<p>The GPU half of Lab 1, part 2 launches 32 threads instead of 1, <code>&lt;&lt;&lt;1, 32&gt;&gt;&gt;</code>, and has each thread take its share of the places using threadIdx.x, the thread's own number. The usual split gives thread t the places j = t, t + 32, t + 64, and so on.</p>
+<p>The learner was told this split is good because neighbouring threads touch nearby memory, and refused: inside one thread the places 7 and 39 are 32 apart, and threads do not talk to each other. Then a second question: each thread executes its own while loop, so what happens when the 32 threads need different numbers of repetitions?</p>
+<p>Where exactly is the nearby, and what do 32 threads with different counts cost?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>With 32 GPU threads instead of 1 on the same picture, guess the speedup: 32, about 22, or about 8?</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "no proof this how can 7 and 39 and all be nearby stuff" / "On one hand you are saying nearby, and on one hand you are saying spacing. You cannot space out and do nearby at the same time" / "Threads don't talk to each other. A thread doesn't know about other threads, right?"</p>
+
+<h2 id="work">Work it out</h2>
+<p class="ln"><b>L01</b> The learner's kernel and launch, with the scalar while loop shortened, copied from page 06: <span class="from">from: your code</span></p>
+<pre>__global__ void mandelbrot_gpu_vector(uint32_t img_size, uint32_t max_iters, uint32_t *out) {
+    for (uint64_t i = 0; i &lt; img_size; ++i) {
+        for (uint64_t j = threadIdx.x; j &lt; img_size; j += blockDim.x) {
+            /* cx, cy, and the scalar while loop that makes iters */
+            out[i * img_size + j] = iters;
+        }
+    }
+}
+mandelbrot_gpu_vector&lt;&lt;&lt;1, 32&gt;&gt;&gt;(img_size, max_iters, out);</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>__global__ void mandelbrot_gpu_vector(uint32_t img_size, uint32_t max_iters, uint32_t *out) {</code><span>Define a function that executes on the GPU (__global__ marks it). It receives img_size, max_iters, and out, the address of the output array in the graphics card's memory. void means it hands nothing back.</span></li>
+<li><code>for (uint64_t i = 0; i &lt; img_size; ++i) {</code><span>Give i the values 0 up to img_size minus 1, one after another.</span></li>
+<li><code>for (uint64_t j = threadIdx.x; j &lt; img_size; j += blockDim.x) {</code><span>Give j a first value equal to this thread's own number, threadIdx.x, then keep adding blockDim.x, the number of threads in the block, while j is below img_size.</span></li>
+<li><code>/* cx, cy, and the scalar while loop that makes iters */</code><span>A note for people: the cx line, the cy line and the plain while loop go here.</span></li>
+<li><code>out[i * img_size + j] = iters;</code><span>Store the whole number iters into the array out, at place number i times img_size plus j.</span></li>
+<li><code>}</code><span>End of the block opened by the matching brace above.</span></li>
+<li><code>}</code><span>End of the block opened by the matching brace above.</span></li>
+<li><code>}</code><span>End of the block opened by the matching brace above.</span></li>
+<li><code>mandelbrot_gpu_vector&lt;&lt;&lt;1, 32&gt;&gt;&gt;(img_size, max_iters, out);</code><span>From the CPU, start the GPU function: 1 block of 32 threads, every thread executing the whole function with these three values.</span></li>
+</ol>
+</div>
+<p class="ln"><b>L02</b> CUDA facts: in thread t, threadIdx.x = t (0 to 31) and blockDim.x = 32. An SM handles a block's threads in consecutive sets of 32, which NVIDIA calls warps; an instruction begins for all threads of a warp at once, each thread with its own i, j and iters. <span class="from">from: CUDA programming guide (SIMT architecture)</span></p>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> From L01, in thread t, j takes t, t + 32, t + 64, ... while j &lt; 256; write j = t + 32 x k. Thread 7's values of j = ____ . The thread and k that store j = 103: t = ____ , k = ____ . <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>thread 7: 7, 39, 71, 103, 135, 167, 199, 231 (k = 0 to 7)
+103 = 7 + 32 x 3 -&gt; t = 7, k = 3
+Inside one thread, the places are 32 apart: your words are right for one thread.</pre>
+</details>
+<p class="ln"><b>L04</b> Facts: the store <code>out[i * img_size + j] = iters</code> executes for all 32 threads together, with the same i and k; each value is 4 bytes, so thread t writes the 4 bytes that begin at byte 4 x (i x 256 + t + 32 x k). Memory moves bytes in blocks of 32 bytes that begin at a multiple of 32. The profiler calls one store instruction for the 32 threads a request, and each 32-byte block touched a sector. <span class="from">from: L02, L03, CUDA programming guide, Nsight Compute metric names</span></p>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> i = 0, k = 0: thread 0 writes bytes 0 to 3, thread 31 writes bytes ____ to ____ . 32-byte blocks touched = ____ . Store instructions for the whole picture = 256 values of i x 8 values of k = ____ ; blocks touched = ____ . <span class="from">from: L03, L04</span></p>
+<details><summary>CHECK</summary>
+<pre>thread 31: bytes 124 to 127; together bytes 0 to 127, no gap
+4 blocks of 32 bytes per store instruction
+2,048 store instructions, 2,048 x 4 = 8,192 blocks</pre>
+</details>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> Another split: thread t takes j = 8t to 8t + 7. In the first store, thread t writes byte ____ , so the 32 threads touch ____ blocks; whole picture ____ blocks, ____ times L05. <span class="from">from: L04, L05</span></p>
+<details><summary>CHECK</summary>
+<pre>thread t writes j = 8t, byte 32t: 0, 32, ..., 992, each in its own block: 32 blocks
+2,048 x 32 = 65,536 blocks, 8 times 8,192
+Inside one thread the places are 32 apart; across the 32 threads of one store they sit side
+by side. Both are true; memory receives only the second.</pre>
+</details>
+
+<h2 id="build">Build it</h2>
+<p class="ln"><b>L07</b> What to write: the kernel of L01, with the reference's body inside the j loop (cx, cy, the while loop, iters); the launch function starts it with <code>&lt;&lt;&lt;1, 32&gt;&gt;&gt;</code>. <span class="from">from: Lab 1 handout (part 2, GPU), L01</span></p>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> Compile and execute (<code>./mandelbrot_gpu -i vector</code>). Printed difference = ____ . <span class="from">from: L07, your output</span></p>
+<details><summary>CHECK</summary>
+<pre>exactly 0 for a correct version; about 0.248 if nothing was stored</pre>
+</details>
+
+<h2 id="check">Check it</h2>
+<p class="ln"><b>L09</b> If Nsight Compute is installed, count the stores yourself: <span class="from">from: Nsight Compute command line</span></p>
+<pre>ncu --metrics l1tex__t_requests_pipe_lsu_mem_global_op_st.sum,l1tex__t_sectors_pipe_lsu_mem_global_op_st.sum ./mandelbrot_gpu -i vector</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>ncu --metrics l1tex__t_requests_pipe_lsu_mem_global_op_st.sum,l1tex__t_sectors_pipe_lsu_mem_global_op_st.sum ./mandelbrot_gpu -i vector</code><span>Execute the program under the profiler and print, for each kernel launch, the number of store requests and of 32-byte sectors they touched.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> Your printed requests = ____ , sectors = ____ . The laptop printed 2,048 and 8,192. Do they match L05? ____ . <span class="from">from: L05, L09, your output</span></p>
+<details><summary>CHECK</summary>
+<pre>the laptop's profiler: 2,048 requests, 8,192 sectors, exactly L05
+The "nearby" is this: each store instruction of 32 threads lands in 4 blocks of 32 bytes.</pre>
+</details>
+
+<h2 id="measure">Measure it</h2>
+<p class="ln"><b>L11</b> Measured on the laptop, 256 by 256, max_iters 1000: 1 GPU thread 403.435 ms; 32 GPU threads 17.732 ms. <span class="from">from: your output</span></p>
+<p class="ln"><b>L12</b> From L02, the warp's while loop keeps beginning instructions until the last of its 32 threads has left; threads already done wait. Name one thread doing one repetition a thread-repetition: each repetition of the warp costs 32 of them, and the useful ones add up to the iters. <span class="from">from: L02</span></p>
+<p class="ln do"><b>L13</b> <b class="x">DO</b> Speedup measured = 403.435 / 17.732 = ____ . Real data, i = 40, k = 5 (j = 160 to 191): largest iters 1000, sum 1,334; thread-repetitions = ____ , useful = ____ percent. Whole picture: 16,274,722 useful of 23,609,216 thread-repetitions, so the predicted speedup = 32 x ____ = ____ . <span class="from">from: L11, L12, computation on the lab code</span></p>
+<details><summary>CHECK</summary>
+<pre>measured 22.75
+i = 40, k = 5: 32 x 1000 = 32,000 thread-repetitions, 1,334 useful, 4.2 percent
+whole picture: 16,274,722 / 23,609,216 = 0.6893, 32 x 0.6893 = 22.06 predicted
+Threads waiting for the slowest of their warp explain most of the gap between 32 and 22.75.</pre>
+</details>
+
+<div class="connect" id="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L14</b> <b class="x">DO</b> Collect L05 (4 blocks per store), L06 (8 times more with the other split), L10 (the profiler agrees), L13 (22.06 predicted, 22.75 measured), and the CPU version's 88.8 percent useful share with 8 neighbours per instruction. Write one sentence on what the single line <code>for (j = threadIdx.x; j &lt; img_size; j += blockDim.x)</code> decides. <span class="from">from: L05, L06, L10, L13</span></p>
+<details><summary>CHECK</summary>
+<pre>It decides two things at once: which 32 places share one store instruction (side by side,
+so 4 blocks instead of 32) and which 32 places share one while loop (neighbours, so similar
+counts and 69 percent useful, the GPU version of the CPU's 88.8 percent with 8).
+
+Tempting answer that fails: "32 threads give 32 times". L13 refutes it: the threads of one
+warp wait for its slowest place.</pre>
+</details>
+</div>
+
+<h2 id="wrong">When it goes wrong</h2>
+<ul class="pitfalls">
+<li><b>Difference 0, but the time is close to one thread's.</b> The launch was <code>&lt;&lt;&lt;32, 1&gt;&gt;&gt;</code>: 32 blocks of 1 thread, where threadIdx.x is 0 and blockDim.x is 1, so every block computes the whole picture.</li>
+<li><b>Difference about 0.248.</b> Nothing stored: the launch is missing or the kernel never executed (L08).</li>
+<li><b>ncu prints ERR_NVGPUCTRPERM.</b> The driver hides the performance counters from ordinary users: execute ncu with sudo, or allow access in the NVIDIA driver settings.</li>
+<li><b>The sector count is 8 times L05.</b> The places are split in consecutive pieces per thread, as in L06.</li>
+</ul>
+
+<h2 id="questions">The lab's questions</h2>
+<p>Paraphrased from the Fall 2025 handout. Write your own answers from the lines named; the numbers are yours to measure.</p>
+<ul class="related">
+<li><b>Question 3: how does the vector version compare with the scalar ones, and how does the GPU handle copies of the kernel that need different numbers of repetitions?</b> L11 and L13 for the numbers; L12 for the mechanism: the warp keeps executing until its slowest thread is done, and the finished threads wait.</li>
+</ul>
+
+<div class="plain" id="plain">
+<p class="label">In plain words</p>
+<p>On a GPU, 32 threads move through the program together. When their pieces of work are unequal, the quick ones wait for the slow one, so 32 threads gave about 22 times, not 32. The way the work is dealt out also decides how much memory traffic it causes, here a factor of 8.</p>
+<p>For a manager: a team that must finish together is as fast as its slowest member. How work is handed out matters as much as how many workers there are.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>About 22: measured 22.75 (403.435 ms against 17.732 ms); predicted 22.06 from the
+useful share of thread-repetitions.</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>Launch the same kernel as <code>&lt;&lt;&lt;1, 64&gt;&gt;&gt;</code>. Predict the profiler's requests and sectors, the useful share of thread-repetitions, and the time, before measuring.</p>
+<details><summary>CHECK</summary>
+<pre>Each warp now takes j = 32w + t + 64k: its 32 threads still store 32 side-by-side places, so
+requests stay 2,048 and sectors 8,192. The sets of 32 places that share a loop are the same
+sets as before (j = 0 to 31, 32 to 63, ...), so the useful share stays 0.689. What changes:
+2 warps, which can sit on 2 of the SM's 4 schedulers, so the time can fall to about half of
+17.732 ms. Measure to confirm.</pre>
+</details>
+</div>
+
+<h2 id="deeper">Go deeper</h2>
+<ul class="related">
+<li><a href="../06-gpu-threads.html">06. GPU: one changed line, and the proof of "nearby"</a></li>
+<li><a href="../11-program-counter.html">11. A program counter for every thread: is the 32-thread unit useless?</a></li>
+<li><a href="warp.html">The 32-thread unit</a></li>
+<li><a href="nearby.html">Nearby: 32 stores in 4 blocks of 32 bytes</a></li>
+<li><a href="program-counter.html">A program counter for every thread</a></li>
+</ul>
+
+<nav class="pager"><a href="lesson-03-cpu-vector.html"><small>previous</small>Lesson 3. Vector code on the CPU: 8 places per instruction</a><a class="next" href="lesson-05-timing-one-multiply-add.html"><small>next</small>Lesson 5. Timing one multiply-add</a></nav>
+</main>
+<footer class="site">
+<p>Independent self-study material for MIT 6.S894 Accelerated Computing, written from one learner's work. Not affiliated with or endorsed by MIT or the course staff. Course pages: <a href="https://accelerated-computing.academy/fall25/">accelerated-computing.academy/fall25</a>. Starter code: <a href="https://github.com/accelerated-computing-class">github.com/accelerated-computing-class</a>. Every measured number comes from one laptop (Ryzen 5 4600H, GTX 1650) unless a line says otherwise.</p>
+</footer>
+</body>
+</html>
