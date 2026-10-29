@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Split the places between 32 threads with threadIdx.x, prove with the profiler&#x27;s own counts that each store instruction lands in 4 blocks of 32 bytes, and explain 22.75 times instead of 32.">
+<meta name="description" content="Split the places between 32 threads with threadIdx.x, count by hand and with the profiler the 32-byte blocks each store touches, and work out why 32 threads gave 22.75 times rather than 32.">
 <meta name="keywords" content="lesson">
 <title>Lesson 4: 32 GPU Threads</title>
 <link rel="stylesheet" href="../style.css">
@@ -16,13 +16,40 @@
 <main>
 <p class="crumbs"><a href="MIT-6.S894.html">MIT 6.S894 tutorial</a> / Lesson 4</p>
 <h1>Lesson 4. The picture on 32 GPU threads</h1>
-<p class="sub">This lesson covers Lab 1, part 2, on the GPU, where you write mandelbrot_gpu_vector and launch_mandelbrot_gpu_vector. It needs an NVIDIA GPU, and Nsight Compute (ncu) for one profiler measurement. Paragraphs with a red rule beside them are for your pencil; work each one before opening its CHECK.</p>
-<p>The GPU half of Lab 1, part 2 launches 32 threads instead of 1, <code>&lt;&lt;&lt;1, 32&gt;&gt;&gt;</code>, and has each thread take its share of the places by its own number, threadIdx.x. The usual split gives thread t the places j = t, t + 32, t + 64, and so on, and it is usually defended on the grounds that neighbouring threads touch nearby memory. Inside one thread, however, the places 7 and 39 are 32 apart, and threads do not talk to each other; and each thread executes its own while loop, so the 32 threads need different numbers of repetitions. Where is the nearby, and what do 32 threads with different counts cost?</p>
+<p class="sub">This lesson covers Lab 1, part 2, on the GPU, where you write <code>mandelbrot_gpu_vector</code> and <code>launch_mandelbrot_gpu_vector</code> in the starter file <code>mandelbrot_gpu.cu</code>. You need an NVIDIA GPU with its driver, the CUDA toolkit with Nsight Compute, ncu, for one profiler measurement, and the Lab 1 starter folder, fetched with <code>git clone https://github.com/accelerated-computing-class/lab1.git</code>. Paragraphs with a red rule beside them are for your pencil; work each one before opening its CHECK.</p>
+<p>The GPU half of Lab 1, part 2, starts 32 GPU threads instead of 1 and has each thread take its share of the picture's places by its own number. The usual way of dealing out the places gives each thread every 32nd place, beginning at its own number, and it is usually defended on the grounds that neighbouring threads touch nearby memory. Inside one thread, however, the places 7 and 39 are 32 apart, and threads do not talk to each other; and each thread goes round its own loop for its own place, so the 32 threads need different numbers of trips round it. Where is the nearby, and what do 32 threads with different counts cost?</p>
 <p>Both objections were raised at this step, in these words:</p>
 <p class="you">"no proof this how can 7 and 39 and all be nearby stuff" / "On one hand you are saying nearby, and on one hand you are saying spacing. You cannot space out and do nearby at the same time" / "Threads don't talk to each other. A thread doesn't know about other threads, right?"</p>
-<p class="do">Write a guess. With 32 GPU threads instead of 1 on the same picture, what speedup do you expect: 32, about 22, or about 8?</p>
+<p class="do">Write a guess. Call the speedup the time of 1 GPU thread divided by the time of 32. With 32 threads instead of 1 on the same picture, what speedup do you expect: 32, about 22, or about 8?</p>
 
-<h2 id="inside-one-thread-the-places-are-32-apart">Inside one thread the places are 32 apart</h2>
+<h2 id="reading-the-reference-loop-that-the-threads-share-out">Reading the reference loop that the threads share out</h2>
+<pre>void mandelbrot_cpu_scalar(uint32_t img_size, uint32_t max_iters, uint32_t *out) {
+    for (uint64_t i = 0; i &lt; img_size; ++i) {
+        for (uint64_t j = 0; j &lt; img_size; ++j) {
+            float cx = (float(j) / float(img_size)) * 2.5f - 2.0f;
+            float cy = (float(i) / float(img_size)) * 2.5f - 1.25f;
+            float x2 = 0.0f;
+            float y2 = 0.0f;
+            float w = 0.0f;
+            uint32_t iters = 0;
+            while (x2 + y2 &lt;= 4.0f &amp;&amp; iters &lt; max_iters) {
+                float x = x2 - y2 + cx;
+                float y = w - x2 - y2 + cy;
+                x2 = x * x;
+                y2 = y * y;
+                float z = x + y;
+                w = z * z;
+                ++iters;
+            }
+            out[i * img_size + j] = iters;
+        }
+    }
+}</pre>
+<p>This is the reference as the starter has it, with its comments left out; the GPU file holds the same function and computes it on the CPU. It takes img_size and max_iters, two 32-bit whole numbers, and out, the address in memory where the answers go, one 32-bit whole number, 4 bytes, after another. The outer for loop gives i every value from 0 to img_size - 1 and, for each i, the inner for loop gives j every value from 0 to img_size - 1, so everything inside executes once for every pair (i, j), each pair being one place of the picture. For each place, cx and cy come from j and i, x2, y2, w and iters start out as 0, and the while loop repeats its trip while x2 + y2 is at most 4 and iters is below max_iters; in the trip, x becomes x2 minus y2 plus cx, y becomes w minus x2, minus y2, plus cy, x2 becomes x times x, y2 becomes y times y, z becomes x plus y, w becomes z times z, and iters goes up by 1. Once the while loop is left, iters is stored in out at entry i times img_size plus j.</p>
+<p>Call one trip through the braces of the while loop a repetition; iters counts the repetitions at a place, its count, and nothing inside the while loop reads another place's values.</p>
+
+<h2 id="reading-the-kernel-that-deals-the-places-out-by-thread-numbe">Reading the kernel that deals the places out by thread number</h2>
+<p>A function that executes on the GPU is a kernel, marked __global__, and it is started from the CPU with <code>kernel&lt;&lt;&lt;B, T&gt;&gt;&gt;(arguments)</code>, which, as NVIDIA's CUDA programming guide defines it, starts B blocks of T threads each, a thread being one execution of the kernel from its beginning. Inside the kernel, threadIdx.x is a thread's own number in its block, from 0 to T - 1, and blockDim.x is T. Code written at this step for the 32 threads reads:</p>
 <pre>__global__ void mandelbrot_gpu_vector(uint32_t img_size, uint32_t max_iters, uint32_t *out) {
     for (uint64_t i = 0; i &lt; img_size; ++i) {
         for (uint64_t j = threadIdx.x; j &lt; img_size; j += blockDim.x) {
@@ -32,67 +59,78 @@
     }
 }
 mandelbrot_gpu_vector&lt;&lt;&lt;1, 32&gt;&gt;&gt;(img_size, max_iters, out);</pre>
-<p>Read in English, the first line marks a kernel with __global__, a function that executes on the GPU and hands nothing back, and it receives img_size, max_iters and out, the address of the output array in the graphics card's memory. The kernel gives i every value from 0 to img_size - 1, one after another; for each i, a thread's j begins at its own number, threadIdx.x, and grows by blockDim.x, the number of threads in the block, while it stays below img_size; for each j the comment stands for the cx line, the cy line and the scalar while loop that makes iters, and the thread stores the count at place i times img_size plus j. The last line starts the kernel from the CPU as 1 block of 32 threads, every thread executing the whole kernel.</p>
-<p>In thread t, threadIdx.x is t, from 0 to 31, and blockDim.x is 32. The GPU chip is built from identical blocks of hardware, which NVIDIA calls SMs, and an SM handles the threads of a block in consecutive sets of 32, beginning each instruction for all 32 at once, each thread with its own i, j and count; NVIDIA's CUDA programming guide calls such a set a warp.</p>
-<p class="do">Write j as t + 32 x k and list the values thread 7 takes for one i. Which thread, and which k, stores j = 103?</p>
+<p>The kernel gives i every value from 0 to img_size - 1, one after another. For each i, a thread's j begins at its own number, threadIdx.x, and grows by blockDim.x, the number of threads in the block, while it stays below img_size; for each such j the comment stands for cx, cy and the reference's while loop, and the thread stores the count at entry i times img_size plus j of out. The last statement starts the kernel from the CPU as 1 block of 32 threads, every thread executing the whole kernel.</p>
+<p>In thread t, threadIdx.x is t, from 0 to 31, and blockDim.x is 32. The GPU chip is built from identical blocks of hardware, which NVIDIA calls SMs, and an SM handles the threads of a block in consecutive sets of 32, beginning each instruction for all 32 at once, each thread with its own i, j and count; NVIDIA's CUDA programming guide calls such a set a warp, so the 32 threads here are one warp.</p>
+<p class="do">Write j as t + 32 * k and list the values thread 7 takes for one i. Which thread, and which k, stores j = 103?</p>
 <details><summary>CHECK</summary>
-<p>Thread 7 takes 7, 39, 71, 103, 135, 167, 199 and 231, for k = 0 to 7, and 103 = 7 + 32 x 3, so thread 7 stores it at k = 3. Inside one thread the places are 32 apart: the objection is right for one thread.</p>
+<p>Thread 7 takes 7, 39, 71, 103, 135, 167, 199 and 231, for k = 0 to 7, and 103 = 7 + 32 * 3, so thread 7 stores it at k = 3. Inside one thread the places are 32 apart, so the first objection is right for one thread.</p>
 </details>
 
-<h2 id="across-the-32-threads-of-one-store-the-places-sit-side-by-si">Across the 32 threads of one store, the places sit side by side in 4 blocks of 32 bytes</h2>
-<p>The store <code>out[i * img_size + j] = iters</code> executes for all 32 threads of the warp together, with the same i and k, and each value takes 4 bytes, so thread t writes the 4 bytes that begin at byte 4 x (i x 256 + t + 32 x k). Memory moves bytes in blocks of 32 that begin at a multiple of 32; Nsight Compute, NVIDIA's profiler, calls one store instruction for the 32 threads a request, and each 32-byte block it touches a sector.</p>
-<p class="do">For i = 0 and k = 0, thread 0 writes bytes 0 to 3. Write which bytes thread 31 writes, how many 32-byte blocks the store touches, how many store instructions the whole picture needs, 256 values of i times 8 of k, and how many blocks they touch in all.</p>
+<h2 id="counting-the-32-byte-blocks-that-one-store-touches">Counting the 32-byte blocks that one store touches</h2>
+<p>The store into out executes for all 32 threads of the warp together, with the same i and k, and each count takes 4 bytes, so thread t writes the 4 bytes that begin at byte 4 * (i * 256 + t + 32 * k) of out. Nsight Compute, NVIDIA's profiler, counts memory in sectors, 32-byte blocks that begin at a multiple of 32 bytes, and calls one store instruction executed for a warp a request.</p>
+<p class="do">Take i = 0 and k = 0, where thread 0 writes bytes 0 to 3 of out. Write which bytes thread 31 writes, how many sectors the store touches, how many store instructions the whole picture needs, 256 values of i times 8 of k, and how many sectors they touch in all.</p>
 <details><summary>CHECK</summary>
-<pre>thread 31: bytes 124 to 127; together, bytes 0 to 127 with no gap
-blocks per store instruction: 128 / 32 = 4
-store instructions: 256 x 8 = 2,048;  blocks: 2,048 x 4 = 8,192</pre>
+<pre>thread 31: bytes 4 * 31 = 124 to 127;  all 32 threads: bytes 0 to 127, with no gap
+sectors per store instruction: 128 / 32 = 4
+store instructions: 256 * 8 = 2,048;  sectors: 2,048 * 4 = 8,192</pre>
 </details>
-<p class="do">Take the other split, where thread t takes j = 8t to 8t + 7. In the first store thread t writes j = 8t; write its byte, the number of blocks the 32 threads touch, the total for the whole picture, and the factor against 8,192.</p>
+<p class="do">Take the other way of dealing the places out, where thread t takes j = 8 * t to 8 * t + 7. In the first store thread t writes j = 8 * t; write its byte, the sectors the 32 threads touch, the total for the whole picture, and the factor against 8,192.</p>
 <details><summary>CHECK</summary>
-<p>Thread t writes byte 32t, so the 32 threads write bytes 0, 32, up to 992, each in a block of its own: 32 blocks per store instruction, 2,048 x 32 = 65,536 in all, 8 times 8,192.</p>
+<p>Thread t writes byte 4 * 8 * t = 32 * t, so the 32 threads write bytes 0, 32 and so on up to 992, each in a sector of its own: 32 sectors per store instruction, 2,048 * 32 = 65,536 in all, 8 times 8,192.</p>
 <p>Inside one thread the places are 32 apart; across the 32 threads of one store they sit side by side. Both are true, and memory receives only the second.</p>
 </details>
-<p>Nsight Compute counts both numbers on a real execution.</p>
+<p>Nsight Compute counts both numbers on a real execution:</p>
 <pre>ncu --metrics l1tex__t_requests_pipe_lsu_mem_global_op_st.sum,l1tex__t_sectors_pipe_lsu_mem_global_op_st.sum ./mandelbrot_gpu -i vector</pre>
-<p>Read in English, the command executes the program under the profiler and prints, for each kernel launch, the number of store requests and the number of 32-byte sectors they touched.</p>
+<p>ncu executes the program under the profiler and prints, for each kernel launch, the two metrics asked for: the store requests to global memory, the graphics card's memory, and the sectors those requests touched.</p>
 <p class="do">Write your printed requests and sectors beside the laptop's 2,048 and 8,192, and say whether they match the count by hand.</p>
 <details><summary>CHECK</summary>
-<p>The laptop's profiler printed 2,048 requests and 8,192 sectors, exactly the count by hand: the nearby is that each store instruction of 32 threads lands in 4 blocks of 32 bytes.</p>
+<p>The laptop's profiler printed 2,048 requests and 8,192 sectors, the count by hand exactly: the nearby is that each store instruction of 32 threads lands in 4 sectors of 32 bytes.</p>
 <p>If ncu prints ERR_NVGPUCTRPERM, the driver hides its counters from ordinary users; executing ncu with sudo, or allowing access in the driver's settings, lifts it.</p>
 </details>
 
-<h2 id="writing-the-kernel-and-a-launch-that-prints-0-while-doing-th">Writing the kernel, and a launch that prints 0 while doing the work 32 times</h2>
-<p>The kernel is the code above with the reference's body inside the j loop, cx, cy, the while loop and the count, and the launch function starts it with <code>&lt;&lt;&lt;1, 32&gt;&gt;&gt;</code>. A launch written as <code>&lt;&lt;&lt;32, 1&gt;&gt;&gt;</code> instead also prints a difference of 0, with a time close to one thread's, because each of its 32 blocks has blockDim.x = 1 and threadIdx.x = 0, so every block computes the whole picture.</p>
-<p class="do">Compile, execute <code>./mandelbrot_gpu -i vector</code>, and write the printed difference.</p>
+<h2 id="writing-the-kernel-and-its-launch">Writing the kernel and its launch</h2>
+<p>The kernel is the code above with the reference's body in place of the comment: cx, cy, the while loop and the count. The launch function, <code>launch_mandelbrot_gpu_vector</code>, starts it with &lt;&lt;&lt;1, 32&gt;&gt;&gt;. A launch written as &lt;&lt;&lt;32, 1&gt;&gt;&gt; instead makes 32 blocks of 1 thread, where threadIdx.x is 0 and blockDim.x is 1 in every block, so every block computes the whole picture by itself: the printed difference is still 0, and the time should be about one thread's, since each block repeats all of the work.</p>
+<pre>nvcc -O3 -arch=sm_75 -std=c++17 mandelbrot_gpu.cu -o mandelbrot_gpu
+./mandelbrot_gpu -i vector</pre>
+<p>nvcc compiles the CUDA file with full optimization for compute capability 7.5, the GTX 1650's, as 2017 C++; put your own GPU's compute capability in place of 75. ./mandelbrot_gpu -i vector computes the reference on the CPU, times only the vector version, copies its result back and prints its average output difference from the reference.</p>
+<p class="do">Write the printed difference. Computed with the reference's own arithmetic, the default picture's counts add up to 16,274,722; work out what a kernel that stores nothing prints, 16,274,722 / (256 * 256 * 1000).</p>
 <details><summary>CHECK</summary>
-<p>A correct version prints exactly 0, and about 0.248 means nothing was stored, a missing launch or a kernel that never executed.</p>
+<p>A correct version prints exactly 0. A kernel that stores nothing leaves the 0 that main put into the GPU's memory with cudaMemset, and prints 16,274,722 / 65,536,000 = 0.2483: the launch is missing, or the kernel never executed.</p>
 </details>
 
-<h2 id="finished-threads-wait-so-32-threads-gave-22-75-times-not-32">Finished threads wait, so 32 threads gave 22.75 times, not 32</h2>
-<p>Measured on the laptop for the 256 by 256 picture at max_iters 1000, one GPU thread took 403.435 ms and 32 threads took 17.732 ms. Since an instruction begins for all 32 threads of the warp at once, the while loop keeps beginning instructions until the last of its 32 threads has left it, and the threads already done wait. A thread doing one repetition will be called a thread-repetition here: each repetition of the warp costs 32 of them, and the useful ones add up to the counts.</p>
-<p class="do">Work out the measured speedup. Then take a real moment of the loop, i = 40 and k = 5, where j goes from 160 to 191, one place per thread; the largest count is 1000 and the 32 counts add up to 1,334. Work out the thread-repetitions and the useful share. Over the whole picture 16,274,722 of 23,609,216 thread-repetitions are useful; work out 32 times that share as the speedup predicted when only thread-repetitions cost time.</p>
+<h2 id="timing-32-threads-against-1">Timing 32 threads against 1</h2>
+<p>Measured on the laptop for the default picture, 256 by 256 places at max_iters 1000, one GPU thread took 403.435 ms and 32 threads took 17.732 ms. NVIDIA's CUDA programming guide describes what a warp does when its threads take different paths: it executes each path that some thread takes, with the threads not on that path idle. So the warp's while loop keeps beginning instructions until the last of its 32 threads has left it, and the threads already done wait. Call one thread doing one repetition a thread-repetition: each repetition of the warp's loop costs 32 of them, and the useful ones add up to the counts.</p>
+<p class="do">Work out the measured speedup. Then take a real moment of the loop, i = 40 and k = 5, where j goes from 160 to 191, one place per thread; computed with the reference's own arithmetic, the largest count is 1000 and the 32 counts add up to 1,334. Work out the thread-repetitions and the useful share. Over the whole picture the warp's loop makes 737,788 repetitions, so 32 * 737,788 = 23,609,216 thread-repetitions, of which the 16,274,722 counts are useful; work out 32 times that share as the speedup predicted when only thread-repetitions cost time.</p>
 <details><summary>CHECK</summary>
-<pre>measured: 403.435 / 17.732 = 22.75
-i = 40, k = 5: 32 x 1000 = 32,000 thread-repetitions, 1,334 useful, 4.2 percent
-whole picture: 16,274,722 / 23,609,216 = 0.6893;  32 x 0.6893 = 22.06 predicted</pre>
+<pre>measured:      403.435 / 17.732 = 22.75
+i = 40, k = 5: 32 * 1000 = 32,000 thread-repetitions, 1,334 useful, 4.2 percent
+whole picture: 16,274,722 / 23,609,216 = 0.6893;  32 * 0.6893 = 22.06 predicted</pre>
 <p>Threads waiting for the slowest thread of their warp explain most of the gap between 32 and 22.75.</p>
 </details>
+<p class="do">Computed the same way, the other way of dealing out, thread t taking j = 8 * t to 8 * t + 7, puts the places 8 * t + k of one i into the warp's loop together and makes it repeat 1,416,900 times. Work out its useful share and its predicted speedup.</p>
+<details><summary>CHECK</summary>
+<pre>32 * 1,416,900 = 45,340,800 thread-repetitions
+16,274,722 / 45,340,800 = 0.359;  32 * 0.359 = 11.5 predicted</pre>
+<p>Places 8 apart are less alike than neighbours, so their counts differ more, and the warp waits longer for its slowest thread.</p>
+</details>
 
-<h2 id="a-single-line-decides-both-the-memory-traffic-and-the-waitin">A single line decides both the memory traffic and the waiting</h2>
-<p>Gathered together, each store instruction lands in 4 blocks of 32 bytes; the split into consecutive pieces per thread would move 8 times more; the profiler confirms 2,048 and 8,192; and the useful share of thread-repetitions predicts 22.06 against 22.75 measured, the GPU's version of the 88.8 percent that 8 neighbours reach on the CPU.</p>
-<p class="do">Write one sentence on what the line <code>for (j = threadIdx.x; j &lt; img_size; j += blockDim.x)</code> decides.</p>
+<h2 id="gathering-what-one-for-loop-decides">Gathering what one for loop decides</h2>
+<p>Each store instruction of the 32 threads lands in 4 sectors of 32 bytes, and the profiler printed 2,048 requests and 8,192 sectors; dealing the places out in consecutive pieces of 8 per thread would touch 8 times more sectors and leave a useful share of 0.359 instead of 0.689; and the useful share of thread-repetitions predicts 22.06 against 22.75 measured.</p>
+<p class="do">Write one sentence on what the for loop that begins j at threadIdx.x and adds blockDim.x decides.</p>
 <details><summary>CHECK</summary>
-<p>It decides which 32 places share one store instruction, side by side, so 4 blocks instead of 32, and which 32 places share one while loop, neighbours, so similar counts and 69 percent useful.</p>
-<p>The reading "32 threads give 32 times" fails, because the threads of one warp wait for its slowest place.</p>
+<p>It decides which 32 places share one store instruction, side by side, so 4 sectors instead of 32, and which 32 places share one while loop, neighbours with similar counts, so 69 percent of the thread-repetitions are useful instead of 36.</p>
+<p>The reading "32 threads give 32 times" fails, because the threads of one warp wait for its slowest place, and 22.75 was measured.</p>
 </details>
-<p>The Fall 2025 handout's third question asks how the vector version compares with the scalar ones and how the GPU handles copies of the kernel that need different numbers of repetitions; 22.75 measured against 22.06 predicted answers the first part, and the warp that keeps executing until its slowest thread is done, with the finished threads waiting, answers the second. A sector count 8 times the hand count means the places were split in consecutive pieces per thread.</p>
-<p>Without code, the 32 threads move through the program together, so when their pieces of work are unequal the quick ones wait for the slow one, and workers that must finish together are as fast as the slowest of them. The way the work is dealt out also decides how much memory traffic it causes, here by a factor of 8, so how the work is handed out matters as much as how many workers there are.</p>
-<p>The guess at the top has its answer: about 22, measured 22.75 from 403.435 ms against 17.732 ms, predicted 22.06 from the useful share of thread-repetitions.</p>
-<p class="do">A harder question to finish with. Launch the same kernel as <code>&lt;&lt;&lt;1, 64&gt;&gt;&gt;</code>. Predict the profiler's requests and sectors, the useful share of thread-repetitions, and the time, before measuring.</p>
+<p>The Fall 2025 handout's third question asks how the vector version compares with the scalar ones and how the GPU handles copies of the kernel that need different numbers of repetitions; 22.75 measured against 22.06 predicted answers the first part, and the warp that keeps executing until its slowest thread is done, with the finished threads waiting, answers the second.</p>
+<p>A difference of 0 with a time close to one thread's means a launch of &lt;&lt;&lt;32, 1&gt;&gt;&gt;, where every block computes the whole picture. A difference of about 0.248 means nothing was stored. A sector count 8 times 8,192 means the places were dealt out in consecutive pieces per thread. ERR_NVGPUCTRPERM from ncu means the driver hides its counters.</p>
+<p>On a GPU, 32 threads move through the program together, so when their pieces of work are unequal the quick ones wait for the slow one, and 32 threads gave 22.75 times, not 32. The way the work is dealt out also decides how much memory traffic it causes, here by a factor of 8. Workers that must finish together are as fast as the slowest of them, and how the work is handed out matters as much as how many workers there are.</p>
+<p>The speedup asked for before any arithmetic is about 22: 22.75 measured, from 403.435 ms against 17.732 ms, and 22.06 predicted from the useful share of thread-repetitions.</p>
+<p class="do">Launch the same kernel as &lt;&lt;&lt;1, 64&gt;&gt;&gt;, 1 block of 64 threads, which is 2 warps. Each SM of the GTX 1650 has 4 schedulers, the circuits that pick which warp's instruction begins next, as NVIDIA's Turing tuning guide gives it. Predict the profiler's requests and sectors, the useful share of thread-repetitions, and the time, before measuring.</p>
 <details><summary>CHECK</summary>
-<p>Each warp w now takes j = 32w + t + 64k, so its 32 threads still store 32 places side by side: requests stay 2,048 and sectors 8,192. The sets of 32 places that share a loop are the same sets as before, j = 0 to 31, 32 to 63 and so on, so the useful share stays 0.689. What changes is that there are 2 warps, which can sit on 2 of the SM's 4 schedulers, the circuits that pick which warp's instruction begins next, so the time can fall to about half of 17.732 ms, which a measurement has to confirm.</p>
+<p>Thread t of warp w, for w = 0 or 1, takes j = 32 * w + t + 64 * k, so the 32 threads of each warp still store 32 places side by side: the requests stay 2,048 and the sectors 8,192. The sets of 32 places that share a loop are the same sets as before, j = 0 to 31, 32 to 63 and so on, so the useful share stays 0.689.</p>
+<p>What changes is that the two warps can sit on two different schedulers of the SM. Computed with the reference's own arithmetic, warp 0 makes 373,810 repetitions and warp 1 makes 363,978, which add up to the 737,788 of the single warp, so if each warp keeps the pace the single warp had, the time is the larger share, 373,810 / 737,788 = 0.507 of 17.732 ms, about 8.98 ms, which a measurement has to confirm.</p>
 </details>
-<p>The lab pages <a href="../06-gpu-threads.html">a single changed line, and the proof of nearby</a> and <a href="../11-program-counter.html">a program counter for every thread</a> work these numbers out at length, and the notes on <a href="warp.html">the 32-thread unit</a>, <a href="nearby.html">nearby</a> and <a href="program-counter.html">a program counter for every thread</a> hold the short versions.</p>
+<p>The lab pages <a href="../06-gpu-threads.html">a single changed for loop, and the proof of nearby</a> and <a href="../11-program-counter.html">a program counter for every thread</a> work these numbers out at length, and the notes on <a href="warp.html">the 32-thread unit</a>, <a href="nearby.html">nearby</a> and <a href="program-counter.html">a program counter for every thread</a> hold the short versions.</p>
 
 <nav class="pager"><a href="lesson-03-cpu-vector.html">&larr; Lesson 3. Vector code on the CPU: 8 places per instruction</a><a class="next" href="lesson-05-timing-one-multiply-add.html">Lesson 5. Timing one multiply-add &rarr;</a></nav>
 </main>
