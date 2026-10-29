@@ -26,7 +26,7 @@
 <!-- lessons:begin -->
 <ul class="related">
 <li><a href="lesson-00-setup.html">Lesson 0. Set up your machine and read the starter program</a>: Get the Lab 1 and Lab 2 starter code, compile it on your own computer, and read what the untouched program prints, including the 0.248 that an empty function prints.</li>
-<li><a href="lesson-01-reference.html">Lesson 1. The reference program, by hand</a>: Read mandelbrot_cpu_scalar line by line: where (cx, cy) comes from, one place worked by hand, why the loop has a w and no 2xy, and why a quarter of the places do 97.7 percent of the work.</li>
+<li><a href="lesson-01-reference.html">Lesson 1. The reference program, by hand</a>: Read mandelbrot_cpu_scalar and main from the Lab 1 starter, work one place through the loop by hand, follow how line B makes 2 x a x b out of w, and add up and split the repetitions of all 65,536 places.</li>
 <li><a href="lesson-02-gpu-one-thread.html">Lesson 2. The picture on one GPU thread</a>: Write the first kernel and its launch, check that it prints exactly 0, and work out why one GPU thread took 403 ms against 61.6 ms on one CPU core.</li>
 <li><a href="lesson-03-cpu-vector.html">Lesson 3. Vector code on the CPU: 8 places per instruction</a>: Write the vector version with AVX2 (8 floats) or AVX-512 (16): the cx of 8 places from one number, a loop that 8 places leave at different times, and why the result was 7.07 times, not 8.</li>
 <li><a href="lesson-04-gpu-32-threads.html">Lesson 4. The picture on 32 GPU threads</a>: Split the places between 32 threads with threadIdx.x, prove with the profiler's own counts that each store instruction lands in 4 blocks of 32 bytes, and explain 22.75 times instead of 32.</li>
