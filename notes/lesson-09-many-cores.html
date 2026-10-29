@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Split the picture between CPU threads and GPU blocks so that every place has one owner and every owner similar work: 4.72 in bands against 5.98 in turns, blockIdx.x, and launches that use only 7 of 14 SMs.">
+<meta name="description" content="Split the picture between CPU threads and GPU blocks: give every place one owner, set bands of i against turns, number warps across blocks with blockIdx.x, and count the SMs each launch can keep working.">
 <meta name="keywords" content="lesson">
 <title>Lesson 9: Many Cores</title>
 <link rel="stylesheet" href="../style.css">
@@ -16,26 +16,67 @@
 <main>
 <p class="crumbs"><a href="MIT-6.S894.html">MIT 6.S894 tutorial</a> / Lesson 9</p>
 <h1>Lesson 9. Many CPU cores, many SMs</h1>
-<p class="sub">This lesson covers part 2 of Lab 2, where you write mandelbrot_cpu_vector_multicore, mandelbrot_gpu_vector_multicore and its launch, beginning from the ported Lab 2 vector versions. Paragraphs with a red rule beside them are for your pencil; work each one before opening its CHECK.</p>
-<p>Part 2 of Lab 2 spreads the vector version over many cores: one CPU thread per core, and on the GPU one set of 32 threads for each scheduler, the circuit that picks which instruction begins next. Either of two things can go wrong, and neither shows in the time alone. A split can give some places two writers and others none, and a correct split can still give one worker far more of the work, so that the job ends only when that worker does. How do you split a picture whose work is unevenly spread, and how do you know every part of the GPU got its share?</p>
+<p class="sub">This lesson covers part 2 of Lab 2, where you write <code>mandelbrot_cpu_vector_multicore</code>, <code>mandelbrot_gpu_vector_multicore</code> and its launch, beginning from your ported Lab 2 vector versions. You need g++ with the POSIX threads library, the CUDA toolkit, and the Lab 2 starter folder, fetched with <code>git clone https://github.com/accelerated-computing-class/lab2.git</code>. Paragraphs with a red rule beside them are for your pencil; work each one before opening its CHECK.</p>
+<p>Part 2 of Lab 2 spreads the vector version over many cores: on the CPU one thread of work per core, and on the GPU one set of 32 threads for each of the circuits that choose which instruction begins next. Either of two things can go wrong, and neither shows in the time alone. A split can give some places two writers and others none, and a correct split can still give one worker far more of the work, so that the job ends only when that worker does. How should a picture be split when its places need different amounts of work, and how do you know every part of the GPU got its share?</p>
 <p>The first surprise at this step was that the part asks for threads at all:</p>
 <p class="you">"One question. So in this assignment I have to make threads? I thought I am just extending SIMD." / "Help me recall my working memory is zero."</p>
-<p class="do">Write a guess. Split the Lab 2 picture's 1024 values of i between 6 CPU threads in 6 consecutive bands. If time follows the work, is the speedup over one thread about 6, about 5, or about 3?</p>
+<p class="do">Write a guess. Split the Lab 2 picture between 6 CPU threads, each taking a solid band of it, the first thread the top sixth, the next thread the sixth below that, and so on. If time follows the work, is the speedup, the time of one thread divided by the time of 6, about 6, about 5, or about 3?</p>
 
-<h2 id="bands-of-i-give-4-72-times-on-6-threads-and-turns-give-5-98">Bands of i give 4.72 times on 6 threads, and turns give 5.98</h2>
-<p>Call the worker that writes a given place of out its owner; a split is correct only if every place has exactly one owner. The Fall 2025 handout's CPU, an AMD Ryzen 7 7700, has 8 cores with 2 hardware threads each, and part 2 asks for 8 CPU threads; the laptop's Ryzen 5 4600H has 6 cores with 2 hardware threads each, so 6 CPU threads here.</p>
-<p class="do">Cut the 1024 values of i into 6 consecutive bands: divide, round up, and write the bands from [0, 171) to the last one. The repetitions per band, computed from the real Lab 2 counts, are 20,219,285, 20,203,424, 28,346,172, 29,263,472, 19,303,420 and 20,884,049, out of 138,219,822. The job ends with the largest band; work out the speedup.</p>
+<h2 id="reading-the-lab-2-reference-and-adding-up-its-repetitions">Reading the Lab 2 reference and adding up its repetitions</h2>
+<pre>constexpr float window_zoom = 1.0 / 10000.0f;
+constexpr float window_x = -0.743643887 - 0.5 * window_zoom;
+constexpr float window_y = 0.131825904 - 0.5 * window_zoom;
+constexpr uint32_t default_max_iters = 2000;
+
+void mandelbrot_cpu_scalar(uint32_t img_size, uint32_t max_iters, uint32_t *out) {
+    for (uint64_t i = 0; i &lt; img_size; ++i) {
+        for (uint64_t j = 0; j &lt; img_size; ++j) {
+            float cx = (float(j) / float(img_size)) * window_zoom + window_x;
+            float cy = (float(i) / float(img_size)) * window_zoom + window_y;
+
+            float x2 = 0.0f;
+            float y2 = 0.0f;
+            float w = 0.0f;
+            uint32_t iters = 0;
+            while (x2 + y2 &lt;= 4.0f &amp;&amp; iters &lt; max_iters) {
+                float x = x2 - y2 + cx;
+                float y = w - (x2 + y2) + cy;
+                x2 = x * x;
+                y2 = y * y;
+                float z = x + y;
+                w = z * z;
+                ++iters;
+            }
+
+            out[i * img_size + j] = iters;
+        }
+    }
+}</pre>
+<p>window_zoom is 1 divided by 10000, window_x is -0.743643887 minus half of window_zoom, and window_y is 0.131825904 minus half of window_zoom, each stored as a float, and default_max_iters is 2000. mandelbrot_cpu_scalar takes img_size and max_iters, two 32-bit whole numbers, and out, the address in memory where the answers go, one 32-bit whole number after another. For every pair (i, j) with i and j from 0 to img_size - 1, one place of the picture, cx is j divided by img_size, times window_zoom, plus window_x, and cy is i divided by img_size, times window_zoom, plus window_y. Then x2, y2 and w start out as 0 and iters as 0, and the while loop repeats its trip while x2 + y2 is at most 4 and iters is below max_iters: x becomes x2 minus y2 plus cx; y becomes w minus the sum x2 + y2, plus cy; x2 becomes x times x and y2 becomes y times y; z becomes x plus y; w becomes z times z; and iters goes up by 1. Once the while loop is left, iters is stored in out at entry i times img_size plus j.</p>
+<p>The starter's main gives img_size the value 1024 and max_iters the value default_max_iters, so the Lab 2 picture has 1024 * 1024 = 1,048,576 places, and the places of one value of i fill 1024 neighbouring entries of out. Call one trip through the braces of the while loop a repetition; the iters stored for a place, its count, is the number of repetitions it made. Computed in 32-bit floats from the Lab 2 reference, the counts go from 69 to 2000 and add up to 138,219,822 repetitions.</p>
+<p>Call the worker that writes a given place of out its owner; a split of the picture between workers is correct only if every place has exactly one owner. Assume that a repetition takes the same time on every worker. A single worker then takes time in proportion to all 138,219,822 repetitions, workers that work at once finish when the one with the most repetitions does, and the speedup of a split is 138,219,822 divided by the most repetitions any one worker has.</p>
+
+<h2 id="cutting-the-1024-values-of-i-into-bands-and-into-turns">Cutting the 1024 values of i into bands and into turns</h2>
+<p>A CPU thread is a sequence of instructions that the operating system gives a core to execute. AMD's specifications give the handout's CPU, a Ryzen 7 7700, 8 cores with 2 hardware threads each, a hardware thread being one of the 2 threads a core can hold at once, and part 2 of the Fall 2025 handout asks for 8 CPU threads; the laptop's Ryzen 5 4600H has 6 cores with 2 hardware threads each, so this lesson splits between 6.</p>
+<p class="do">Write [a, b) for the values from a up to b - 1. Cut the 1024 values of i into 6 consecutive bands: divide 1024 by 6, round up, and write the bands from [0, 171) to the last one, checking that none is missing or repeated. Computed from the counts, the bands carry 20,219,285, 20,203,424, 28,346,172, 29,263,472, 19,303,420 and 20,884,049 repetitions; work out each band's percent of the work and the speedup.</p>
 <details><summary>CHECK</summary>
-<pre>1024 / 6 = 170.67, rounded up 171
+<pre>1024 / 6 = 170.67, rounded up 171;  6 * 171 = 1026, 2 too many for the last band
 [0,171) [171,342) [342,513) [513,684) [684,855) [855,1024)
-138,219,822 / 29,263,472 = 4.72, not 6</pre>
+sizes 171, 171, 171, 171, 171 and 169 = 1024, each band beginning where the one before ends
+percent: 14.6, 14.6, 20.5, 21.2, 14.0, 15.1
+speedup: 138,219,822 / 29,263,472 = 4.72, not 6</pre>
 </details>
-<p class="do">Deal the values out in turns instead: owner t takes i = t, t + 6, t + 12, and so on. Which owner gets i = 1023, and why can no value of i have two owners? The repetitions per owner are 23,029,821, 23,043,321, 23,099,034, 23,079,169, 22,974,325 and 22,994,152; work out the speedup.</p>
+<p class="do">Deal the values out in turns instead: owner t takes i = t, t + 6, t + 12 and so on while i is below 1024. Which owner gets i = 1023, and why can no value of i have two owners? Computed from the counts, the owners carry 23,029,821, 23,043,321, 23,099,034, 23,079,169, 22,974,325 and 22,994,152 repetitions; work out the speedup.</p>
 <details><summary>CHECK</summary>
-<p>1023 = 170 x 6 + 3, so owner 3 gets it; each i has exactly one remainder when divided by 6, so exactly one owner. The speedup is 138,219,822 / 23,099,034 = 5.98.</p>
+<p>1023 = 170 * 6 + 3, so owner 3 gets it; each value of i leaves exactly one remainder when divided by 6, so it has exactly one owner. The speedup is 138,219,822 / 23,099,034 = 5.98.</p>
+</details>
+<p class="do">For the handout's 8 threads, each band holds 1024 / 8 = 128 values of i exactly. Computed from the counts, the band with the most work carries 22,059,919 repetitions, and in turns the owner with the most carries 17,303,293. Work out both speedups.</p>
+<details><summary>CHECK</summary>
+<p>Bands give 138,219,822 / 22,059,919 = 6.27 and turns 138,219,822 / 17,303,293 = 7.99, of 8.</p>
 </details>
 
-<h2 id="a-shared-description-of-the-work-leaves-whole-lines-without">A shared description of the work leaves whole lines without an owner</h2>
+<h2 id="creating-the-cpu-threads-and-waiting-for-each-to-finish">Creating the CPU threads and waiting for each to finish</h2>
+<p>The POSIX threads library starts a thread with pthread_create, which takes the address of a handle for the thread, nullptr for the default settings, the function the thread executes and one address handed to that function; it returns as soon as the thread exists, so the new thread may read what that address points to at any later moment. pthread_join waits until the thread of a handle has finished. A start written for 6 owners in turns reads:</p>
 <pre>struct Args { uint32_t first; uint32_t step; uint32_t *out; };
 Args args[6];
 pthread_t tid[6];
@@ -44,48 +85,92 @@ for (uint32_t t = 0; t &lt; 6; ++t) {
     pthread_create(&amp;tid[t], nullptr, worker, &amp;args[t]);
 }
 for (uint32_t t = 0; t &lt; 6; ++t) pthread_join(tid[t], nullptr);</pre>
-<p>Read in English, the struct describes what one worker needs, the first i it owns, the step to its next i and the address of the picture; args holds 6 such descriptions, one per worker, all alive until this function ends, and tid holds 6 thread handles; for t from 0 to 5 the loop fills worker t's own description with first i t and step 6, and starts a thread with the POSIX threads call pthread_create, executing the function worker on the address of that description; the last line waits with pthread_join for each of the 6 threads to finish before going on.</p>
-<p class="do">If the loop filled one shared description instead of args[t], thread 0 could read it after the loop had already written a later t into it. Which owner's values of i would then have no owner? And if the pthread_join loop were removed, when would main know the picture is finished?</p>
+<p>Args describes what one worker needs: first, the first i it owns, step, the distance to its next i, and out, the address of the picture. args holds 6 such descriptions and tid 6 thread handles, all kept until the function that holds them ends. For t from 0 to 5, worker t's own description, args[t], is filled with first t, step 6 and the picture's address, and pthread_create starts a thread executing the function worker on the address of args[t]. After that loop, pthread_join waits for each of the 6 threads in turn to finish.</p>
+<p>worker is the function written at this step for each thread: it takes the address of its description, and for i from first, in steps of step, while i is below 1024, it computes the 1024 places of that i with the vector code and stores their counts in out.</p>
+<p class="do">Suppose the loop filled one shared description instead of args[t]. Thread 0 may read it after the loop has already written t = 1 or a later t into it: which values of i would then have two owners, and which none? And if the pthread_join loop were removed, how would the function know the picture is finished?</p>
 <details><summary>CHECK</summary>
-<p>Thread 0 may read t = 1 or any later t, so two threads share those values of i, and owner 0's values, i = 0, 6, 12 and so on, are written by nobody. Without the joins main never knows, and it could check and time a picture still being written.</p>
+<p>Thread 0 then takes the values of the t it read, which another thread takes too, and nobody takes owner 0's values, i = 0, 6, 12 and so on. Without the joins nothing tells the function that the threads have finished, and it could return, to be checked and timed, while they are still writing.</p>
+</details>
+<p>Before each version the starter sets every entry of out to 0, and after it the starter prints what this function returns:</p>
+<pre>double difference(
+    uint32_t img_size,
+    uint32_t max_iters,
+    std::vector&lt;uint32_t&gt; &amp;result,
+    std::vector&lt;uint32_t&gt; &amp;ref_result) {
+    int64_t diff = 0;
+    for (uint32_t i = 0; i &lt; img_size; i++) {
+        for (uint32_t j = 0; j &lt; img_size; j++) {
+            diff +=
+                abs(int(result[i * img_size + j]) - int(ref_result[i * img_size + j]));
+        }
+    }
+    return diff / double(img_size * img_size * max_iters);
+}</pre>
+<p>difference sets a 64-bit whole number diff to 0, visits every place (i, j), adds the size of the gap between the version's count in result and the reference's count in ref_result, and returns diff divided by img_size times img_size times max_iters; main prints it as the average output difference from the reference.</p>
+<p class="do">Owner 0's values of i, 1024 / 6 rounded up = 171 of them, carry 23,029,821 repetitions, computed from the counts. If they are never written, what does difference print?</p>
+<details><summary>CHECK</summary>
+<pre>divisor:  1024 * 1024 * 2000 = 2,097,152,000
+owner 0's values left at 0:  23,029,821 / 2,097,152,000 = 0.0110</pre>
 </details>
 
-<h2 id="on-the-gpu-blockidx-x-keeps-14-blocks-from-repeating-each-ot">On the GPU, blockIdx.x keeps 14 blocks from repeating each other's work</h2>
-<p>A launch <code>&lt;&lt;&lt;B, T&gt;&gt;&gt;</code> makes, as the CUDA programming guide defines it, B blocks of T threads; threadIdx.x goes from 0 to T - 1 inside every block and blockIdx.x numbers the blocks; each block executes on one SM, one of the identical blocks of hardware the GPU is built from, 48 on the course GPU and 14 on the laptop, each with 4 schedulers; an SM handles a block's threads in consecutive sets of 32 that NVIDIA calls warps. The handout asks for one warp per scheduler, 192 on the course GPU as 48 blocks of 4 warps, and on the laptop's 56 schedulers that is 14 blocks of 4 warps.</p>
-<p class="do">With <code>&lt;&lt;&lt;14, 128&gt;&gt;&gt;</code>, number every warp of the launch as w = 4 x blockIdx.x + threadIdx.x / 32, dividing in whole numbers, and write its range. If warp w takes the values of i in turns, i = w, w + 56, w + 112 and so on, with its 32 threads splitting j as in Lab 1, which warp owns i = 1000? What goes wrong if w is computed from threadIdx.x alone?</p>
+<h2 id="numbering-warps-across-blocks-with-blockidx-x">Numbering warps across blocks with blockIdx.x</h2>
+<p>On the GPU, a function that executes there is a kernel, and each execution of it from its beginning is a thread. A kernel is started from the CPU with <code>kernel&lt;&lt;&lt;B, T&gt;&gt;&gt;(arguments)</code>, which, as NVIDIA's CUDA programming guide defines it, starts B blocks of T threads each; inside the kernel, threadIdx.x is a thread's number in its block, from 0 to T - 1, blockIdx.x is its block's number, from 0 to B - 1, and blockDim.x is T. The GPU chip is built from identical blocks of hardware, which NVIDIA calls SMs, and the guide puts every block on one SM; the course GPU, an RTX 4000 Ada, has 48 SMs by NVIDIA's specification, and the laptop's GTX 1650 reports 14 through cudaGetDeviceProperties, in multiProcessorCount. Each SM of both GPUs has 4 schedulers, the circuits that choose which instruction begins next, and handles a block's threads in consecutive sets of 32 that begin each instruction together, which NVIDIA calls warps, each warp on one scheduler.</p>
+<p>Part 2 of the handout asks the GPU version for one warp per scheduler: 48 * 4 = 192 warps on the course GPU, as 48 blocks of 4 warps, <code>&lt;&lt;&lt;48, 128&gt;&gt;&gt;</code>, and 14 * 4 = 56 on the laptop, <code>&lt;&lt;&lt;14, 128&gt;&gt;&gt;</code>. The Lab 2 GPU vector version, started with <code>&lt;&lt;&lt;1, 32&gt;&gt;&gt;</code> as a single warp, has thread t take j = t, t + 32, t + 64 and so on for every i; call it the single-warp version.</p>
+<p class="do">With <code>&lt;&lt;&lt;14, 128&gt;&gt;&gt;</code>, number every warp of the launch as w = 4 * blockIdx.x + threadIdx.x / 32, dividing in whole numbers, and write its range. Let warp w take the values of i in turns, i = w, w + 56, w + 112 and so on, its thread with number threadIdx.x % 32 in the warp taking j as thread t did in the single-warp version. Which warp owns i = 1000? If w were computed from threadIdx.x alone, which values of i would be computed, by how many warps each? Computed from the counts, those values, 76 of them, carry 10,410,388 repetitions; what would difference print?</p>
 <details><summary>CHECK</summary>
-<p>w goes from 0 to 55, and 1000 = 17 x 56 + 48, so warp 48 owns it. Computed from threadIdx.x alone, every block repeats warps 0 to 3, so their values of i get 14 owners each and every other value of i gets none.</p>
+<pre>w = 4 * blockIdx.x + threadIdx.x / 32 goes from 4 * 0 + 0 = 0 to 4 * 13 + 3 = 55
+1000 = 17 * 56 + 48 -&gt; warp 48 owns i = 1000
+w from threadIdx.x alone: 0 to 3 in every block, so only i = 0 to 3, 56 to 59 and so on
+  are computed, each by 14 warps, one per block, and every other value of i by none
+difference: (138,219,822 - 10,410,388) / 2,097,152,000 = 127,809,434 / 2,097,152,000 = 0.0609</pre>
 </details>
-<p class="do">The handout's fourth question tries other launches with the same number of warps. On the laptop <code>&lt;&lt;&lt;28, 64&gt;&gt;&gt;</code> and <code>&lt;&lt;&lt;7, 256&gt;&gt;&gt;</code> also make 56 warps; work out how many SMs can be working at once for each of the three launches, and whether any of them guarantees one warp per scheduler.</p>
+<p class="do">The handout's fourth question tries other launches with the same number of warps. On the laptop, <code>&lt;&lt;&lt;28, 64&gt;&gt;&gt;</code> and <code>&lt;&lt;&lt;7, 256&gt;&gt;&gt;</code> also make 56 warps, and on the course GPU <code>&lt;&lt;&lt;96, 64&gt;&gt;&gt;</code> and <code>&lt;&lt;&lt;24, 256&gt;&gt;&gt;</code> make 192. For each launch, how many SMs can be working at once, and does any launch guarantee one warp per scheduler?</p>
 <details><summary>CHECK</summary>
-<p><code>&lt;&lt;&lt;14, 128&gt;&gt;&gt;</code> and <code>&lt;&lt;&lt;28, 64&gt;&gt;&gt;</code> can keep 14 SMs working, <code>&lt;&lt;&lt;7, 256&gt;&gt;&gt;</code> at most 7, since each block executes on one SM. None guarantees one warp per scheduler, because the hardware chooses where blocks and warps go; with 7 blocks of 8 warps, at best 2 warps per scheduler on 7 SMs and nothing on the other 7.</p>
+<pre>laptop:      &lt;&lt;&lt;14, 128&gt;&gt;&gt; 14 * 4 = 56 warps, at most 14 SMs
+             &lt;&lt;&lt;28, 64&gt;&gt;&gt;  28 * 2 = 56 warps, at most 14 SMs
+             &lt;&lt;&lt;7, 256&gt;&gt;&gt;   7 * 8 = 56 warps, at most 7 SMs
+course GPU:  &lt;&lt;&lt;96, 64&gt;&gt;&gt;  96 * 2 = 192 warps, at most 48 SMs
+             &lt;&lt;&lt;24, 256&gt;&gt;&gt; 24 * 8 = 192 warps, at most 24 SMs</pre>
+<p>Every block sits on one SM, so 7 blocks keep at most 7 SMs working and 24 blocks at most 24; with 7 blocks of 8 warps, each working SM holds 8 warps on its 4 schedulers, 2 per scheduler if they are spread evenly, while the other 7 SMs hold nothing. None of the launches guarantees one warp per scheduler, because the hardware chooses which SM takes each block.</p>
+</details>
+<p>Since the 32 threads of a warp begin each instruction together, NVIDIA's CUDA programming guide has a warp keep executing a loop, with its finished threads switched off, until its last thread leaves it, so a warp repeats until the slowest of its places is done. Call one repetition of the loop by a whole warp a warp-repetition. Computed in 32-bit floats from the Lab 2 reference, the single-warp version needs 8,792,320 warp-repetitions, and with 56 warps in turns over i, the warp with the most needs 168,029.</p>
+<p class="do">How many values of i do warps 0 to 15 take, and warps 16 to 55? If every value of i carried the same work, what speedup would 56 warps give over one, and what do the warp-repetitions give, if each warp has a scheduler of its own and time follows warp-repetitions?</p>
+<details><summary>CHECK</summary>
+<pre>1024 = 18 * 56 + 16 -&gt; warps 0 to 15 take 19 values of i, warps 16 to 55 take 18
+equal work per value of i:  1024 / 19 = 53.9
+from the warp-repetitions:  8,792,320 / 168,029 = 52.3, of 56</pre>
 </details>
 
-<h2 id="writing-both-versions-and-what-their-times-can-show">Writing both versions, and what their times can show</h2>
-<p>The CPU version, <code>mandelbrot_cpu_vector_multicore</code>, starts one pthread per core, each executing your vector code on the values of i it owns in turns, then joins them all. The GPU version, <code>mandelbrot_gpu_vector_multicore</code>, computes w as above and loops over its own values of i, its 32 threads splitting j, and its launch function starts <code>&lt;&lt;&lt;number of SMs, 128&gt;&gt;&gt;</code>.</p>
-<p class="do">Compile and execute both files as in the Lab 2 setup, with -pthread for the CPU file, and write the two differences.</p>
+<h2 id="writing-both-versions-and-timing-them">Writing both versions and timing them</h2>
+<p>The CPU version, <code>mandelbrot_cpu_vector_multicore</code>, starts one thread per core with pthread_create, each executing your vector code on the values of i it owns in turns, and then joins them all with pthread_join. The GPU version, <code>mandelbrot_gpu_vector_multicore</code>, computes w = 4 * blockIdx.x + threadIdx.x / 32 and loops over its own values of i in steps of the launch's number of warps, i = w, w + 56 and so on on the laptop, its 32 threads splitting j, and <code>launch_mandelbrot_gpu_vector_multicore</code> starts it with <code>&lt;&lt;&lt;number of SMs, 128&gt;&gt;&gt;</code>. Compile and execute both files from the lab2 folder:</p>
+<pre>g++ -O3 -march=native -std=c++17 -pthread mandelbrot_cpu_2.cpp -o mandelbrot_cpu_2
+nvcc -O3 -arch=sm_75 -std=c++17 mandelbrot_gpu_2.cu -o mandelbrot_gpu_2
+./mandelbrot_cpu_2 &amp;&amp; ./mandelbrot_gpu_2</pre>
+<p>g++ compiles the CPU file with full optimization for every instruction this CPU has, as 2017 C++, and -pthread adds the POSIX threads library; nvcc compiles the GPU file for compute capability 7.5, the GTX 1650's, so put your own GPU's number after sm_; and the last command executes the CPU program and, if it succeeds, the GPU program, each printing a time and a difference for every version.</p>
+<p class="do">Write the difference printed for each multicore version, and what 0.0110 or 0.0609 would point to.</p>
 <details><summary>CHECK</summary>
-<p>Both must be exactly 0. A value near 0.0000448, or a multiple of it, suggests whole lines of the picture without an owner, from a shared description or a w that ignores blockIdx.x.</p>
+<p>Both must print exactly 0. A printed 0.0110 matches owner 0's 171 values of i left at 0, from a shared description, and 0.0609 matches warps numbered from threadIdx.x alone, which leave 948 of the 1024 values of i at 0.</p>
 </details>
-<p class="do">Write your CPU vector and multicore times and their ratio, and your GPU baseline and multicore times and their ratio. The counts above predict at most 5.98 for 6 owners in turns and 4.72 in bands.</p>
+<p>The counts leave out two costs on the CPU. pthread_create and pthread_join take time of their own. And AMD's specification gives the Ryzen 5 4600H a base clock of 3.0 GHz and a boost clock of up to 4.0 GHz, which its footnote defines as the most a single core reaches on a single-threaded workload, so 6 busy cores may each be slower than the 1 they are compared with.</p>
+<p class="do">Write your CPU vector and multicore times and their ratio, and your GPU single-warp and multicore times and their ratio. Set them beside 5.98 for 6 owners in turns and 52.3 for 56 warps.</p>
 <details><summary>CHECK</summary>
-<p>The laptop's times for this part were not recorded, so yours are the first. The CPU ratio should come out below 5.98, because thread start-up and a clock that falls when every core is busy also count. On the GPU, 56 warps instead of 1 can approach 56 times only if every warp gets equal work and a scheduler of its own.</p>
+<p>The laptop's times for this part were not recorded in the chats, so yours are the first. A CPU ratio below 5.98 can come from the thread start and join and from a clock below its single-core boost with 6 cores busy; a GPU ratio below 52.3 from warps that share a scheduler or SMs left empty by the hardware's choice of where blocks go.</p>
 </details>
 
-<h2 id="a-split-needs-one-owner-per-place-and-similar-work-per-owner">A split needs one owner per place and similar work per owner</h2>
-<p>Gathered together, bands of equal size give 4.72 and turns give 5.98 on the same 6 threads; one shared description of the work leaves owner 0's lines unwritten; without blockIdx.x every block repeats the same 4 warps; and 56 warps can sit on only 7 of the 14 SMs.</p>
+<h2 id="gathering-what-a-split-has-to-get-right">Gathering what a split has to get right</h2>
+<p>Bands of 171 or 169 values of i give 4.72 on 6 threads and turns give 5.98, or 6.27 and 7.99 on 8; a shared description leaves owner 0's 171 values of i unwritten and prints 0.0110; warps numbered without blockIdx.x leave 948 values of i unwritten and print 0.0609; <code>&lt;&lt;&lt;7, 256&gt;&gt;&gt;</code> makes the same 56 warps as <code>&lt;&lt;&lt;14, 128&gt;&gt;&gt;</code> but can keep only 7 of the 14 SMs working; and 56 warps in turns can give at most 52.3.</p>
 <p class="do">Write one sentence on what a split has to get right, and why equal sizes and equal warp counts are not it.</p>
 <details><summary>CHECK</summary>
-<p>A split has to give every place exactly one owner and every owner nearly the same work: equal numbers of places carry very different work in this picture, 4.72 against 5.98, and equal numbers of warps can leave half the SMs empty.</p>
-<p>The reading "6 threads, so 6 times" fails on the bands, which give 4.72 on the same hardware.</p>
+<p>A split has to give every place exactly one owner and every owner nearly the same work: equal numbers of places carry very different work in this picture, 4.72 against 5.98 on the same 6 threads, and equal numbers of warps can leave half the SMs empty, 7 of 14.</p>
+<p>The reading "6 threads, so 6 times" fails on the bands, which give 4.72 on the same 6 threads, because the band from 513 to 683 carries 21.2 percent of the work instead of a sixth.</p>
 </details>
-<p>The handout's second question asks for the speedup over the single-core vector version with 8 cores, 6 on the laptop, and how the split affects it; the bands, the turns and your measured ratio answer it. Its third asks for the speedup over the single-warp GPU version with one warp per scheduler, its time against the CPU multicore version, and how the work was split; the warp numbering and your GPU ratio answer it. Its fourth asks whether <code>&lt;&lt;&lt;96, 64&gt;&gt;&gt;</code> and <code>&lt;&lt;&lt;24, 256&gt;&gt;&gt;</code> still give one warp per scheduler on the course GPU, <code>&lt;&lt;&lt;28, 64&gt;&gt;&gt;</code> and <code>&lt;&lt;&lt;7, 256&gt;&gt;&gt;</code> on the laptop, and how their times compare; the count of busy SMs above answers the first part, and your own times the second.</p>
-<p>Lines of the picture left at 0 mean values of i with no owner, from a shared description or a missing blockIdx.x; a result that differs between executions means threads reading a shared description at different moments; a correct version far from 6 times means bands of unequal work, which turns fix; a GPU version no faster with more blocks means blocks crowded onto a few SMs, or warps onto a few schedulers.</p>
-<p>Without code, splitting work between processors has two requirements, every piece done exactly once and every processor given a similar amount of work. Here, equal-sized bands fail the second, because the expensive part of the picture sits in the middle, and dealing the lines out in turns fixes it. Equal headcount per task and equal work per task are different things, so the question to ask is how the work was divided, not only into how many parts.</p>
-<p>The guess at the top has its answer: about 5, 4.72, because the largest band carries 21.2 percent of the work instead of the 16.7 percent a sixth would be.</p>
-<p class="do">A harder question to finish with. A 6-thread version in turns predicts 5.98 but measures well below it. Name two causes that the repetition counts cannot see, and a measurement for each.</p>
+<p>The handout's second question asks for the speedup over the single-core vector version with 8 cores, 6 on the laptop, and how the split affects it; the bands, the turns and your measured ratio answer it. Its third asks for the speedup over the single-warp GPU version with one warp per scheduler, its time against the CPU multicore version, and how the work was split; the warp numbering, the 52.3 and your GPU ratio answer it. Its fourth asks whether <code>&lt;&lt;&lt;96, 64&gt;&gt;&gt;</code> and <code>&lt;&lt;&lt;24, 256&gt;&gt;&gt;</code> still give one warp per scheduler on the course GPU and how their times compare, on the laptop <code>&lt;&lt;&lt;28, 64&gt;&gt;&gt;</code> and <code>&lt;&lt;&lt;7, 256&gt;&gt;&gt;</code>; the 48 and 24 SMs that the course GPU's launches can keep working, the 14 and 7 of the laptop's, and the hardware's own choice of where blocks go answer the first part, and your own times the second.</p>
+<p>Values of i left at 0 mean values with no owner, from a shared description or a w without blockIdx.x, and the printed 0.0110 and 0.0609 match those two. A result that differs between executions means threads reading a shared description at different moments. A correct version far from 6 times means bands of unequal work, which turns fix. A GPU version no faster with more blocks means blocks crowded onto a few SMs, or warps onto a few schedulers.</p>
+<p>Splitting work between processors has two requirements, every piece done exactly once and every processor given a similar amount of work. Here equal-sized bands fail the second, because the expensive part of the picture sits in the middle bands, and dealing the values of i out in turns fixes it. Equal headcount per task and equal work per task are different things, so the question to ask of any split is how the work was divided, not only into how many parts.</p>
+<p>The speedup asked for at the start is about 5: the counts give 4.72, because the largest band carries 21.2 percent of the work instead of the 100 / 6 = 16.7 percent of a sixth.</p>
+<p class="do">On the course GPU, <code>&lt;&lt;&lt;48, 128&gt;&gt;&gt;</code> makes 192 warps, w = 4 * blockIdx.x + threadIdx.x / 32, taking the values of i in turns, i = w, w + 192 and so on. Which warp owns i = 1000, and how many values of i does each warp take? Even if every value of i carried the same work, what speedup over one warp could the 192 warps give?</p>
 <details><summary>CHECK</summary>
-<p>Thread start-up and joining, measured by timing a version whose threads do no work; and a CPU clock that falls when every core is busy, measured by reading the clock with <code>grep MHz /proc/cpuinfo</code> while the version executes and comparing one busy core with six. Memory is an unlikely cause here, since the picture is 1024 x 1024 x 4 bytes = 4 MB, written once.</p>
+<p>1000 = 5 * 192 + 40, so warp 40 owns it. 1024 = 5 * 192 + 64, so warps 0 to 63 take 6 values of i and warps 64 to 191 take 5. With equal work per value of i the job ends with a warp of 6, at most 1024 / 6 = 170.7 times one warp, not 192: 64 warps carry a sixth value while 128 wait for them.</p>
 </details>
 <p>The lab pages <a href="../14-ownership.html">who writes which place, and who finishes last</a> and <a href="../17-hardware-or-launch.html">fixed by the chip, or made by the launch</a> work these numbers out at length, and the notes on <a href="owner.html">a single writer per place</a> and <a href="sm.html">the block of hardware a GPU chip is built from</a> hold the short versions.</p>
 

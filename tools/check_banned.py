@@ -64,7 +64,10 @@ REBUILT = {"notes/MIT-6.S894.html", "notes/lesson-00-setup.html", "notes/lesson-
            "notes/lesson-03-cpu-vector.html", "notes/lesson-04-gpu-32-threads.html",
            "notes/lesson-05-timing-one-multiply-add.html",
            "notes/lesson-06-how-many-threads.html",
-           "notes/lesson-07-lab2-picture.html"}
+           "notes/lesson-07-lab2-picture.html",
+           "notes/lesson-08-independent-work.html",
+           "notes/lesson-09-many-cores.html",
+           "notes/lesson-10-many-threads.html"}
 LABELLING = re.compile(
     r"\b(lines?|read in english|gathered together|without code|for a manager|the guess at the top|"
     r"a harder question to finish with)\b",

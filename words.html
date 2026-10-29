@@ -12,11 +12,14 @@
 <p class="sub">Every technical word on these pages, in plain English, in alphabetical order. Each page also defines the words it needs before using them, so this list is for looking things up, not for reading first.</p>
 
 <dl class="words">
+<dt>[a, b)</dt><dd>The whole numbers from a up to b - 1: a is included and b is not, so [0, 171) holds 0 to 170.</dd>
 <dt>address</dt><dd>The number that says where a value sits in memory. Memory is a long list of bytes, numbered from 0; an address is one of those numbers.</dd>
 <dt>array</dt><dd>Many values of the same kind stored one after another in memory, reached by their place number: <code>out[5]</code> is the value at place 5 of the array <code>out</code>.</dd>
 <dt>AVX2</dt><dd>A set of instructions in the laptop's Ryzen processor that act on 256 bits at once, which is 8 fractions of 32 bits each.</dd>
 <dt>AVX-512</dt><dd>A larger set of such instructions, acting on 512 bits at once: 16 fractions of 32 bits. The Lab 1 handout targets it; the laptop's Ryzen 5 4600H does not have it.</dd>
-<dt>BRA, BSSY, BSYNC</dt><dd>GPU machine instructions that control where execution goes: BRA jumps to another instruction; BSSY and BSYNC mark where threads that took different paths meet again.</dd>
+<dt>bands, turns (splitting work)</dt><dd>Ways to split the values of i between n workers. In bands, each worker takes one stretch of consecutive values, the first worker the first n-th of them, the next worker the next n-th; in turns, worker t takes t, t + n, t + 2n and so on.</dd>
+<dt>base clock, boost clock</dt><dd>The clock speeds a chip maker publishes: the base clock is the speed the chip is promised to hold under load, and the boost clock the highest it reaches when temperature and power allow, for a CPU with a single core busy. The laptop's Ryzen 5 4600H has 3.0 GHz and up to 4.0 GHz; NVIDIA gives the GTX 1650 laptop GPU a boost clock between 1,125 and 1,560 MHz, depending on the laptop.</dd>
+<dt>BRA, BSSY, BSYNC, BMOV, BREAK</dt><dd>GPU machine instructions that control where execution goes: BRA jumps to another instruction; BSSY and BSYNC mark where threads that took different paths meet again; BMOV copies the record of which threads are to meet there into or out of a register; BREAK takes threads that leave a loop out of that record.</dd>
 <dt>bit, byte</dt><dd>A bit holds 0 or 1. A byte is 8 bits. A float or a <code>uint32_t</code> takes 32 bits, which is 4 bytes.</dd>
 <dt>block (CUDA)</dt><dd>A set of GPU threads started together. The launch <code>&lt;&lt;&lt;B, T&gt;&gt;&gt;</code> starts B blocks of T threads each. Each block executes on one SM.</dd>
 <dt>chain</dt><dd>A list of operations in which each one needs the value of the one before it, so they cannot overlap.</dd>
@@ -25,6 +28,7 @@
 <dt>CHECK</dt><dd>On this site, the fold-out box under each exercise that holds the worked answer. Open it only after writing your own.</dd>
 <dt>compiler</dt><dd>The program (here <code>g++</code> for the CPU and <code>nvcc</code> for the GPU) that turns source code into machine instructions. It may reorder instructions when nothing forbids it.</dd>
 <dt>compiler flags: -O3, -march=native, -arch=sm_75, -ccbin, -pthread</dt><dd>Options on the compile line. -O3: optimize fully. -march=native: allow every instruction this CPU has, such as AVX2. -arch=sm_75: make nvcc produce machine instructions for compute capability 7.5. -ccbin: tell nvcc which g++ to use. -pthread: add the POSIX threads library.</dd>
+<dt>-Xptxas -v</dt><dd>An nvcc option that hands -v on to ptxas, the step that turns PTX into machine instructions, so that it prints, for each kernel, how many registers each thread uses.</dd>
 <dt>compute capability</dt><dd>A pair of numbers that names an NVIDIA GPU's generation and what it can execute. The GTX 1650 is 7.5; <code>nvidia-smi --query-gpu=compute_cap --format=csv</code> prints yours.</dd>
 <dt>core</dt><dd>A part of a CPU that executes its own sequence of instructions. The Ryzen 5 4600H has 6.</dd>
 <dt>CPU</dt><dd>The central processor of a computer, built to finish one sequence of instructions as fast as possible.</dd>
@@ -32,23 +36,33 @@
 <dt>cudaMalloc, cudaMemcpy, cudaDeviceSynchronize</dt><dd>CUDA calls made from the CPU: the first reserves memory on the graphics card, the second copies between CPU memory and the graphics card's memory, the third waits until everything sent to the GPU has finished.</dd>
 <dt>cudaGetDeviceProperties, multiProcessorCount</dt><dd>A CUDA call made from the CPU that fills a record describing the GPU; its field multiProcessorCount holds the number of SMs, 14 on the GTX 1650 and 48 on the course GPU.</dd>
 <dt>cudaOccupancyMaxActiveBlocksPerMultiprocessor</dt><dd>A CUDA call made from the CPU that returns how many blocks of a given kernel, at a given number of threads per block, one SM can hold at once.</dd>
+<dt>cuobjdump</dt><dd>A CUDA toolkit program that prints what is inside a compiled GPU program; <code>cuobjdump -sass</code> prints its machine instructions, the listing.</dd>
 <dt>cycle</dt><dd>A single tick of a processor's clock. Times inside the GPU are counted in cycles.</dd>
+<dt>difference (the starters' check)</dt><dd>The number the Lab 1 and Lab 2 starters print after each version: the sum over all places of the gap between the version's count and the reference's count, divided by img_size times img_size times max_iters. A correct version prints exactly 0.</dd>
 <dt>DRAM</dt><dd>The memory chips. On a graphics card they sit outside the GPU chip, so reading from them takes many cycles.</dd>
+<dt>fat while loop, thin loop</dt><dd>The learner's names: a thin loop carries one set of places in each repetition; a fat while loop carries two or more independent sets in the same repetition and is left only when every set is done, each set's mask still stopping its own counts.</dd>
 <dt>FFMA, FADD, FMUL</dt><dd>Names of GPU machine instructions: FFMA multiplies two fractions and adds a third in one step; FADD adds two fractions; FMUL multiplies two.</dd>
 <dt>float</dt><dd>A fraction stored in 32 bits. It can only hold certain values; a typed number becomes the nearest one it can hold.</dd>
 <dt>fmadd (fused multiply-add)</dt><dd>A single instruction that computes a times b plus c. On the CPU, <code>_mm256_fmadd_ps</code> does it at 8 indexes at once.</dd>
 <dt>FP32 unit</dt><dd>A circuit in the GPU that does one 32-bit multiply-add for one thread. The GTX 1650 has 896 of them; NVIDIA's specifications call them CUDA cores.</dd>
-<dt>hardware thread (SMT)</dt><dd>An instruction sequence that a CPU core keeps going alongside others. The laptop's cores keep 2 each, sharing the core's arithmetic circuits, so either can begin instructions while the other waits.</dd>
+<dt>hardware thread (SMT)</dt><dd>An instruction sequence that a CPU core keeps going alongside others, which AMD calls simultaneous multithreading, SMT. The laptop's cores keep 2 each, sharing the core's arithmetic circuits, so either can begin instructions while the other waits.</dd>
 <dt>GDDR5, GDDR6</dt><dd>Kinds of memory chips used on graphics cards. GDDR6 moves more bytes per second over the same wires.</dd>
 <dt>GPU</dt><dd>A graphics processor: thousands of simple arithmetic circuits that are fast when many of them do the same instruction at the same moment.</dd>
 <dt>graph paper</dt><dd>The learner's word for the mathematical plane with (0, 0) at its center, where the middleman pairs live.</dd>
 <dt>image paper</dt><dd>The learner's word for the 256 by 256 sheet of results, the array <code>out</code>, with i counting down and j counting right.</dd>
 <dt>IEEE 754</dt><dd>The standard that fixes how floats are stored and how a result that falls between two floats is rounded.</dd>
 <dt>ILP (instruction-level parallelism)</dt><dd>Independent instructions inside one thread, which the processor can begin while earlier ones still wait for their results. Lab 2, part 1 creates it by giving each loop several independent sets of places.</dd>
+<dt>independent set (of places)</dt><dd>Places whose arithmetic never needs the values of another set, so that one set's instructions can begin while another set's wait. On the CPU a set is the 8 places of one vector; on the GPU, one place per thread.</dd>
 <dt>index-repetition</dt><dd>On this site: one index of an 8-float AVX2 variable doing one repetition of the loop. A repetition of the vector loop costs 8 of them, useful or not.</dd>
 <dt>index 0 to 7</dt><dd>The place of one of the 8 values held in a 256-bit AVX2 variable.</dd>
 <dt>instruction</dt><dd>A basic step a processor executes: add, multiply, compare, copy, jump.</dd>
+<dt>instruction tables (Agner Fog)</dt><dd>Agner Fog's published measurements of each instruction on each CPU design: how many cycles its result takes and how many can begin per cycle. For Zen 2 they give 3 cycles for a vector float add or multiply, and 2 adds and 2 multiplies begun per cycle.</dd>
 <dt>intrinsic</dt><dd>A function name in C++ that the compiler turns into one specific processor instruction, such as <code>_mm256_add_ps</code>.</dd>
+<dt>_mm256_add_ps, _mm256_fmadd_ps</dt><dd>AVX2 intrinsics for 8 floats at once: add_ps adds 8 floats to 8 others, index by index; fmadd_ps multiplies two sets of 8 and adds a third, rounding once.</dd>
+<dt>_mm256_cmp_ps, _mm256_testz_ps</dt><dd>cmp_ps compares 8 floats with 8 others, index by index, and puts 32 bits all 1 where the comparison holds and 32 bits all 0 elsewhere; testz_ps(a, a) gives 1 when the top bit of each of the 8 pieces of a is 0.</dd>
+<dt>_mm256_castps_si256, _mm256_sub_epi32</dt><dd>castps_si256 reads the same 256 bits as 8 32-bit whole numbers without changing them; sub_epi32 subtracts 8 whole numbers from 8 others, index by index.</dd>
+<dt>_mm256_set1_ps, _mm256_set_ps, _mm256_setr_ps, _mm256_setzero_si256</dt><dd>Ways to make a vector: set1_ps puts one float at all 8 indexes; set_ps takes 8 floats with the one for index 7 first; setr_ps takes them with index 0 first; setzero_si256 makes 256 bits of 0.</dd>
+<dt>_mm256_store_si256, _mm256_storeu_si256</dt><dd>Write 256 bits to memory: store_si256 needs an address that is a multiple of 32; storeu_si256 takes any address.</dd>
 <dt>iters</dt><dd>The number of repetitions the Mandelbrot loop did for one place before leaving; this is what the picture stores.</dd>
 <dt>kernel</dt><dd>A function that executes on the GPU, marked <code>__global__</code> in CUDA.</dd>
 <dt>listing</dt><dd>The machine instructions the compiler actually produced, printed with <code>cuobjdump -sass</code>. It shows the real order of instructions.</dd>
@@ -60,6 +74,7 @@
 <dt>notes (this site)</dt><dd>The short pages in the notes section: one idea each, a few lines to calculate, and the notes that point to each one.</dd>
 <dt>ncu (Nsight Compute)</dt><dd>NVIDIA's profiler for single kernels, used from the command line as <code>ncu --metrics ... ./program</code>. On many machines it needs administrator rights to read the GPU's counters.</dd>
 <dt>nsys (Nsight Systems)</dt><dd>NVIDIA's tool that times what the CPU and the GPU did, kernel by kernel. <code>nsys profile --stats=true ./program</code> prints the time of each kernel.</dd>
+<dt>nvidia-smi</dt><dd>A program installed with NVIDIA's driver that prints the GPU's name, memory, temperature and clocks; <code>nvidia-smi -q -d CLOCK</code> prints the clocks.</dd>
 <dt>profiler</dt><dd>A tool (here NVIDIA Nsight Compute) that counts what the GPU did, such as memory requests and sectors.</dd>
 <dt>operations per byte</dt><dd>How many arithmetic operations a program does for each byte it moves to or from memory. Below what the hardware needs to stay busy, memory sets the time.</dd>
 <dt>operations per second (FLOP/s)</dt><dd>Arithmetic operations completed per second. A multiply-add counts as 2: one multiply and one add.</dd>
@@ -69,6 +84,7 @@
 <dt>predication</dt><dd>An instruction that is executed for every thread but has effect only where a stated condition is true, so no jump is needed. Shown in a listing with a prefix such as <code>@!P2</code>.</dd>
 <dt>PTX</dt><dd>The instruction language NVIDIA defines for its GPUs, one step above the machine instructions that nvcc finally produces. Code can insert a PTX instruction by hand with <code>asm volatile</code>, as the clock read of the Lab 2 prelab does with <code>mov.u64</code>.</dd>
 <dt>program counter</dt><dd>The address of the next instruction a thread will execute.</dd>
+<dt>POSIX threads (pthreads)</dt><dd>The standard library of thread functions on Linux and other Unix systems, such as pthread_create and pthread_join; g++ needs -pthread to use it.</dd>
 <dt>pthread_create, pthread_join</dt><dd>CPU library calls: the first starts a new thread executing a given function; the second waits until that thread has finished.</dd>
 <dt>reduction</dt><dd>Turning many numbers into one, such as adding up an array. The work is easy to split; the dependence between partial results is the hard part.</dd>
 <dt>register</dt><dd>A small storage cell inside the processor chip. Arithmetic reads its inputs only from registers.</dd>
@@ -80,6 +96,7 @@
 <dt>significant bits</dt><dd>The bits of a float that hold its digits, as opposed to the bits that say how large it is. A float has 24, so above 16,777,216 it cannot hold every whole number.</dd>
 <dt>SIMD</dt><dd>Single instruction, multiple data: one instruction acting on several values at once, as AVX2 does with 8.</dd>
 <dt>SM</dt><dd>Each of the identical blocks of hardware an NVIDIA GPU chip is built from. The GTX 1650 has 14, each with 64 FP32 units.</dd>
+<dt>speedup</dt><dd>The time of one version divided by the time of a faster one: a speedup of 4.72 means the faster version takes 4.72 times less time.</dd>
 <dt>telerun</dt><dd>The course's tool for sending code to its own machines. It needs a course account, so self-learners compile and time on their own computer instead.</dd>
 <dt>threadIdx.x, blockIdx.x, blockDim.x</dt><dd>Numbers every GPU thread can read: its own number inside its block, its block's number, and the number of threads per block.</dd>
 <dt>tile</dt><dd>A small square piece of a large table, copied into shared memory so many threads can use each value without fetching it again.</dd>

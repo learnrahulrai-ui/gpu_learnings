@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="More threads per core and more sets of 32 threads per scheduler fill the same waiting as independent work inside a thread: how to find the number that is enough, why speedups do not multiply, and when registers matter.">
+<meta name="description" content="Put more threads on each CPU core and more warps on each GPU scheduler, then add the independent sets back: count the idle cycles one warp leaves, the warps that fill them, the registers that limit them, and what a chained product of speedups can and cannot test.">
 <meta name="keywords" content="lesson">
 <title>Lesson 10: Many Threads</title>
 <link rel="stylesheet" href="../style.css">
@@ -16,81 +16,144 @@
 <main>
 <p class="crumbs"><a href="MIT-6.S894.html">MIT 6.S894 tutorial</a> / Lesson 10</p>
 <h1>Lesson 10. Many threads per core, then everything together</h1>
-<p class="sub">This lesson covers parts 3 and 4 of Lab 2, where you write the multithread and full versions, then the _ilp versions that add independent sets on top, beginning from your part 1 and part 2 versions. Paragraphs with a red rule beside them are for your pencil; work each one before opening its CHECK.</p>
-<p>Part 3 of Lab 2 puts more than one thread on each CPU core and more than one set of 32 threads on each of the GPU's schedulers, the circuits that pick which instruction begins next, and part 4 adds the independent sets of part 1 back in. The lab asks how much each step helps, which number of threads is best, and what decides it. Each technique gives a speedup when tried alone, and the natural expectation is that the speedups multiply. What do the three techniques have in common, and how do you know when adding more of one stops paying?</p>
+<p class="sub">This lesson covers parts 3 and 4 of Lab 2, where you write the multithread and full versions, then the _ilp versions that add independent sets on top, beginning from your part 1 and part 2 versions. You need g++ with the POSIX threads library, the CUDA toolkit, and the Lab 2 starter folder, fetched with <code>git clone https://github.com/accelerated-computing-class/lab2.git</code>. Paragraphs with a red rule beside them are for your pencil; work each one before opening its CHECK.</p>
+<p>Part 3 of Lab 2 puts more than one thread on each CPU core and more than one set of 32 threads on each of the GPU's schedulers, the circuits that choose which instruction begins next, and part 4 adds back the independent sets that part 1 put inside each thread. The lab asks how much each step helps, which number of threads is best, and what decides it. Each technique gives a speedup when tried alone, and the natural expectation is that the speedups multiply. What do the three techniques have in common, and how do you know when adding more of one stops paying?</p>
 <p>The question asked at this step was what makes someone who has memorized everything still fail here:</p>
 <p class="you">"What will make a student fail in each of the parts of the assignment due to memorization? Let's say there is somebody who has memorized all the things but still cannot reason it out."</p>
 <p class="do">Write a guess. On the laptop's GPU, with the Lab 2 loop, how many sets of 32 threads per scheduler are worth having before more stop helping: 1, about 2, or 8 or more?</p>
 
-<h2 id="with-one-set-of-32-threads-per-scheduler-about-17-5-of-every">With one set of 32 threads per scheduler, about 17.5 of every 35.5 cycles sit idle</h2>
-<p>The laptop's CPU has 6 cores with 2 hardware threads each, 12 in all. Its GPU has 14 SMs, the identical blocks of hardware the chip is built from, with 4 schedulers each, 56 in all, each holding up to 8 warps, NVIDIA's name for a set of 32 consecutive threads that begin each instruction together, so 448 warps in all. NVIDIA's Turing tuning guide gives a scheduler at most one instruction begun per cycle, and the prelab measured that a 32-thread float instruction takes 2 cycles to begin and that a float operation needing the previous result waits 4 cycles. The Lab 2 loop has 9 float instructions per repetition and a repeating chain of 4 operations, 16 cycles, and the laptop's baseline, one block of 32 threads and so one warp, took about 208 ms for 8,792,320 warp-repetitions, one repetition of the loop by the whole warp each.</p>
-<p class="do">Work out the time per warp-repetition, 208 ms / 8,792,320, and the cycles that is at an assumed 1.5 billion cycles per second. Set it beside the cycles to begin the 9 float instructions, 9 x 2, and the 16 cycles of the chain. How many cycles per repetition does the scheduler begin no float instruction?</p>
+<h2 id="reading-the-lab-2-loop-and-following-one-repetition">Reading the Lab 2 loop and following one repetition</h2>
+<pre>constexpr float window_zoom = 1.0 / 10000.0f;
+constexpr float window_x = -0.743643887 - 0.5 * window_zoom;
+constexpr float window_y = 0.131825904 - 0.5 * window_zoom;
+constexpr uint32_t default_max_iters = 2000;
+
+void mandelbrot_cpu_scalar(uint32_t img_size, uint32_t max_iters, uint32_t *out) {
+    for (uint64_t i = 0; i &lt; img_size; ++i) {
+        for (uint64_t j = 0; j &lt; img_size; ++j) {
+            float cx = (float(j) / float(img_size)) * window_zoom + window_x;
+            float cy = (float(i) / float(img_size)) * window_zoom + window_y;
+
+            float x2 = 0.0f;
+            float y2 = 0.0f;
+            float w = 0.0f;
+            uint32_t iters = 0;
+            while (x2 + y2 &lt;= 4.0f &amp;&amp; iters &lt; max_iters) {
+                float x = x2 - y2 + cx;
+                float y = w - (x2 + y2) + cy;
+                x2 = x * x;
+                y2 = y * y;
+                float z = x + y;
+                w = z * z;
+                ++iters;
+            }
+
+            out[i * img_size + j] = iters;
+        }
+    }
+}</pre>
+<p>window_zoom is 1 divided by 10000, window_x is -0.743643887 minus half of window_zoom, and window_y is 0.131825904 minus half of window_zoom, each stored as a float, and default_max_iters is 2000. mandelbrot_cpu_scalar takes img_size and max_iters, two 32-bit whole numbers, and out, the address in memory where the answers go, one 32-bit whole number after another. For every pair (i, j) with i and j from 0 to img_size - 1, one place of the picture, cx is j divided by img_size, times window_zoom, plus window_x, and cy is i divided by img_size, times window_zoom, plus window_y. Then x2, y2 and w start out as 0 and iters as 0, and the while loop repeats its trip while x2 + y2 is at most 4 and iters is below max_iters: x becomes x2 minus y2 plus cx; y becomes w minus the sum x2 + y2, plus cy; x2 becomes x times x and y2 becomes y times y; z becomes x plus y; w becomes z times z; and iters goes up by 1. Once the while loop is left, iters is stored in out at entry i times img_size plus j.</p>
+<p>The starter's main gives img_size the value 1024 and max_iters the value default_max_iters, so the Lab 2 picture has 1024 by 1024 places and at most 2000 trips at each. Call one trip through the braces of the while loop a repetition; the iters stored for a place, its count, is the number of repetitions it made.</p>
+<p class="do">Count the float adds or subtracts and the float multiplies of one repetition, including the add of the test's x2 + y2, and taking the compiler to reuse that sum for the new y.</p>
 <details><summary>CHECK</summary>
-<pre>208e-3 / 8,792,320 = 23.7 ns;  x 1.5 = 35.5 cycles per repetition
-begins: 9 x 2 = 18 cycles;  chain: 16 cycles
-idle: about 35.5 - 18 = 17.5 cycles per repetition</pre>
-<p>Neither the begins nor the chain explains 35.5 cycles; the rest goes to the compare, the branch, the count, and the waits around them.</p>
+<p>The test adds once, the new x twice, the new y twice and z once: 6 adds or subtracts. The multiplies are x times x, y times y and z times z, 3. That makes 9 float instructions per repetition.</p>
 </details>
-<p class="do">A second warp on the same scheduler can begin its instructions in those idle cycles. Work out how many warps per scheduler it takes before the float begins themselves fill every cycle, 35.5 / 18, and the cycles of the scheduler per warp-repetition with 1, 2 and 4 warps.</p>
+<p>On the GPU, a function that executes there is a kernel, each execution of a kernel from its beginning is a thread, and the listing of a kernel is the printout of the machine instructions the compiler made for it, which cuobjdump from the CUDA toolkit prints. The chats report that the listing of the laptop's kernel for this loop held 6 FADD and 3 FMUL in the loop, the machine's float add and float multiply.</p>
+<p>Call a list of operations in which each needs the value of the one before it a chain. The Lab 2 prelab measured the wait on the laptop's GTX 1650 with a multiply-add, FFMA, one instruction that computes a times b plus c: started as a single thread, a chain of 64 multiply-adds took 281 cycles, a cycle being one tick of the GPU's clock, and a chain of 256 took 1055, so each of the 192 extra multiply-adds added (1055 - 281) / 192 = 4.03 cycles. NVIDIA's Turing tuning guide gives the same 4 cycles for the core float math operations, so take an operation's value to be ready 4 cycles after it begins.</p>
+<p class="do">Take x and y of one repetition as ready at cycle 0, let every operation begin as soon as its inputs are ready, and work out when the next x and the next y are ready.</p>
 <details><summary>CHECK</summary>
-<pre>35.5 / 18 = about 2 warps per scheduler
-1 warp:  35.5 cycles
-2 warps: the larger of 35.5 and 36, over 2 = 18 each
-4 warps: the larger of 35.5 and 72, over 4 = 18 each</pre>
-<p>Past about 2 warps per scheduler the float begins are the limit, and more warps add nothing. This rests on the assumed clock, which a measurement has to replace.</p>
+<pre>x2 = x * x, y2 = y * y and z = x + y at 4
+w = z * z, x2 + y2 and x2 - y2 at 8
+next x = (x2 - y2) + cx and w - (x2 + y2) at 12
+next y = (w - (x2 + y2)) + cy at 16</pre>
+<p>The y of a repetition is 16 cycles from the next, through 4 operations of 4 cycles each, and the next x is ready before it.</p>
+</details>
+<p>Call these 16 cycles, from one repetition's y to the next, the chain of a repetition.</p>
+
+<h2 id="timing-one-warp-and-counting-the-cycles-its-scheduler-leaves">Timing one warp and counting the cycles its scheduler leaves idle</h2>
+<p>The GPU chip is built from identical blocks of hardware, which NVIDIA calls SMs, and the laptop's GTX 1650 reports 14 of them through cudaGetDeviceProperties. NVIDIA's CUDA programming guide gives each SM of compute capability 7.5, the laptop's, 4 schedulers and 64 float circuits, 16 for each scheduler; an SM handles threads in consecutive sets of 32 that begin each instruction together, which the guide calls warps, and holds at most 32 warps at once. NVIDIA's Turing tuning guide says that each scheduler handles a fixed set of warps and can begin an instruction every cycle, so a scheduler holds at most 32 / 4 = 8 warps.</p>
+<p>The prelab measured the begins as well: started as a single thread, four independent chains of multiply-adds took 519 cycles for 256 multiply-adds and 1031 for 512, so (1031 - 519) / 256 = 2 cycles per multiply-add, where four chains of 4-cycle waits would allow 1 cycle per multiply-add to a scheduler that begins an instruction every cycle. A single thread still forms a whole warp, as the CUDA programming guide counts a block's warps by rounding its thread count up to a multiple of 32, and a warp through a scheduler's 16 float circuits takes 32 / 16 = 2 cycles; take the same 2 cycles for a float add and a float multiply, which the same circuits perform. So the 9 float instructions of a repetition keep the float circuits busy for 9 * 2 = 18 cycles.</p>
+<p>A kernel is started from the CPU with <code>kernel&lt;&lt;&lt;B, T&gt;&gt;&gt;(arguments)</code>, which, as the CUDA programming guide defines it, starts B blocks of T threads each, all threads of one block on one SM. The Lab 2 GPU vector version, written in Lab 1 and ported, gives thread t the places j = t, t + 32, t + 64 and so on for every i and is started with <code>&lt;&lt;&lt;1, 32&gt;&gt;&gt;</code>, one warp on one scheduler; it took 222.90, 207.55 and 208.67 ms in three measurements on the laptop. The guide has a warp keep executing a loop, with its finished threads switched off, until its last thread leaves it; call one repetition of the loop by the whole warp a warp-repetition. Computed in 32-bit floats from the Lab 2 reference, the vector version makes 8,792,320 warp-repetitions.</p>
+<p>NVIDIA gives the GTX 1650 laptop GPU a boost clock between 1,125 and 1,560 MHz, depending on the laptop, and the clock during these measurements was not recorded.</p>
+<p class="do">Work out the time per warp-repetition, 207.55 ms / 8,792,320, and the cycles it takes at 1.125 GHz and at 1.56 GHz. Set those beside the 18 cycles of the float circuits and the 16 of the chain. How many cycles per repetition do the float circuits sit idle?</p>
+<details><summary>CHECK</summary>
+<pre>207.55 ms / 8,792,320 = 23.6 ns per warp-repetition
+at 1.125 GHz: 23.6 * 1.125 = 26.6 cycles;  at 1.56 GHz: 23.6 * 1.56 = 36.8 cycles
+float circuits busy 18, chain 16
+idle: 26.6 - 18 = 8.6  to  36.8 - 18 = 18.8 cycles per repetition</pre>
+<p>Neither the 18 nor the 16 accounts for 26.6 to 36.8 cycles. The rest can only go to the loop's other instructions, its compare, its count and its branch, and to cycles in which the warp's next instruction waits for a value, since no other warp is on the scheduler to begin in the meantime.</p>
 </details>
 
-<h2 id="a-second-hardware-thread-on-a-cpu-core-fills-the-same-waitin">A second hardware thread on a CPU core fills the same waiting as a second set</h2>
-<p>The 2 hardware threads of one CPU core share its arithmetic circuits, and either can begin instructions while the other waits, as AMD describes the simultaneous multithreading of its cores. For one 8-place set the core's chain takes 4 x 3 = 12 cycles per repetition and its 9 vector instructions take about 4.5 cycles to begin, from Agner Fog's published Zen 2 figures of a 3-cycle wait and at least 2 vector float instructions begun per cycle.</p>
-<p class="do">If one CPU thread already carries 2 or 3 independent sets that fill the 12-cycle chain, what can a second hardware thread on the same core still fill? And if each thread carries only one set?</p>
+<h2 id="adding-warps-to-a-scheduler-until-its-float-circuits-are-ful">Adding warps to a scheduler until its float circuits are full</h2>
+<p>Let k warps share one scheduler, each with its own places, so that one can begin while another waits. Each warp alone still needs P cycles for a repetition, the 26.6 to 36.8 worked out for one warp, and the float circuits need 18 cycles per warp-repetition, so a round in which each of the k warps makes one repetition takes at least the larger of P and 18 * k cycles, and exactly that if the warps fill each other's waits.</p>
+<p class="do">Work out the warps per scheduler that bring the float circuits to their limit, P / 18, and the cycles per warp-repetition with 1, 2 and 4 warps, at both ends of the clock range.</p>
 <details><summary>CHECK</summary>
-<p>With the chain already filled, little: both threads compete for the same begins. With one set per thread, the second thread fills the waiting that a second set would have filled, so the two techniques fill the same idle cycles.</p>
+<pre>warps needed:  26.6 / 18 = 1.48   to   36.8 / 18 = 2.04
+at 1.125 GHz:  1 warp 26.6;  2 warps the larger of 26.6 and 36, over 2 = 18;   4 warps 72 / 4 = 18
+at 1.56 GHz:   1 warp 36.8;  2 warps the larger of 36.8 and 36, over 2 = 18.4; 4 warps 72 / 4 = 18</pre>
+<p>At either end of NVIDIA's range, about 2 warps per scheduler bring the float circuits to their limit of 18 cycles per warp-repetition, and more warps add nothing; 2 is a quarter of the 8 a scheduler holds.</p>
 </details>
 
-<h2 id="chained-speedup-ratios-always-multiply-to-the-total-so-that">Chained speedup ratios always multiply to the total, so that check tests nothing</h2>
-<p>The Lab 2 tutor notes illustrate combining with times that were not measured: a baseline B of 120 ms; I, the baseline plus independent sets inside each thread, 60; C, many SMs, 24; T, many SMs and more threads per SM, 12; and F, T plus independent sets, 10.</p>
-<p class="do">Work out (B / C) x (C / T) x (T / F) and B / F. Then repeat with any other times, B = 97, C = 41, T = 13 and F = 7, and write the product as one fraction to see why. Finally work out the gain of the independent sets alone, B / I, and on top of everything else, T / F.</p>
+<h2 id="sharing-one-cpu-core-between-two-threads">Sharing one CPU core between two threads</h2>
+<p>A CPU thread is a sequence of instructions that the operating system gives a core to execute. AMD's specification gives the laptop's Ryzen 5 4600H 6 cores of the design AMD calls Zen 2, each with 2 hardware threads, so 12 in all; AMD describes this as simultaneous multithreading, the 2 threads of a core sharing its circuits, which can begin instructions of either. Agner Fog's instruction tables give, for Zen 2, a wait of 3 cycles before an instruction can use the result of a vector float add or multiply, each of the AVX2 vector instructions computing one operation on 8 floats, and 2 vector adds and 2 vector multiplies begun per cycle; take 2 float instructions begun per cycle in all. For one set of 8 places computed with the Lab 2 loop, the chain takes 4 * 3 = 12 cycles per repetition and the 9 float instructions take 9 / 2 = 4.5 cycles to begin, and a repetition takes at least the larger of the two, since its instructions begin at most 2 per cycle and each operation of the chain waits for the one before.</p>
+<p class="do">Work out the cycles per set on one core with 1, 2 and 3 independent sets in each thread, first with one thread on the core and then with two, and the gain the second hardware thread brings in each case.</p>
 <details><summary>CHECK</summary>
-<pre>5 x 2 x 1.2 = 12 = B / F
-97/41 x 41/13 x 13/7 = 97/7 = 13.86 = B / F
-(B x C x T) / (C x T x F) = B / F, whatever the times
-alone: 120 / 60 = 2;  on top of T: 12 / 10 = 1.2</pre>
-<p>The product cancels to B / F for any times, so as a check it cannot fail. The gain of the sets shrank from 2 alone to 1.2 on top, because T had already filled the same waiting.</p>
+<pre>1 set per thread:   1 thread 12 per set;    2 threads the larger of 2 * 4.5 = 9 and 12 = 12 for 2 sets, 6 per set;    gain 12 / 6 = 2.0
+2 sets per thread:  1 thread 12 / 2 = 6;    2 threads the larger of 4 * 4.5 = 18 and 12 = 18 for 4 sets, 4.5 per set;  gain 6 / 4.5 = 1.33
+3 sets per thread:  1 thread the larger of 13.5 and 12, over 3 = 4.5;  2 threads 6 * 4.5 = 27 for 6 sets, 4.5 per set;  gain 1.0</pre>
+<p>A second hardware thread fills the same 12-cycle chain that independent sets fill: worth 2 times when each thread carries one set, 1.33 times with two, nothing with three.</p>
+</details>
+<p>On the laptop, try part 3 with 6, 12, 18 and 24 threads. Past 12, the operating system takes turns between more threads than the 12 hardware threads, which adds the switching between them and no circuits.</p>
+
+<h2 id="testing-whether-speedups-multiply">Testing whether speedups multiply</h2>
+<p>The chats illustrated combining with times invented for the explanation, not measured: a baseline B, one warp, 120 ms; I, the baseline with independent sets inside each thread, 60 ms; C, many SMs, 24 ms; T, many SMs and more warps per SM, 12 ms; and F, T with independent sets added, 10 ms. Call the time of one version divided by the time of another the speedup of the second over the first.</p>
+<p class="do">Work out (B / C) * (C / T) * (T / F) and B / F. Repeat with other times, B = 97, C = 41, T = 13 and F = 7, and write the product as one fraction to see why. Then work out the gain of the sets alone, B / I, the gain of the sets on top of everything else, T / F, and the F that a full B / I on top of T would give.</p>
+<details><summary>CHECK</summary>
+<pre>5 * 2 * 1.2 = 12 = 120 / 10 = B / F
+97/41 * 41/13 * 13/7 = 97/7 = 13.86 = B / F
+(B * C * T) / (C * T * F) = B / F, whatever the times
+sets alone: 120 / 60 = 2;  on top of T: 12 / 10 = 1.2;  a full 2 on top: F = 12 / 2 = 6 ms</pre>
+<p>The chained product cancels to B / F for any times, so as a check it cannot fail. Only the gain of the sets alone against their gain on top compares anything: here 2 against 1.2, and F at 10 ms instead of 6.</p>
 </details>
 
-<h2 id="registers-slow-a-kernel-only-when-the-work-needs-more-warps">Registers slow a kernel only when the work needs more warps than fit</h2>
-<p class="do">An SM of the GTX 1650 has 65,536 registers, by NVIDIA's Turing tuning guide. Work out how many warps fit when each thread uses 72 registers, 65,536 / (72 x 32), and how many that is per scheduler; compare with the 2 per scheduler the work needs. Then the same at 128 registers per thread.</p>
+<h2 id="counting-the-warps-that-fit-in-an-sm-s-registers">Counting the warps that fit in an SM's registers</h2>
+<p>NVIDIA's CUDA programming guide gives an SM of compute capability 7.5 65,536 registers of 32 bits, the storage that holds each thread's values while it executes, and at most 255 per thread. Each independent set inside a thread keeps its own x2, y2, w, cx, cy and count from one repetition to the next, so more sets mean more registers per thread. The nvcc documentation's <code>-Xptxas -v</code> makes the compiler print each kernel's registers per thread; the laptop's numbers were not recorded, and the chats' example used 72.</p>
+<p class="do">Work out how many warps fit in one SM's registers at 72 registers per thread, 65,536 / (72 * 32), and how many that is per scheduler; then the same at 128 registers per thread. Set both beside the 1.48 to 2.04 warps per scheduler the float circuits need.</p>
 <details><summary>CHECK</summary>
-<pre>72 registers:  65,536 / 2,304 = 28.4 -&gt; 28 warps, 7 per scheduler
-128 registers: 65,536 / 4,096 = 16 warps, 4 per scheduler</pre>
-<p>Both leave more than the 2 per scheduler needed, so registers are not the limit here; they limit a kernel only when the work needs more warps per scheduler than fit, and <code>-Xptxas -v</code> reports a kernel's real use.</p>
+<pre>72 registers:   72 * 32 = 2,304 per warp;  65,536 / 2,304 = 28.4 -&gt; 28 warps, 28 / 4 = 7 per scheduler
+128 registers:  128 * 32 = 4,096 per warp; 65,536 / 4,096 = 16 warps, 16 / 4 = 4 per scheduler</pre>
+<p>Both leave more than the 2.04 warps per scheduler needed at the top of the clock range, so registers do not limit this loop at those counts; they limit a kernel only when it needs more warps per scheduler than its registers let fit.</p>
 </details>
 
-<h2 id="writing-parts-3-and-4-and-the-sweep-that-finds-the-number-th">Writing parts 3 and 4, and the sweep that finds the number that is enough</h2>
-<p>Part 3 on the CPU, <code>mandelbrot_cpu_vector_multicore_multithread</code>, is the part 2 version with a thread count you can change, tried at 6, 12, 18 and 24 on the laptop. Part 3 on the GPU is <code>mandelbrot_gpu_vector_multicore_multithread_single_sm</code>, one block of up to 32 warps, then <code>mandelbrot_gpu_vector_multicore_multithread_full</code>, any number of blocks and warps. Part 4 adds 2 or 3 independent sets per thread on top, in the <code>_ilp</code> versions.</p>
-<p class="do">For the single-SM version, sweep warps per block through 1, 2, 4, 8, 16 and 32 and write the times. From the idle cycles above, where should the times stop falling?</p>
+<h2 id="writing-parts-3-and-4-and-sweeping-the-thread-counts">Writing parts 3 and 4 and sweeping the thread counts</h2>
+<p>Part 3 on the CPU, <code>mandelbrot_cpu_vector_multicore_multithread</code>, is the part 2 version, pthreads taking the values of i in turns, with a thread count you can change. Part 3 on the GPU is <code>mandelbrot_gpu_vector_multicore_multithread_single_sm</code>, one block of up to 32 warps, then <code>mandelbrot_gpu_vector_multicore_multithread_full</code>, any number of blocks and warps, each warp taking its own values of i in turns. Part 4 adds 2 or 3 independent sets per thread on top, in <code>mandelbrot_cpu_vector_multicore_multithread_ilp</code> and <code>mandelbrot_gpu_vector_multicore_multithread_full_ilp</code>. Compile and execute both files from the lab2 folder:</p>
+<pre>g++ -O3 -march=native -std=c++17 -pthread mandelbrot_cpu_2.cpp -o mandelbrot_cpu_2
+nvcc -O3 -arch=sm_75 -std=c++17 mandelbrot_gpu_2.cu -o mandelbrot_gpu_2
+./mandelbrot_cpu_2 &amp;&amp; ./mandelbrot_gpu_2</pre>
+<p>g++ compiles the CPU file with full optimization for every instruction this CPU has, as 2017 C++, and -pthread adds the POSIX threads library; nvcc compiles the GPU file for compute capability 7.5, the GTX 1650's, so put your own GPU's number after sm_; and the last command executes the CPU program and, if it succeeds, the GPU program, each printing a time and a difference for every version.</p>
+<p class="do">For the single-SM version, sweep warps per block through 1, 2, 4, 8, 16 and 32 and write the times. If the 4 warps of a block of 4 sit on the 4 schedulers, one each, what shape should the times have from 1 to 4 warps, from 4 to 8, and from 8 to 32?</p>
 <details><summary>CHECK</summary>
-<p>The calculation predicts the times falling from 1 warp to 4, when each scheduler has one; falling again, by up to 2 times, from 4 to 8, when each has two; and flat from 8 to 32. The laptop's sweep was not recorded, so yours is the first.</p>
+<p>From 1 to 4 warps the times should fall by up to 4 times, each new warp working on a scheduler of its own. From 4 to 8, with 2 warps per scheduler, by up to 26.6 / 18 = 1.48 to 36.8 / 18 = 2.04 times, depending on the clock. From 8 to 32 they should stay flat, the float circuits already at 18 cycles per warp-repetition. The laptop's sweep was not recorded, so yours is the first.</p>
 </details>
 <p class="do">Write your best CPU thread count with its time, and your best GPU warps per scheduler with its time. Then write the gain of the independent sets alone, from your part 1, and their gain on top of your best part 3 version, part 4 against part 3.</p>
 <details><summary>CHECK</summary>
-<p>A gain on top near 1 means part 3 had already filled the waiting that the sets fill; a gain on top near the gain alone would mean they filled different idle cycles.</p>
+<p>A gain on top near 1 means part 3 had already filled the idle cycles that the sets fill; a gain on top near the gain alone would mean they filled different idle cycles.</p>
 </details>
 
-<h2 id="all-three-techniques-fill-the-same-idle-cycles">All three techniques fill the same idle cycles</h2>
-<p>Gathered together, one warp per scheduler leaves 17.5 of 35.5 cycles idle; about 2 warps per scheduler fill them, and more add nothing; a second hardware thread fills the same waiting as a second set; the chained product of speedups always matches the total, while the sets' gain shrank from 2 alone to 1.2 on top; and registers leave 7 or 4 warps per scheduler, more than needed.</p>
+<h2 id="gathering-what-fills-the-idle-cycles">Gathering what fills the idle cycles</h2>
+<p>With one warp per scheduler a repetition takes 26.6 to 36.8 cycles while the float circuits are busy 18; 1.48 to 2.04 warps per scheduler bring them to that limit, against the 8 a scheduler holds; on a CPU core a second hardware thread is worth 2 times with one set per thread, 1.33 with two and nothing with three; the chained product of speedups equals the total for any times; the illustrated sets gained 2 alone and 1.2 on top; and 72 or 128 registers per thread still leave 7 or 4 warps per scheduler.</p>
 <p class="do">Write one sentence answering the lab's last question: why do techniques that each help alone gain little together, and how many threads are enough?</p>
 <details><summary>CHECK</summary>
-<p>Independent sets inside a thread, more threads per core and more warps per scheduler all fill the same idle cycles; enough is the count at which the begins fill them, here about 2 warps per scheduler, and past it every technique adds work, not speed. Combining is tested by the gain on top, T / F, never by the chained product.</p>
-<p>The reading "use the most threads the hardware allows" fails, because the useful number sits near 2 per scheduler against 8 held.</p>
+<p>Independent sets inside a thread, more threads per core and more warps per scheduler all fill the same idle cycles; enough is the count at which the begins fill them, here about 2 warps per scheduler, and past it every technique adds work, not speed. Combining is tested by the gain on top against the gain alone, never by the chained product.</p>
+<p>The reading "use the most threads the hardware allows" fails, because the float circuits reach their 18-cycle limit at 1.48 to 2.04 warps per scheduler, against the 8 a scheduler holds.</p>
 </details>
-<p>The Fall 2025 handout's fifth question, how much multithreading per core speeds up the CPU version, which count is best and why, is answered by the second hardware thread and your best count. The sixth, how the time in one block changes with warps beyond 4 up to 32, by the sweep and its predicted flattening at 8. The seventh, the same for warps per scheduler on the full GPU, by the 2 per scheduler and your best count. The eighth, what adding the independent sets back on top of many cores and many threads gains, and with how many sets, by the gain on top against the gain alone, with 2 sets and with 3.</p>
-<p>A CPU version that slows down with more threads per core has threads competing for the same begins and paying more start-up; a GPU that stops improving at about 8 warps per block behaves as predicted; a set version that gains less on top of multithreading than alone fills the same idle cycles; and a check of chained speedups that succeeds proves nothing, since it always succeeds.</p>
-<p>Without code, three different-sounding techniques, more work inside each thread, more threads per core and more sets of threads per scheduler, solve the same problem, hardware waiting for results. Once the waiting is filled none of them can help further, so combining them gives much less than multiplying their separate gains, and two optimizations worth 2 times each are worth far less than 4 until one is measured on top of the other.</p>
-<p>The guess at the top has its answer: about 2, since one warp per scheduler leaves about 17.5 of 35.5 cycles per repetition idle at the assumed clock, and 2 warps fill them, after which the float begins are the limit.</p>
-<p class="do">A harder question to finish with. Your measurements show the single-SM time still falling from 8 to 16 warps per block. Which assumption above is the most likely to be wrong, and how would you check it?</p>
+<p>The Fall 2025 handout's fifth question, how much multithreading per core speeds up the CPU version, which count is best and why, is answered by the gains of 2.0, 1.33 and 1.0 for a second hardware thread and by your best count. The sixth, how the time in one block changes with warps beyond 4 up to 32, by the sweep and its predicted flattening from 8. The seventh, the same for warps per scheduler on the full GPU, by the 1.48 to 2.04 warps per scheduler and your best count. The eighth, what adding the independent sets back on top of many cores and many threads gains, and with how many sets, by the gain on top against the gain alone, with 2 sets and with 3.</p>
+<p>A CPU version that slows down past 12 threads has the operating system switching between more threads than hardware threads. A GPU version that stops improving at 8 warps per block, 2 per scheduler, behaves as the idle cycles predict. A set version that gains less on top of multithreading than alone fills the same idle cycles. A check of chained speedups that succeeds proves nothing, since it always succeeds.</p>
+<p>More work inside each thread, more threads per core and more sets of threads per scheduler sound like different techniques, yet they solve the same problem, hardware waiting for results. Once the waiting is filled none of them can help further, so combining them gives much less than multiplying their separate gains, and two optimizations worth 2 times each are worth far less than 4 until one is measured on top of the other.</p>
+<p>The number asked for at the start is about 2: one warp per scheduler leaves 8.6 to 18.8 of every 26.6 to 36.8 cycles idle, and 1.48 to 2.04 warps fill them, after which the float circuits are the limit.</p>
+<p class="do">Suppose your sweep shows the single-SM time still falling from 8 to 16 warps per block. From 23.6 ns per warp-repetition, above what clock would a single warp's repetition take more than the 36 cycles that 2 warps' float instructions take, is that clock inside NVIDIA's range, and how large a fall could it explain? What else in the calculation could be wrong, and what would <code>nvidia-smi -q -d CLOCK</code>, which prints the GPU's clocks, settle?</p>
 <details><summary>CHECK</summary>
-<p>The clock, or the count of instructions. A clock above 1.5 GHz means more cycles per repetition and more idle cycles to fill, and instructions other than float ones, compares, integer adds and branches, also take begins, so the true limit sits below 18 cycles. Reading the clock during the measurement with <code>nvidia-smi -q -d CLOCK</code> checks the first, and counting every instruction of the loop in the cuobjdump listing, not only the float ones, checks the second.</p>
+<p>A single warp's repetition takes more than 36 cycles above 36 / 23.6 ns = 1.525 GHz, inside the range that reaches 1.56 GHz. There 2 warps take 36.8 cycles per round, 18.4 per warp-repetition, and a third brings 18, so the clock explains a fall of at most 18.4 / 18 = 1.02 times past 8 warps per block. A larger fall means another assumption failed, such as a block's warps spread evenly over the schedulers or every warp getting the same work from its values of i; <code>nvidia-smi -q -d CLOCK</code> read during the measurement settles the clock.</p>
 </details>
 <p>The lab pages <a href="../16-combining-speedups.html">do speedups multiply</a>, <a href="../17-hardware-or-launch.html">fixed by the chip, or made by the launch</a> and <a href="../18-two-places-per-thread.html">a second place per thread</a> work these numbers out at length, and the notes on <a href="combining-speedups.html">combining speedups</a> and <a href="register-budget.html">the register budget</a> hold the short versions.</p>
 
