@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Move your Lab 1 code into the Lab 2 files: the new window constants, the changed line, and why only an exact 0 counts: 0.045 for a sign error, 0.00756 for a harmless rounding change, 0.0000448 for a missing line.">
+<meta name="description" content="Move your Lab 1 vector code into the Lab 2 files: read the new window constants, compare the two ways of writing the new y, and work out what the printed difference shows for a wrong window, a rounding change and a missing set of 1024 places.">
 <meta name="keywords" content="lesson">
 <title>Lesson 7: Lab 2 Port</title>
 <link rel="stylesheet" href="../style.css">
@@ -16,102 +16,131 @@
 <main>
 <p class="crumbs"><a href="MIT-6.S894.html">MIT 6.S894 tutorial</a> / Lesson 7</p>
 <h1>Lesson 7. The Lab 2 picture: port, check, time</h1>
-<p class="sub">This lesson comes before part 1 of Lab 2 and moves your Lab 1 vector versions into the Lab 2 files, so it needs your Lab 1 vector code for the CPU and the GPU. Paragraphs with a red rule beside them are for your pencil; work each one before opening its CHECK.</p>
-<p>Lab 2 computes a bigger and deeper picture: 1024 by 1024 places, up to 2000 repetitions each, inside a window one ten-thousandth across. Its files invite you to paste in your Lab 1 vector code for comparison, updated to the new window constants, and the move brings two small changes. The window is set by window_zoom, window_x and window_y instead of 2.5, 2.0 and 1.25, and one line of the loop is written w - (x2 + y2) + cy instead of w - x2 - y2 + cy, which is the same in exact arithmetic. When a port prints a small difference instead of 0, is it a bug or rounding, and how can anyone tell?</p>
+<p class="sub">This lesson comes before part 1 of Lab 2 and moves your Lab 1 vector versions into the Lab 2 files, so you need your Lab 1 vector code for the CPU and the GPU, g++, the CUDA toolkit, and the Lab 2 starter folder, fetched with <code>git clone https://github.com/accelerated-computing-class/lab2.git</code>. Paragraphs with a red rule beside them are for your pencil; work each one before opening its CHECK.</p>
+<p>Lab 2 computes a bigger and deeper picture than Lab 1: 1024 by 1024 places, up to 2000 trips round the loop at each, inside a window, the part of the plane the picture shows, one ten-thousandth across. Its files invite you to paste in your Lab 1 vector code for comparison, updated to the new window, and the move brings two small changes. The window is set by the constants window_zoom, window_x and window_y instead of the numbers 2.5, 2.0 and 1.25 typed into Lab 1's reference, and one step of the loop is written w - (x2 + y2) + cy instead of w - x2 - y2 + cy, which is the same in exact arithmetic. When a port prints a small difference instead of 0, is it a bug or rounding, and how can anyone tell?</p>
 <p>The worry at this step was how anyone proves such a port correct rather than guessing:</p>
 <p class="you">"Let's say somebody in an interview, instead of asking me to memorize, gives me this program, and they don't like guesswork. They want me to prove using debugger tools ... why is it slow, where it is going slowness."</p>
-<p class="do">Write a guess. Lab 2 prints a single wrong place as 1 / (1024 x 1024 x 2000). A first version forgets a whole value of i, 1024 places; a second only changes rounding. Which prints the smaller number?</p>
+<p class="do">Write a guess. Lab 2 prints a single place wrong by one trip round the loop as 1 / (1024 * 1024 * 2000). A first version leaves 1024 places that share the same i, the number counting down the picture, with no count at all; a second only changes rounding. Which prints the smaller number?</p>
 
-<h2 id="lab-2-s-window-is-0-0001-across-25-000-times-less-than-lab-1">Lab 2's window is 0.0001 across, 25,000 times less than Lab 1's 2.5</h2>
+<h2 id="reading-the-lab-2-reference-and-its-window">Reading the Lab 2 reference and its window</h2>
 <pre>constexpr float window_zoom = 1.0 / 10000.0f;
 constexpr float window_x = -0.743643887 - 0.5 * window_zoom;
 constexpr float window_y = 0.131825904 - 0.5 * window_zoom;
 constexpr uint32_t default_max_iters = 2000;
-float cx = (float(j) / float(img_size)) * window_zoom + window_x;
-float cy = (float(i) / float(img_size)) * window_zoom + window_y;</pre>
-<p>These lines from the Lab 2 starter, the same in its CPU and GPU files, say that the window, the part of the plane of points (cx, cy) that the picture shows, is 1 / 10000 = 0.0001 across, that its left edge is -0.743643887 minus half of that and its top edge 0.131825904 minus half of that, and that each place gets at most 2000 repetitions; cx is j divided by img_size, times 0.0001, plus the left edge, and cy the same with i and the top edge.</p>
-<p class="do">Work out window_x and window_y. With img_size = 1024, work out cx at j = 0 and at j = 1023, and how many times smaller 0.0001 is than Lab 1's 2.5.</p>
+
+void mandelbrot_cpu_scalar(uint32_t img_size, uint32_t max_iters, uint32_t *out) {
+    for (uint64_t i = 0; i &lt; img_size; ++i) {
+        for (uint64_t j = 0; j &lt; img_size; ++j) {
+            float cx = (float(j) / float(img_size)) * window_zoom + window_x;
+            float cy = (float(i) / float(img_size)) * window_zoom + window_y;
+
+            float x2 = 0.0f;
+            float y2 = 0.0f;
+            float w = 0.0f;
+            uint32_t iters = 0;
+            while (x2 + y2 &lt;= 4.0f &amp;&amp; iters &lt; max_iters) {
+                float x = x2 - y2 + cx;
+                float y = w - (x2 + y2) + cy;
+                x2 = x * x;
+                y2 = y * y;
+                float z = x + y;
+                w = z * z;
+                ++iters;
+            }
+
+            out[i * img_size + j] = iters;
+        }
+    }
+}</pre>
+<p>These are the constants and the reference as the Lab 2 starter has them, the same in its CPU and GPU files, with the comments left out. window_zoom is 1 / 10000 = 0.0001, window_x is -0.743643887 minus half of window_zoom, window_y is 0.131825904 minus half of it, and the default cap on trips round the loop, max_iters, is 2000. The reference gives i and j every value from 0 to img_size - 1, so everything inside executes once for every pair (i, j), each pair being one place of the picture. For each place, cx is j divided by img_size, times window_zoom, plus window_x, and cy is the same with i and window_y. Then x2, y2 and w start out as 0 and iters as 0, and the while loop repeats its trip while x2 + y2 is at most 4 and iters is below max_iters: x becomes x2 minus y2 plus cx; y becomes w minus the sum x2 + y2, plus cy; x2 becomes x times x and y2 becomes y times y; z becomes x plus y; w becomes z times z; and iters goes up by 1. Once the while loop is left, iters is stored in out at entry i times img_size plus j.</p>
+<p>Call one trip through the braces of the while loop a repetition; iters counts the repetitions at a place, its count, and the Lab 2 main sets img_size to 1024. The points (cx, cy) of the places cover a square of the plane whose side is window_zoom, with its corner at (window_x, window_y).</p>
+<p class="do">Work out window_x and window_y. With img_size = 1024, work out cx at j = 0 and at j = 1023, and how many times smaller window_zoom, 0.0001, is than the 2.5 that Lab 1 multiplied by.</p>
 <details><summary>CHECK</summary>
 <pre>window_x = -0.743643887 - 0.00005 = -0.743693887
 window_y =  0.131825904 - 0.00005 =  0.131775904
-j = 0:    cx = -0.743693887
-j = 1023: 1023 / 1024 x 0.0001 - 0.743693887 = -0.743593985
+j = 0:     cx = 0 / 1024 * 0.0001 - 0.743693887 = -0.743693887
+j = 1023:  1023 / 1024 * 0.0001 - 0.743693887 = -0.743593985
 2.5 / 0.0001 = 25,000</pre>
 </details>
-<p class="do">In the IEEE 754 32-bit format, floats between 0.5 and 1 are 2 to the power -24 = 0.0000000596 apart. Work out the step between neighbouring values of cx, 0.0001 / 1024, and that step in float steps.</p>
+<p class="do">In the IEEE 754 32-bit format, floats between 0.5 and 1 are 2 to the power -24 = 0.0000000596 apart. Work out the step between the cx of neighbouring places, 0.0001 / 1024, and that step in float steps.</p>
 <details><summary>CHECK</summary>
 <pre>0.0001 / 1024 = 0.0000000977 per place
 0.0000000977 / 0.0000000596 = 1.64 float steps</pre>
 <p>Neighbouring places are only 1 or 2 float steps apart, so a rounding of one step anywhere in a repetition moves a point by more than half the distance to its neighbour.</p>
 </details>
 
-<h2 id="rewriting-line-b-changes-the-counts-at-23-8-percent-of-the-p">Rewriting line B changes the counts at 23.8 percent of the places</h2>
-<pre>float y = w - (x2 + y2) + cy;</pre>
-<p>Read in English, the Lab 2 form of line B subtracts the sum of x2 and y2 from w, then adds cy; the Lab 1 form, <code>float y = w - x2 - y2 + cy;</code>, subtracted x2 and y2 one at a time.</p>
-<p>Computed in 32-bit fractions from the starter's constants, the two forms give different counts at 249,479 of the 1,048,576 places, a total difference of 15,852,362 repetitions, although they are equal in exact arithmetic. Every place of the Lab 2 picture needs between 69 and 2000 repetitions, and all of them add up to 138,219,822.</p>
+<h2 id="comparing-the-two-ways-of-writing-the-new-y">Comparing the two ways of writing the new y</h2>
+<p>Lab 1's reference made the new y as w - x2 - y2 + cy, subtracting x2 and then y2 from w; Lab 2's subtracts their sum, w - (x2 + y2) + cy. In exact arithmetic both give the same y, but each subtraction of floats rounds, and the two forms round at different steps. Computed by executing the reference's own arithmetic in 32-bit floats for all 1024 * 1024 = 1,048,576 places of the Lab 2 picture, the two forms give different counts at 249,479 places, a total gap of 15,852,362 repetitions; with the Lab 2 form, every count lies between 69 and 2000, and all of them add up to 138,219,822.</p>
 <p class="do">Work out the share of places whose count changed.</p>
 <details><summary>CHECK</summary>
-<p>249,479 / 1,048,576 = 23.8 percent, which fits the 1.64 float steps above: in a picture this zoomed, a one-step rounding difference grows over hundreds of repetitions into a different count.</p>
+<p>249,479 / 1,048,576 = 23.8 percent, which fits the 1.64 float steps between neighbours: in a picture this zoomed, a one-step rounding difference grows over hundreds of repetitions into a different count.</p>
 </details>
 
-<h2 id="a-missing-line-of-the-picture-prints-169-times-less-than-a-r">A missing line of the picture prints 169 times less than a rounding change</h2>
-<pre>int64_t diff = 0;
-for (uint32_t i = 0; i &lt; img_size; i++) {
-    for (uint32_t j = 0; j &lt; img_size; j++) {
-        diff +=
-            abs(int(result[i * img_size + j]) - int(ref_result[i * img_size + j]));
+<h2 id="working-out-what-the-check-prints-for-each-kind-of-error">Working out what the check prints for each kind of error</h2>
+<p>The Lab 2 files check each version against the reference with the same function as Lab 1:</p>
+<pre>double difference(
+    uint32_t img_size,
+    uint32_t max_iters,
+    std::vector&lt;uint32_t&gt; &amp;result,
+    std::vector&lt;uint32_t&gt; &amp;ref_result) {
+    int64_t diff = 0;
+    for (uint32_t i = 0; i &lt; img_size; i++) {
+        for (uint32_t j = 0; j &lt; img_size; j++) {
+            diff +=
+                abs(int(result[i * img_size + j]) - int(ref_result[i * img_size + j]));
+        }
     }
-}
-return diff / double(img_size * img_size * max_iters);</pre>
-<p>Read in English, the check sets a 64-bit sum to 0, visits every place, adds the size of the gap between the version's count and the reference's count, and returns that sum divided by img_size times img_size times max_iters.</p>
-<p class="do">Work out the divisor, 1024 x 1024 x 2000, and what a single place wrong by 1 prints. Then work out what the line B change prints, 15,852,362 over the divisor, and what a version prints that forgets the cheapest value of i and leaves its 1024 places at 0, a total difference of 93,904. Which looks better, and by how much?</p>
+    return diff / double(img_size * img_size * max_iters);
+}</pre>
+<p>difference sets a 64-bit whole number diff to 0, visits every place (i, j), adds the size of the gap between the version's count in result and the reference's count in ref_result, and returns diff divided by img_size times img_size times max_iters; main prints it as the average output difference from the reference.</p>
+<p class="do">Work out the divisor, 1024 * 1024 * 2000, and what a single place wrong by 1 prints. Then work out what the change to the Lab 1 form of the new y prints, 15,852,362 over the divisor. Computed with the reference's arithmetic, the 1024 places of i = 855 have the smallest counts of any i, 93,904 repetitions in all; work out what a version prints that leaves those places at 0. Which looks better, and by how much?</p>
 <details><summary>CHECK</summary>
-<pre>divisor: 2,097,152,000
-one place wrong by 1:  1 / 2,097,152,000 = 0.000000000477
-line B change:  15,852,362 / 2,097,152,000 = 0.00756
-missing line:       93,904 / 2,097,152,000 = 0.0000448</pre>
-<p>The broken version prints about 169 times less than the harmless rounding change.</p>
+<pre>divisor: 1024 * 1024 * 2000 = 2,097,152,000
+a single place wrong by 1:   1 / 2,097,152,000 = 0.000000000477
+the Lab 1 form of y:         15,852,362 / 2,097,152,000 = 0.00756
+i = 855 left at 0:           93,904 / 2,097,152,000 = 0.0000448</pre>
+<p>The version missing 1024 places prints 0.00756 / 0.0000448 = 169 times less than the harmless rounding change.</p>
 </details>
-<p class="do">The first port of this picture on the laptop had the sign of window_y wrong and printed 0.045. Work out the total gap, 0.045 x 2,097,152,000, and the gap per place. The fixed version printed exactly 0, at 221.97 ms on the GPU with one block of 32 threads.</p>
+<p class="do">The first port of this picture on the laptop had the sign of window_y wrong and printed 0.045. Work out the total gap, 0.045 * 2,097,152,000, and the gap per place. The fixed version printed exactly 0, at 221.97 ms on the GPU with one block of 32 threads.</p>
 <details><summary>CHECK</summary>
-<p>0.045 x 2,097,152,000 = 94,371,840 repetitions, 90 per place. A wrong window moves the whole picture, so its number is large and obvious; the dangerous bugs move a few places and print tiny numbers, as the missing line shows.</p>
+<p>0.045 * 2,097,152,000 = 94,371,840 repetitions, 94,371,840 / 1,048,576 = 90 per place. A wrong window moves the whole picture, so its number is large and obvious; the dangerous errors move a few places and print tiny numbers, as the missing 1024 places show.</p>
 </details>
 
-<h2 id="porting-the-code-and-the-only-result-that-counts-as-correct">Porting the code, and the only result that counts as correct</h2>
-<p>In both Lab 2 files, uncomment the optional vector block, which keeps <code>#define HAS_VECTOR_IMPL</code>, paste your Lab 1 vector functions into it, replace 2.5, 2.0 and 1.25 by window_zoom, window_x and window_y, write line B in the Lab 2 form, and in the CPU version make the step between neighbouring cx window_zoom / img_size.</p>
+<h2 id="porting-the-lab-1-vector-code-into-the-lab-2-files">Porting the Lab 1 vector code into the Lab 2 files</h2>
+<p>In both Lab 2 files, mandelbrot_cpu_2.cpp and mandelbrot_gpu_2.cu, the vector version sits in a commented-out block marked optional; uncomment it, keep its #define HAS_VECTOR_IMPL, which tells main to time the vector version, and paste your Lab 1 vector functions into it. Then replace 2.5, 2.0 and 1.25 by window_zoom, window_x and window_y, write the new y as w - (x2 + y2) + cy, and in the CPU version make the step between the cx of neighbouring places window_zoom / img_size.</p>
 <pre>mkdir -p out
 g++ -O3 -march=native -std=c++17 -pthread mandelbrot_cpu_2.cpp -o mandelbrot_cpu_2
 nvcc -O3 -arch=sm_75 -std=c++17 mandelbrot_gpu_2.cu -o mandelbrot_gpu_2
 ./mandelbrot_cpu_2 &amp;&amp; ./mandelbrot_gpu_2</pre>
-<p>In the lab2 folder, the first line makes the folder for the pictures, as in Lab 1. The second compiles the CPU file, with -pthread adding the POSIX threads library that its later parts use. The third compiles the GPU file for compute capability 7.5, and the fourth executes both, each timing every version it has and printing its difference.</p>
+<p>In the lab2 folder that git clone made, mkdir -p out makes the folder the programs write their pictures into. g++ compiles the CPU file with full optimization for every instruction this CPU has, as 2017 C++, and -pthread adds the POSIX threads library, which the file includes for its later parts. nvcc compiles the GPU file for compute capability 7.5, the GTX 1650's; put your own GPU's in place of 75. The last command executes both programs, the second only if the first succeeds, and each times every version it has and prints its average output difference.</p>
 <p class="do">Write the differences printed for your CPU vector version and your GPU vector version. If either is not exactly 0, which of the cases above does its size suggest?</p>
 <details><summary>CHECK</summary>
-<p>Both must be exactly 0. Around 0.045 points to the window, a sign or an edge; around 0.0076 to line B in the Lab 1 form; below 0.0001 to a few places, or a whole line of the picture, missing.</p>
-<p>Since the average alone cannot tell these apart, add your own count of differing places and print the first (i, j) that differs, with both counts.</p>
+<p>Both must be exactly 0. Around 0.045 points to the window, a sign or an edge; around 0.0076 to the new y in the Lab 1 form; below 0.0001 to a few places missing, or a whole set of 1024 that share one i.</p>
+<p>Since the average alone cannot tell these apart, add your own count of the places whose counts differ, and print the first (i, j) that differs with both counts.</p>
 </details>
 
-<h2 id="separate-executions-of-one-version-already-differ-by-7-4-per">Separate executions of one version already differ by 7.4 percent</h2>
-<p>The Lab 2 starter times each CPU version 10 times, 1 call each, and prints the smallest. The GPU file sets the counts separately for each version: the vector baseline is timed 1 time with 4 launches, the ILP version 1 time with 2, and every later version 3 times with 5.</p>
-<p class="do">The laptop's GPU vector baseline printed 221.97, 222.90, 207.55, 208.67, 221.11, 207.87 and 207.82 ms in seven separate executions. Work out the spread, (222.90 - 207.55) / 207.55, and from how many numbers the baseline's smallest is chosen. Then write your own executions.</p>
+<h2 id="timing-separate-executions-of-the-same-version">Timing separate executions of the same version</h2>
+<p>The Lab 2 CPU file times each version with a BENCHPRESS that calls it 10 times, 1 call per measurement, and prints the smallest. The GPU file's BENCHPRESS takes the numbers at each use, and its main uses 1 measurement of 4 calls for the vector version, 1 of 2 for the next version, and 3 of 5 for every later one, printing the smallest measurement divided by its calls.</p>
+<p class="do">The laptop's GPU vector version printed 221.97, 222.90, 207.55, 208.67, 221.11, 207.87 and 207.82 ms in seven separate executions. Work out the spread, (222.90 - 207.55) / 207.55, and from how many measurements the vector version's printed time is chosen. Then write your own executions.</p>
 <details><summary>CHECK</summary>
-<p>The spread is 7.4 percent. The baseline is timed once, so its smallest is chosen from one number and is that number. Versions can only be compared across several executions each, with the numbers compared stated.</p>
+<p>The spread is 7.4 percent. The vector version is measured once, so its smallest is chosen from one measurement and is that measurement. Versions can only be compared across several executions each, with the numbers compared stated.</p>
 </details>
 
-<h2 id="in-a-zoomed-picture-correct-means-exactly-0-against-the-refe">In a zoomed picture, correct means exactly 0 against the reference's own lines</h2>
-<p>Gathered together, the window is 0.0001 across, neighbouring places are 1.64 float steps apart, a rewrite that is exact in arithmetic changes 23.8 percent of the counts, a missing line prints 169 times less than that rewrite, a wrong window prints 90 repetitions per place, and separate executions differ by 7.4 percent.</p>
+<h2 id="gathering-what-correct-and-faster-have-to-mean">Gathering what correct and faster have to mean</h2>
+<p>The window is 0.0001 across, 25,000 times smaller than Lab 1's; neighbouring places are 1.64 float steps apart; a rewrite that is exact in arithmetic changes 23.8 percent of the counts; 1024 missing places print 169 times less than that rewrite; a wrong window prints 90 repetitions per place; and separate executions of one version differ by 7.4 percent.</p>
 <p class="do">Write one sentence on what correct and faster have to mean before any Lab 2 version is compared with another.</p>
 <details><summary>CHECK</summary>
-<p>Neighbouring places are a float step or two apart, so any change in rounding changes counts across a quarter of the picture; correct has to mean exactly 0 against the reference's own line forms, confirmed by a count of differing places, and faster has to mean a gap larger than the 7 percent that separate executions already show.</p>
-<p>The reading "a tiny average difference is close enough" fails, because a missing line of the picture prints 169 times less than a harmless rounding change.</p>
+<p>Neighbouring places are a float step or two apart, so any change in rounding changes counts across a quarter of the picture; correct has to mean exactly 0 against the reference's own arithmetic, confirmed by a count of differing places, and faster has to mean a gap larger than the 7 percent that separate executions already show.</p>
+<p>The reading "a tiny average difference is close enough" fails, because 1024 missing places print 169 times less than a harmless rounding change.</p>
 </details>
-<p>A difference near 0.045 means wrong window constants, often a sign; one near 0.0076 means line B still in the Lab 1 form; one below 0.0001 but not 0 means missing places, such as a whole value of i. A speedup that changes from one execution to the next is the 7 percent by which executions differ on their own, so compare several of each.</p>
-<p>Without code, Lab 2 zooms 25,000 times deeper into the same picture, and at that depth neighbouring points differ by only one or two steps of the computer's number format, so a harmless-looking rewrite of one line changes the result at a quarter of the places. Only an exact match counts as correct, and a summary error figure can rank a seriously broken version above a harmless one, so the question to ask is how many results differ, not only by how much on average.</p>
-<p>The guess at the top has its answer: the version missing a line of the picture prints 0.0000448, 169 times less than the rounding change's 0.00756.</p>
-<p class="do">A harder question to finish with. A port prints 0.000000000477. Is it correct, and what comes next?</p>
+<p>A difference near 0.045 means wrong window constants, often a sign; one near 0.0076 means the new y still in the Lab 1 form; one below 0.0001 but not 0 means missing places, such as all 1024 of one i. A speedup that changes from one execution to the next is the 7 percent by which executions differ on their own, so compare several of each.</p>
+<p>Lab 2 zooms 25,000 times deeper into the same picture, and at that depth neighbouring points differ by only one or two steps of the computer's number format, so a harmless-looking rewrite of one step changes the result at a quarter of the places. Only an exact match counts as correct, and a summary error figure can rank a seriously broken version above a harmless one, so the question to ask is how many results differ, not only by how much on average.</p>
+<p>The smaller number asked for at the start belongs to the version missing 1024 places: 0.0000448, 169 times less than the rounding change's 0.00756.</p>
+<p class="do">A port prints 0.000000000477. Is it correct, and what comes next?</p>
 <details><summary>CHECK</summary>
-<p>It is not: 0.000000000477 is exactly one place wrong by 1. The next step is a count of mismatched places, with the first one's i, j and both counts printed, and then the cause, either a real bug or a rounding difference such as a reordered line B, which has to match the reference before any speed comparison.</p>
+<p>It is not: 0.000000000477 is 1 / 2,097,152,000, a single place wrong by 1. The next step is a count of mismatched places, with the first one's i, j and both counts printed, and then the cause, either a real error or a rounding difference such as the Lab 1 form of the new y, which has to match the reference before any speed is compared.</p>
 </details>
-<p>The lab pages <a href="../15-trusting-a-number.html">what the two printed numbers can hide</a> and <a href="../07-waiting-chain.html">which line waits for which line</a> work these numbers out at length, and the notes on <a href="checking-the-output.html">what the printed difference can hide</a> and on <a href="owner.html">a single writer per place</a> hold the short versions.</p>
+<p>The lab pages <a href="../15-trusting-a-number.html">what the two printed numbers can hide</a> and <a href="../07-waiting-chain.html">which operation waits for which</a> work these numbers out at length, and the notes on <a href="checking-the-output.html">what the printed difference can hide</a> and on <a href="owner.html">a single writer per place</a> hold the short versions.</p>
 
 <nav class="pager"><a href="lesson-06-how-many-threads.html">&larr; Lesson 6. How many threads keep the GPU busy</a><a class="next" href="lesson-08-independent-work.html">Lesson 8. Independent work inside one thread &rarr;</a></nav>
 </main>

@@ -62,7 +62,9 @@ LEFTOVER = re.compile(r"\bL\d\d\b|____")
 # Tutorial pages rebuilt under the axiom audit (see CLAUDE.md); a lesson joins this set once it is rebuilt.
 REBUILT = {"notes/MIT-6.S894.html", "notes/lesson-00-setup.html", "notes/lesson-01-reference.html", "notes/lesson-02-gpu-one-thread.html",
            "notes/lesson-03-cpu-vector.html", "notes/lesson-04-gpu-32-threads.html",
-           "notes/lesson-05-timing-one-multiply-add.html"}
+           "notes/lesson-05-timing-one-multiply-add.html",
+           "notes/lesson-06-how-many-threads.html",
+           "notes/lesson-07-lab2-picture.html"}
 LABELLING = re.compile(
     r"\b(lines?|read in english|gathered together|without code|for a manager|the guess at the top|"
     r"a harder question to finish with)\b",

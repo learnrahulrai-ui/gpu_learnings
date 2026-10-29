@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Read warp_scheduler.cu&#x27;s sweep: why the course GPU peaks at 768 sets of 32 threads, why the laptop needs only 112, what the literal 48 does on 14 SMs, and what 12.5 percent more work costing 87 percent more time means.">
+<meta name="description" content="Read warp_scheduler.cu&#x27;s sweep: how many sets of 32 threads each GPU holds and how many its chains of multiply-adds need, what one more step of work did to the course GPU&#x27;s time, and what the literal 48 does on 14 SMs.">
 <meta name="keywords" content="lesson">
 <title>Lesson 6: How Many Threads</title>
 <link rel="stylesheet" href="../style.css">
@@ -16,89 +16,155 @@
 <main>
 <p class="crumbs"><a href="MIT-6.S894.html">MIT 6.S894 tutorial</a> / Lesson 6</p>
 <h1>Lesson 6. How many threads keep the GPU busy</h1>
-<p class="sub">This lesson covers part 0 of Lab 2, the prelab file warp_scheduler.cu. There is nothing new to write, only its sweep to execute and read, on an NVIDIA GPU. Paragraphs with a red rule beside them are for your pencil; work each one before opening its CHECK.</p>
-<p>The second prelab file launches more and more threads, each doing one long chain of multiply-adds, and prints operations per second for each launch; the lab asks when the GPU reaches its largest rate and what the multiply-add's wait says about it. The file was written for the course GPU, with that GPU's count of SMs, the identical blocks of hardware the chip is built from, typed in as the number 48. On a laptop with 14 SMs it still compiles and executes, and its table looks as clean as the course GPU's. How many threads does a GPU need to stay busy, and how does that differ from how many it can hold?</p>
+<p class="sub">This lesson covers part 0 of Lab 2, the prelab file <code>warp_scheduler.cu</code>. There is nothing new to write, only its sweep to execute and read. You need an NVIDIA GPU with its driver, the CUDA toolkit, and the Lab 2 starter folder, fetched with <code>git clone https://github.com/accelerated-computing-class/lab2.git</code>. Paragraphs with a red rule beside them are for your pencil; work each one before opening its CHECK.</p>
+<p>The second prelab file launches more and more GPU threads, each working through long chains of multiply-adds, instructions that multiply two numbers and add a third, and prints the operations per second of each launch. The Fall 2025 handout asks when the GPU reaches its largest rate and what the wait of a multiply-add says about it. The file was written for the course GPU, and it holds that GPU's count of SMs, the identical blocks of hardware a GPU chip is built from, typed in as the number 48. On a laptop with 14 SMs it still compiles and executes, and its table looks as clean as the course GPU's. How many threads does a GPU need to stay busy, and how does that differ from how many it can hold?</p>
 <p>The first thing to settle at this step was which of these numbers belong to the chip at all:</p>
 <p class="you">"Confirm me this part, okay? I have 14 SMs. Yes or no?" / "just because I have SMs doesn't mean I know how many threads or schedulers you run. That is a different piece of information, yes or no?" / "Okay, so now what exactly I have to do?"</p>
 <p class="do">Write a guess. The GTX 1650 has 14 SMs with 4 schedulers each, the circuits that pick which instruction begins next. How many sets of 32 threads does it need to keep every one of its arithmetic circuits busy with chains of multiply-adds: 56, 112 or 448?</p>
 
-<h2 id="course-gpu-and-laptop-have-192-and-56-schedulers">Course GPU and laptop have 192 and 56 schedulers</h2>
-<p>The Fall 2025 Lab 2 handout names the course GPU, an NVIDIA RTX 4000 Ada at 2.175 GHz with 48 SMs. Each SM handles the threads of a block in consecutive sets of 32, beginning each instruction for all 32 at once, and NVIDIA calls such a set a warp; each SM has 4 schedulers, which pick the warp whose instruction begins, 192 in all, and each scheduler holds up to 12 warps. NVIDIA's Ada specification gives each SM of that GPU 128 float circuits. The laptop's GTX 1650, of the generation NVIDIA calls Turing, has 14 SMs with 4 schedulers each, 56 in all, and NVIDIA's Turing tuning guide gives it 64 float circuits per SM and at most 32 warps and 16 blocks per SM.</p>
-<pre>uint32_t block_size = default_tile_size * num_threads_per_block;
-dim3 grid(N / block_size);
-tail_latency_fma&lt;default_num_ops, default_tile_size&gt;&lt;&lt;&lt;grid, block&gt;&gt;&gt;(in, out, N);
-int N = block_size * 48 * multiplier;
-double flops = ((double)N * default_num_ops * 2) / time_in_seconds;
-uint32_t warps = (N / block_size) * (num_threads_per_block / 32);</pre>
-<p>Read in English, a block handles default_tile_size, 32 numbers per thread, times num_threads_per_block, 64 threads by default, so 2,048 numbers; the grid has N / 2,048 blocks, in whole-number division; the kernel is launched on that grid with the default tile size and number of updates fixed in, so the tile size handed to this launch function is never used; N, the numbers for one setting of the sweep, is the block size times 48 times the multiplier, with the 48 typed in; the printed rate is N times default_num_ops times 2, each multiply-add counted as 2 operations, over the time in seconds; and the printed warps are the blocks times the threads per block divided by 32.</p>
-<p>From the starter file itself, default_num_ops is 263 x 20 = 5,260, so each number goes through <code>tmp += tmp * 3.0f</code> 5,260 times, each time needing the value before. N is 2,048 x 48 x m numbers, for multipliers m from 1 to 48, and each line of output gives the warps and the rate.</p>
-<p class="do">For a multiplier m, write the number of blocks and the number of warps. Then work them out for m = 8, together with the warps per scheduler on the course GPU.</p>
+<h2 id="reading-the-sweep-in-warp-scheduler-cu">Reading the sweep in warp_scheduler.cu</h2>
+<p>A kernel is a function that executes on the GPU, marked __global__, and the CPU starts it with <code>kernel&lt;&lt;&lt;grid, block&gt;&gt;&gt;(arguments)</code>, which, as NVIDIA's CUDA programming guide defines it, starts grid blocks of block threads each, a thread being one execution of the kernel from its beginning; inside the kernel, blockIdx.x is a block's number, blockDim.x the threads per block, and threadIdx.x a thread's own number in its block. The file holds one kernel, its launch function and a main:</p>
+<pre>constexpr uint32_t default_num_ops = 263 * 20;
+constexpr uint32_t default_tile_size = 32;
+constexpr uint32_t default_num_threads_per_block = 64;
+
+template &lt;int NumOps, int Tile&gt;
+__global__ void
+tail_latency_fma(const float *__restrict__ in, float *__restrict__ out, int N) {
+    int index = blockIdx.x * blockDim.x * Tile + threadIdx.x * Tile;
+
+    for (int i = 0; i &lt; Tile; ++i) {
+        float tmp = in[index + i];
+#pragma unroll
+        for (int op = 0; op &lt; NumOps; ++op) {
+            tmp += tmp * 3.0f;
+        }
+        out[index + i] = tmp;
+    }
+}
+
+void launch_tail_latency_fma(
+    const float *in,
+    float *out,
+    int N,
+    uint32_t tile_size,
+    uint32_t num_threads_per_block) {
+    uint32_t block_size = default_tile_size * num_threads_per_block;
+    dim3 block(num_threads_per_block);
+    dim3 grid(N / block_size);
+
+    tail_latency_fma&lt;default_num_ops, default_tile_size&gt;&lt;&lt;&lt;grid, block&gt;&gt;&gt;(in, out, N);
+}</pre>
+<p>default_num_ops is 263 * 20 = 5,260, default_tile_size is 32 and default_num_threads_per_block is 64; the flag -b changes the threads per block. In the kernel, each thread computes index, its first number, as its block's number times the threads per block times 32 plus its own number times 32, so each thread owns 32 consecutive numbers. For each of them, one after another, it copies the number into tmp, applies tmp += tmp * 3.0f 5,260 times, each time to the tmp the step before made, and stores the result. The launch function makes blocks of num_threads_per_block threads and a grid of N / block_size blocks, where block_size is 32 numbers per thread times the threads per block, and launches the kernel with the default tile size fixed in, so the tile_size it receives is never used.</p>
+<p>NVIDIA's CUDA programming guide calls a block's threads, taken in consecutive sets of 32 that an SM begins each instruction for at once, warps. With 64 threads per block and 32 numbers per thread, block_size is 32 * 64 = 2,048 numbers, and each block is 64 / 32 = 2 warps. As written, each thread works through its 32 numbers one after another, so at any moment each warp has a single chain of multiply-adds under way; whether the compiler keeps it that way shows only in the listing of machine instructions, which this lesson does not read.</p>
+<pre>std::vector&lt;int&gt; n_multipliers = {1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12,
+                                  13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+                                  25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36,
+                                  37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48};
+
+uint32_t block_size = default_tile_size * num_threads_per_block;
+double benchmark_time_ns = 0.0;
+
+std::cout &lt;&lt; "Warps, FLOPS" &lt;&lt; std::endl;
+for (int multiplier : n_multipliers) {
+    int N = block_size * 48 * multiplier;
+
+    float *d_in, *d_out;
+    CUDA_CHECK(cudaMalloc(&amp;d_in, N * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&amp;d_out, N * sizeof(float)));
+    CUDA_CHECK(cudaMemset(d_in, 1, N * sizeof(float)));
+
+    BENCHPRESS(
+        launch_tail_latency_fma,
+        3,
+        10,
+        d_in,
+        d_out,
+        N,
+        default_tile_size,
+        num_threads_per_block);
+
+    double time_in_seconds = benchmark_time_ns / 1e9;
+    double flops = ((double)N * default_num_ops * 2) / time_in_seconds;
+    uint32_t warps = (N / block_size) * (num_threads_per_block / 32);
+
+    std::cout &lt;&lt; warps &lt;&lt; ", " &lt;&lt; flops &lt;&lt; std::endl;
+
+    CUDA_CHECK(cudaFree(d_in));
+    CUDA_CHECK(cudaFree(d_out));
+}</pre>
+<p>main tries the multipliers 1 to 48. For each multiplier m it takes N = block_size * 48 * m numbers, reserves room for them on the graphics card and fills it with bytes of 1, then times the launch function with BENCHPRESS, which the same file defines: over 3 measurements it calls the launch function 10 times, waits with cudaDeviceSynchronize, divides the time by 10 and keeps the smallest of the 3. It counts each multiply-add as 2 operations, so the rate is N times 5,260 times 2 over the time in seconds, and it prints the warps, the blocks times the threads per block divided by 32, then the rate.</p>
+<p class="do">For a multiplier m, write the number of blocks and the number of warps. Then work them out for m = 8.</p>
 <details><summary>CHECK</summary>
-<pre>blocks = 2,048 x 48 x m / 2,048 = 48m;   warps = 2 x 48m = 96m
-m = 8: 384 blocks, 768 warps, 768 / 192 = 4 per scheduler</pre>
+<pre>blocks = N / block_size = 2,048 * 48 * m / 2,048 = 48 * m
+warps  = 48 * m * 2 = 96 * m
+m = 8:  384 blocks, 768 warps</pre>
 </details>
 
-<h2 id="a-4-cycle-wait-needs-4-warps-per-scheduler-on-the-course-gpu">A 4-cycle wait needs 4 warps per scheduler on the course GPU and 2 on the laptop</h2>
-<p class="do">Every warp here is a single chain of multiply-adds, and a multiply-add that needs the previous one waits 4 cycles, measured on Turing and assumed the same on Ada. On the course GPU each scheduler has 128 / 4 float circuits; work out how many cycles 32 threads need to begin a multiply-add, how many warps per scheduler keep the circuits busy, and how many for the whole GPU. Then the same for the laptop, whose begin time the prelab measured as 2 cycles.</p>
+<h2 id="counting-what-each-gpu-holds-and-what-its-chains-need">Counting what each GPU holds and what its chains need</h2>
+<p>The Fall 2025 Lab 2 handout names the course GPU, an NVIDIA RTX 4000 Ada at 2.175 billion cycles per second, a cycle being one tick of the chip's clock, with 48 SMs. Each SM has 4 schedulers, 192 in all, and each scheduler holds up to 12 warps, and NVIDIA's Ada specification gives each SM 128 float circuits. The laptop's GTX 1650, of the generation NVIDIA calls Turing, has 14 SMs with 4 schedulers each, 56 in all, and NVIDIA's Turing tuning guide gives it 64 float circuits per SM and at most 32 warps and 16 blocks per SM.</p>
+<p class="do">Work out the most each GPU holds, 192 * 12 warps and 14 * 32 warps.</p>
+<details><summary>CHECK</summary>
+<pre>course GPU: 192 * 12 = 2,304 warps
+laptop:     14 * 32  =   448 warps</pre>
+</details>
+<p class="do">A multiply-add that needs the previous one waits 4 cycles, as the prelab's other file measured on the laptop's Turing GPU; take the same for Ada. On the course GPU each scheduler has 128 / 4 float circuits; work out how many cycles 32 threads need to begin a multiply-add, how many warps per scheduler keep the circuits busy, and how many for the whole GPU. Then the same for the laptop, where the prelab measured the begin time as 2 cycles. Set each need beside what the GPU holds.</p>
 <details><summary>CHECK</summary>
 <pre>course GPU: 128 / 4 = 32 circuits per scheduler -&gt; 32 threads begin in 1 cycle
-            4 / 1 = 4 warps per scheduler -&gt; 192 x 4 = 768 warps
-laptop:     64 / 4 = 16 circuits per scheduler -&gt; 2 cycles (measured: 2)
-            4 / 2 = 2 warps per scheduler -&gt; 56 x 2 = 112 warps</pre>
-<p>On the laptop, warp A begins at cycle 0, warp B at cycle 2, and warp A's next multiply-add is ready at cycle 4, so a third warp finds no free cycle.</p>
-</details>
-<p class="do">Work out the most each GPU holds, 192 x 12 warps and 14 x 32 warps, and the share of that the chains need.</p>
-<details><summary>CHECK</summary>
-<p>The course GPU holds 2,304 warps and needs 768, 33 percent; the laptop holds 448 and needs 112, 25 percent. The most a chip holds is a ceiling, and the number the work needs comes from the wait and the begin time.</p>
+            4 / 1 = 4 warps per scheduler -&gt; 192 * 4 = 768 warps, 768 / 2,304 = 33 percent held
+laptop:     64 / 4 = 16 circuits per scheduler -&gt; 32 / 16 = 2 cycles, as measured
+            4 / 2 = 2 warps per scheduler -&gt; 56 * 2 = 112 warps, 112 / 448 = 25 percent held</pre>
+<p>On the laptop, warp A begins a multiply-add at cycle 0 and warp B at cycle 2, and warp A's next multiply-add is ready at cycle 4, so a third warp finds no free cycle. The most a chip holds is a ceiling, and the number the work needs comes from the wait and the begin time.</p>
 </details>
 
-<h2 id="on-the-course-gpu-12-5-percent-more-work-cost-87-percent-mor">On the course GPU, 12.5 percent more work cost 87 percent more time</h2>
-<p class="do">Rates reported for the course GPU in the notes kept from Lab 2: 26.4575 x 10^12 operations per second at m = 8 and 15.9401 x 10^12 at m = 9. Work out the operations per block, 2 x 2,048 x 5,260, the time at each multiplier as operations over rate, and the GPU's full rate, 6,144 circuits x 2 x 2.175 billion per second, with the share of it reached at m = 8.</p>
+<h2 id="timing-the-course-gpu-at-m-8-and-at-m-9">Timing the course GPU at m = 8 and at m = 9</h2>
+<p>Rates reported for the course GPU in the notes kept from Lab 2 are 26.4575 * 10^12 operations per second at m = 8 and 15.9401 * 10^12 at m = 9.</p>
+<p class="do">Work out the operations per block, 2 * 2,048 * 5,260, the time at each multiplier as operations over rate, and the GPU's full rate, 48 * 128 = 6,144 circuits times 2 operations times 2.175 billion cycles per second, with the share of it reached at m = 8.</p>
 <details><summary>CHECK</summary>
-<pre>per block: 2 x 2,048 x 5,260 = 21,544,960 operations
-m = 8: 384 x 21,544,960 = 8,273,264,640 / 26.4575e12 = 0.3127 ms
-m = 9: 432 x 21,544,960 = 9,307,422,720 / 15.9401e12 = 0.5839 ms
-full rate: 6,144 x 2 x 2.175e9 = 26.73e12;  26.4575 / 26.73 = 99 percent</pre>
+<pre>per block: 2 * 2,048 * 5,260 = 21,544,960 operations
+m = 8: 384 * 21,544,960 = 8,273,264,640 / 26.4575e12 = 0.3127 ms
+m = 9: 432 * 21,544,960 = 9,307,422,720 / 15.9401e12 = 0.5839 ms
+full rate: 6,144 * 2 * 2.175e9 = 26.73e12;   26.4575 / 26.73 = 99 percent at m = 8</pre>
 </details>
-<p class="do">Work out the ratio of work and the ratio of time from m = 8 to m = 9. Then test a guess that no measurement has confirmed: an SM holds at most 8 blocks of this kernel at once, so 48 x 8 = 384 blocks fit and the extra 48 at m = 9 wait for a second round. If that round costs as much as the first, the time is 2 x 0.3127 ms; set it beside 0.5839.</p>
+<p class="do">Work out the ratio of work and the ratio of time from m = 8 to m = 9. Then test a guess that no measurement has confirmed: an SM holds at most 8 blocks of this kernel at once, so 48 * 8 = 384 blocks fit together and the extra 48 at m = 9 wait for a second round. If that round costs as much as the first, the time is 2 * 0.3127 ms; set it beside 0.5839.</p>
 <details><summary>CHECK</summary>
-<p>Work grows 432 / 384 = 1.125 times and time 0.5839 / 0.3127 = 1.867 times. The second round predicts 0.6254 ms, 6.6 percent from 0.5839, which supports the guess without proving it; asking CUDA for the blocks one SM holds, with cudaOccupancyMaxActiveBlocksPerMultiprocessor for this kernel at 64 threads per block, settles it.</p>
+<p>Work grows 432 / 384 = 1.125 times and time 0.5839 / 0.3127 = 1.867 times. The second round predicts 0.6254 ms, 0.0415 ms or 7.1 percent above the measured 0.5839, which supports the guess without proving it; CUDA's cudaOccupancyMaxActiveBlocksPerMultiprocessor, asked about this kernel at 64 threads per block, returns the blocks one SM holds at once and settles it.</p>
 </details>
 
-<h2 id="on-14-sms-the-literal-48-spreads-the-blocks-unevenly">On 14 SMs the literal 48 spreads the blocks unevenly</h2>
-<p class="do">On the laptop the file still multiplies by 48. For m = 1 it launches 48 blocks on 14 SMs; write 48 as 3 x 14 plus a remainder, and say how many SMs get 4 blocks and how many get 3. The output then says 96 warps; work out what that is per scheduler on the laptop and on the course GPU.</p>
+<h2 id="sweeping-the-laptop-where-48-is-not-its-sm-count">Sweeping the laptop, where 48 is not its SM count</h2>
+<p class="do">On the laptop the file still multiplies by 48. For m = 1 it launches 48 blocks on 14 SMs; write 48 as 3 * 14 plus a remainder, and say how many SMs get 4 blocks and how many get 3 if the blocks are spread as evenly as possible. The output then says 96 warps; work out what that is per scheduler on the laptop and on the course GPU.</p>
 <details><summary>CHECK</summary>
-<pre>48 = 3 x 14 + 6: 6 SMs hold 4 blocks (8 warps), 8 SMs hold 3 (6 warps)
+<pre>48 = 3 * 14 + 6:  6 SMs hold 4 blocks, 8 warps;  8 SMs hold 3 blocks, 6 warps
 96 / 56  = 1.71 warps per scheduler on the laptop
 96 / 192 = 0.5 warps per scheduler on the course GPU</pre>
-<p>The same printed line describes a different point of each GPU's curve, so the two tables cannot be compared line by line.</p>
+<p>The same printed number of warps describes a different point of each GPU's curve, so the two tables cannot be compared entry by entry.</p>
 </details>
-<p>On your own GPU the sweep takes two commands in the lab2 folder.</p>
+<p>On your own GPU the sweep takes two commands in the lab2 folder:</p>
 <pre>nvcc -O3 -arch=sm_75 -std=c++17 warp_scheduler.cu -o warp_scheduler
 ./warp_scheduler &gt; sweep.csv</pre>
-<p>The first line compiles the sweep for compute capability 7.5, and the second executes it and saves its table in sweep.csv, one line per multiplier, with the warps and then the operations per second.</p>
-<p class="do">The laptop's circuits are all busy from about 112 warps, which the file's steps of 96 warps reach between m = 1 and m = 2. In your sweep, find the first line within 5 percent of the largest rate and write its warps and that rate, together with your GPU's full rate, 896 x 2 x your clock.</p>
+<p>nvcc compiles the sweep with full optimization for compute capability 7.5, the GTX 1650's; put your own GPU's in place of 75. ./warp_scheduler executes it, and &gt; sweep.csv saves what it prints in the file sweep.csv: the header Warps, FLOPS and one entry per multiplier, with the warps and then the operations per second.</p>
+<p class="do">The laptop's circuits are all busy from about 112 warps, which the file's steps of 96 warps reach between m = 1 and m = 2. In your sweep, find the first multiplier whose rate is within 5 percent of the largest, and write its warps and that rate, together with your GPU's full rate, 14 * 64 = 896 circuits times 2 times your clock.</p>
 <details><summary>CHECK</summary>
-<p>The rate should stop growing near the m = 2 line, 192 warps, since 96 is below the 112 needed and 192 is above it. The laptop's own sweep was not recorded, so yours is the first measurement of it; at an assumed 1.5 billion cycles per second the full rate is 896 x 2 x 1.5e9 = 2.69 x 10^12.</p>
+<p>The rate should stop growing near m = 2, 192 warps, since 96 is below the 112 needed and 192 above it. The laptop's own sweep was not recorded, so yours is the first measurement of it; at an assumed 1.5 billion cycles per second the full rate is 896 * 2 * 1.5e9 = 2.69 * 10^12.</p>
 </details>
-<p class="do">Replace the 48 by the SM count the GPU reports, the field multiProcessorCount that <code>cudaGetDeviceProperties</code> fills, as the CUDA programming guide describes. With 14 there are 14m blocks and 28m warps; which m first reaches 112 warps?</p>
+<p class="do">Replace the 48 by the SM count the GPU reports, the field multiProcessorCount that <code>cudaGetDeviceProperties</code> fills, as the CUDA programming guide describes. With 14 there are 14 * m blocks and 28 * m warps; which m first reaches 112 warps?</p>
 <details><summary>CHECK</summary>
-<p>28m &gt;= 112 gives m = 4, where every SM holds 4 blocks, 8 warps, 2 per scheduler.</p>
+<p>28 * m &gt;= 112 gives m = 4, where every SM holds 4 blocks, 8 warps, 2 per scheduler.</p>
 </details>
 
-<h2 id="holding-is-a-ceiling-and-the-wait-sets-the-target">Holding is a ceiling, and the wait sets the target</h2>
-<p>Gathered together, the chains need 768 warps on the course GPU and 112 on the laptop, against 2,304 and 448 held; 768 warps reach 99 percent of the course GPU's full rate; 12.5 percent more work there cost 87 percent more time; and on 14 SMs the literal 48 leaves 6 SMs with 4 blocks and 8 with 3.</p>
+<h2 id="gathering-what-sets-the-number-of-warps-that-is-enough">Gathering what sets the number of warps that is enough</h2>
+<p>The chains need 768 warps on the course GPU and 112 on the laptop, against 2,304 and 448 held; 768 warps reached 99 percent of the course GPU's full rate; 12.5 percent more work there cost 87 percent more time, close to what a second round of blocks predicts; and on 14 SMs the literal 48 leaves 6 SMs with 4 blocks and 8 with 3.</p>
 <p class="do">Answer the prelab's fourth question in one sentence: when does the sweep reach its largest rate, and what does the multiply-add's wait say about it?</p>
 <details><summary>CHECK</summary>
 <p>The rate peaks once each scheduler has enough independent warps to begin a multiply-add at every chance during the 4-cycle wait: on the course GPU that is 4 per scheduler, 768 warps in all, and on the laptop 2 per scheduler, 112 in all. Past that, extra warps add nothing and can add a round of waiting.</p>
-<p>The reading "fill every SM to its maximum" fails twice above: the target is a third of the ceiling, and going past it cost 87 percent more time.</p>
+<p>The reading "fill every SM to its maximum" fails twice: the need is a third of the course GPU's ceiling, and going past it, from 384 blocks to 432, cost 87 percent more time.</p>
 </details>
-<p>A laptop table with no clean peak comes from the 48 spreading blocks unevenly over 14 SMs, which the reported SM count fixes. A laptop that peaks at a different warp count than the course GPU is correct, because it needs 2 warps per scheduler, not 4. A small step up in warps that costs far more time is a second round of blocks.</p>
-<p>Without code, a GPU hides waiting by switching between many independent sets of threads, and it needs only enough of them to cover each wait, here a third or a quarter of what it can hold. Past that point more threads add nothing, and a launch slightly too large can add a whole extra round of time, so "the hardware supports N" is a ceiling, not a target; the right number comes from how long each step of the work waits, and it differs between machines.</p>
-<p>The guess at the top has its answer: 112, 56 schedulers with 2 warps each, because a multiply-add waits 4 cycles and 32 threads take 2 cycles to begin one on this GPU.</p>
-<p class="do">A harder question to finish with. How would you test, on the course GPU, that the jump from 768 to 864 warps is a second round of blocks and not something else?</p>
+<p>A laptop table with no clean peak comes from the 48 spreading blocks unevenly over 14 SMs, which the reported SM count fixes. A laptop that peaks at a different warp count from the course GPU is correct, since it needs 2 warps per scheduler, not 4. A small step up in warps that costs far more time is a second round of blocks.</p>
+<p>A GPU hides waiting by switching between many independent sets of threads, and it needs only enough of them to cover each wait, here a third or a quarter of what it can hold. Past that point more threads add nothing, and a launch slightly too large can add a whole extra round of time, so "the hardware supports N" is a ceiling, not a target; the right number comes from how long each step of the work waits, and it differs between machines.</p>
+<p>The number of sets of 32 threads asked for at the start is 112: 56 schedulers with 2 warps each, because a multiply-add waits 4 cycles and 32 threads take 2 cycles to begin one on this GPU.</p>
+<p class="do">How would you test, on the course GPU, that the jump from 768 warps to 864 is a second round of blocks and not something else?</p>
 <details><summary>CHECK</summary>
-<p>Compile with -Xptxas -v to see the registers per thread of this kernel, and call cudaOccupancyMaxActiveBlocksPerMultiprocessor for the real kernel at 64 threads per block to get the blocks one SM holds at once. If it says 8, sweep the block count in steps of 1 from a little below 384 = 48 x 8 to a little above it: a second round predicts a step right after 384, not a gradual slope.</p>
+<p>Compile with -Xptxas -v, which prints the registers each thread of the kernel uses, and call cudaOccupancyMaxActiveBlocksPerMultiprocessor for this kernel at 64 threads per block to get the blocks one SM holds at once. If it says 8, launch block counts in steps of 1 from a little below 384 = 48 * 8 to a little above it: a second round predicts a step in time right after 384, not a gradual slope.</p>
 </details>
 <p>The lab pages <a href="../12-the-48-trap.html">the 48 in warp_scheduler.cu</a>, <a href="../13-the-864-cliff.html">12.5 percent more work, 87 percent more time</a> and <a href="../17-hardware-or-launch.html">fixed by the chip, or made by the launch</a> work these numbers out at length, and the notes on <a href="filling-the-wait.html">filling the 4-cycle wait</a> and <a href="second-round.html">a second round of blocks</a> hold the short versions.</p>
 
