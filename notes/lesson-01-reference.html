@@ -54,7 +54,7 @@ cx = 0.625 - 2.0  = -1.375
 cy = 0.625 - 1.25 = -0.625
 
 j = 0    -&gt;  cx = 0 * 2.5 - 2.0 = -2.0
-j = 255  -&gt;  255 / 256 = 0.99609375,  x 2.5 = 2.490234375,  - 2.0 = 0.490234375
+j = 255  -&gt;  255 / 256 = 0.99609375,  * 2.5 = 2.490234375,  - 2.0 = 0.490234375
 i = 0    -&gt;  cy = 0 * 2.5 - 1.25 = -1.25
 i = 255  -&gt;  cy = 2.490234375 - 1.25 = 1.240234375</pre>
 </details>
@@ -152,10 +152,10 @@ if (impl == VECTOR || impl == ALL) {
 <pre>mkdir -p out
 g++ -O3 -march=native -std=c++17 mandelbrot_cpu.cpp -o mandelbrot_cpu
 ./mandelbrot_cpu</pre>
-<p>In the lab1 folder that git clone made, <code>mkdir -p out</code> makes the folder out, which dump_image writes into; writeBMP, which dump_image calls, opens the file with std::ofstream and never checks that the file opened, so without that folder the program finishes with no picture and no message. <code>g++ -O3 -march=native -std=c++17 mandelbrot_cpu.cpp -o mandelbrot_cpu</code> compiles the file with full optimization, -O3, allowing every instruction this CPU has, -march=native, as 2017 C++, into the program mandelbrot_cpu. <code>./mandelbrot_cpu</code> executes it with the defaults, 256 by 256 places and max_iters 1000: it computes the reference, prints your sum, times the reference, and then times the still empty vector function too, printing a number about it that this lesson does not use.</p>
-<p class="do">Execute it and write your sum and the time printed for mandelbrot_cpu_scalar.</p>
+<p>In the lab1 folder that git clone made, <code>mkdir -p out</code> makes the folder out, which dump_image writes into; writeBMP, the function in the same file that dump_image calls, opens the file with std::ofstream and never checks that the file opened, so without that folder the program finishes with no picture and no message. <code>g++ -O3 -march=native -std=c++17 mandelbrot_cpu.cpp -o mandelbrot_cpu</code> compiles the file with full optimization, -O3, allowing every instruction this CPU has, -march=native, as 2017 C++, into the program mandelbrot_cpu. <code>./mandelbrot_cpu</code> executes it with the defaults, 256 by 256 places and max_iters 1000: it computes the reference, prints your sum, times the reference, and then times the still empty vector function too, printing a number about it that this lesson does not use.</p>
+<p class="do">Execute it and write your sum and the time printed for mandelbrot_cpu_scalar. The laptop printed a sum of 16,274,722 and a time of 61.6 ms; what would a different sum mean?</p>
 <details><summary>CHECK</summary>
-<p>The laptop printed a sum of 16,274,722 and a time of 61.6 ms. A different sum means different counts at some places, so something in your build differs: a change in the reference, another img_size or max_iters, or a compiler that rounds some float step differently.</p>
+<p>A different sum means different counts at some places, so something in your build differs: a change in the reference, another img_size or max_iters, or a compiler that rounds some float step differently.</p>
 </details>
 <p>Computed by executing the reference's own arithmetic in 32-bit floats for all 256 * 256 = 65,536 places at max_iters 1000, the counts add up to 16,274,722, the laptop's printed sum; 3,781 places have a count of 1, and 15,902 have a count of 1000.</p>
 <p class="do">A place stops after 1 repetition when x2 + y2 before repetition 2 is above 4, and after repetition 1, x = cx and y = cy, so that sum is cx * cx + cy * cy. Work it out at the corner place (0, 0) and at (64, 64).</p>
@@ -196,9 +196,9 @@ at (64, 64):  1.890625 + 0.390625 = 2.28125, at most 4                -&gt; coun
 <p>A sum of 0 means your added loop read result, which main has only filled with zeros at that point, instead of ref_result. A program that finishes without out/mandelbrot_cpu_scalar.bmp was executed without the folder out. A picture at -r 512 with the same shape as at 256 is correct, since cx and cy cover the same part of the graph paper at every img_size, only with more places.</p>
 <p>The program computes a picture of 65,536 places, and each place's number comes from a loop that reads only that place's own pair of fractions, so the places are separate calculations. They are far from equal: 24.3 percent of the places make 97.7 percent of the repetitions, the costly ones sit together, and splitting the picture into 4 equal bands gave 2.10 times the speed of one worker, not 4. "We split the job into equal parts" says nothing until someone checks that the parts are equal in work, not only in size.</p>
 <p>The share asked for before any arithmetic is almost all: 97.7 percent of the 16,274,722 repetitions come from the 15,902 places, 24.3 percent of the picture, that reach 1000.</p>
-<p class="do">Without knowing any count in advance, how would you split the 256 values of i between 4 workers so that each carries about a quarter of the repetitions, and what speedup would that give?</p>
+<p class="do">A split that knows no count in advance can deal the values of i out in turns: worker k, for k = 0 to 3, takes i = k, k + 4, k + 8 and so on up to 252 + k. Computed from the same counts, the four workers then carry 4,095,090, 4,066,690, 4,047,903 and 4,065,039 repetitions. Why does this split balance the work without knowing any count, and what speedup does it give?</p>
 <details><summary>CHECK</summary>
-<p>Deal the values of i out in turns: worker k, for k = 0 to 3, takes i = k, k + 4, k + 8 and so on up to 252 + k, which is 16 values of i from each of the four bands, cheap and costly alike. Computed from the same counts, the workers then carry 4,095,090, 4,066,690, 4,047,903 and 4,065,039 repetitions, 25.2, 25.0, 24.9 and 25.0 percent, and the job ends with the largest: 16,274,722 / 4,095,090 = 3.97, out of 4. Dealing in turns used no count, only the fact found above that the places with large counts sit together.</p>
+<p>Each band of 64 values of i gives 64 / 4 = 16 of its values to each worker, cheap and costly alike, so every worker gets a quarter of the two costly middle bands: 25.2, 25.0, 24.9 and 25.0 percent of the 16,274,722 repetitions, and the job ends with the largest, 16,274,722 / 4,095,090 = 3.97, out of 4. Dealing in turns used no count, only that the places with large counts sit together in the two middle bands.</p>
 </details>
 <p>The lab pages <a href="../01-image-to-middleman.html">from (i, j) to the middleman pair</a>, <a href="../02-square-and-add.html">the while loop by hand</a> and <a href="../03-the-w-line.html">where the squaring went</a> work the same ground at length, and the notes on <a href="middleman-pair.html">the middleman pair</a> and on <a href="iters.html">iters</a> hold the short versions.</p>
 

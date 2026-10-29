@@ -101,7 +101,7 @@ for (int i = 0; i &lt; 64; ++i)
 end_time = clock_cycle();</pre>
 <p>x gets the float at n, where data_type is float; the fence follows; x = x + 3 adds 3 to x; then the start reading, the 64 copies of the multiply-add, and the end reading.</p>
 <p>The float at n lives in DRAM, the memory chips outside the GPU chip, so x = *n becomes a load instruction, LDG in the listing. As the 2019 microbenchmark study of Jia and others, Dissecting the NVIDIA Turing T4 GPU via Microbenchmarking, describes, the chip begins the next instruction without waiting for a load, and an instruction that reads the loaded register is held until the value arrives. So x = x + 3 makes the wait for the load happen before the start reading, as long as it stays before it.</p>
-<p>The interleaved kernel written at this step loaded x and y from n in the same way and placed x = x + 3.0f and y = y + 4.0f above its start reading. Its listing began:</p>
+<p>The interleaved kernel written at this step loaded x and y from n in the same way and placed x = x + 3.0f and y = y + 4.0f above its start reading. The two constants differ for a reason: two chains that begin at the same loaded value and apply the same constants compute equal values, and the compiler may then compute only one of them. Its listing began:</p>
 <pre>/*0020*/  LDG.E.SYS R2, [UR4] ;
 /*0060*/  CS2R R6, SR_CLOCKLO ;
 /*0080*/  FADD R3, R2.reuse, 3 ;
@@ -109,8 +109,9 @@ end_time = clock_cycle();</pre>
 <p>At address 0x20, LDG loads 32 bits from the graphics card's memory into register R2. At 0x60, CS2R copies the clock counter into register R6, which is the start reading. At 0x80 and 0x90, FADD adds 3 and 4 to R2 into R3 and R5, which are x + 3 and y + 4.</p>
 <p class="do">Which waits fall inside the timed window in that listing, and what in clock_cycle allowed the move? If a clock read lists only x as its input, which add may still move after it?</p>
 <details><summary>CHECK</summary>
-<p>The wait for the load and both FADDs fall inside, since the start reading at 0x60 comes before the adds at 0x80 and 0x90. clock_cycle lists no input, so nothing ties the reading to the adds. With only x listed, the add on y is tied to nothing and may still move after the reading, which is what the listing of that version showed.</p>
+<p>The wait for the load and both FADDs fall inside, since the start reading at 0x60 comes before the adds at 0x80 and 0x90. clock_cycle lists no input, so nothing ties the reading to the adds. With only x listed, the add on y is tied to nothing and may still move after the reading.</p>
 </details>
+<p>The chats report that the listing of a version whose start reading listed only x showed exactly that: the add on y had moved after the reading, inside the timed window.</p>
 <p>A clock read with inputs, which the starter does not have, was written at this step:</p>
 <pre>#define clock_cycle_dep2(a, b) \
     ({ \
@@ -147,7 +148,7 @@ four chains: 512 / 256 = 2
 single-chain kernel:  256 / 64 = 4.00 and 256 / 64 = 4.00</pre>
 <p>In one chain an FFMA follows the one before 4 cycles later, and with two or four chains the FFMAs follow each other every 2 cycles.</p>
 </details>
-<p class="do">The 2 has two possible explanations. In the first, an FFMA can begin every cycle, so k chains give 4 / k cycles per FFMA, never below 1; in the second, an FFMA keeps the float circuits busy for 2 cycles, never below 2. Write what each predicts for four chains and set it beside the measurement. Then use the layout of an SM, one of the identical blocks of hardware a Turing chip is built from, as NVIDIA's Turing tuning guide gives it: 64 float circuits and 4 schedulers, the circuits that pick which instruction begins next. The hardware handles threads in sets of 32, which NVIDIA calls warps, and begins each instruction for a whole warp, so the single thread here is a warp with 31 idle threads. Work out the circuits per scheduler and the cycles needed to put 32 threads through them.</p>
+<p class="do">The 2 has two possible explanations. In the first, an FFMA can begin every cycle, so k chains give 4 / k cycles per FFMA, never below 1; in the second, an FFMA keeps the float circuits busy for 2 cycles, never below 2. Write what each predicts for four chains and set it beside the measurement. Then use the layout of an SM, one of the identical blocks of hardware a Turing chip is built from, as NVIDIA's CUDA programming guide gives it for compute capability 7.5: 64 float circuits and 4 schedulers, the circuits that pick which instruction begins next. The hardware handles threads in sets of 32, which NVIDIA calls warps, and begins each instruction for a whole warp, so the single thread here is a warp with 31 idle threads. Work out the circuits per scheduler and the cycles needed to put 32 threads through them.</p>
 <details><summary>CHECK</summary>
 <p>The first explanation predicts 4 / 4 = 1 and the second 2; the measurement is 2, so the first fails. Each scheduler has 64 / 4 = 16 circuits, and 32 threads through 16 circuits take 32 / 16 = 2 cycles. With two chains both explanations give 2, so only the four-chain kernel tells them apart.</p>
 </details>
@@ -161,7 +162,7 @@ four chains, 256:  519 - 255 * 2 = 9
 four chains, 512: 1031 - 511 * 2 = 9</pre>
 <p>The same kernel gives the same outside part, 41 and 41, 9 and 9, while different kernels give different parts, 29 against 35; that is why the subtraction across two kernels gave 4.03 and not 4.00, since (35 - 29) / 192 = 0.03, while the single-chain kernel at 64, 128 and 192 gave 4.00.</p>
 </details>
-<p class="do">After the mistake was fixed, fma_latency_no_interleave had all 128 FFMAs of x and then all 128 of y in the source. It printed 551 cycles, and its listing alternated the registers R3 and R5 of x and y, while the chip begins instructions in listing order. Who interleaved the chains, and does the no-interleave version print the same cycles as the interleaved one?</p>
+<p class="do">After the mistake was fixed, fma_latency_no_interleave had all 128 FFMAs of x and then all 128 of y in the source. It printed 551 cycles, and its listing alternated the registers R3 and R5 of x and y, while the chip begins a thread's instructions in listing order, as NVIDIA's CUDA programming guide says a GPU issues them in order. Who interleaved the chains, and does the no-interleave version print the same cycles as the interleaved one?</p>
 <details><summary>CHECK</summary>
 <p>The compiler reordered the two independent loops into one alternating stream, so both versions print 551 from the same listing: the source order of independent work does not survive -O3.</p>
 </details>
