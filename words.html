@@ -15,17 +15,20 @@
 <dt>[a, b)</dt><dd>The whole numbers from a up to b - 1: a is included and b is not, so [0, 171) holds 0 to 170.</dd>
 <dt>addq, cmpq, jne, jg, jbe</dt><dd>x86 machine instructions on 64-bit numbers: addq adds a number to a register, cmpq compares two numbers, and jne, jg and jbe jump to another instruction if that comparison found them not equal, greater, or below or equal.</dd>
 <dt>address</dt><dd>The number that says where a value sits in memory. Memory is a long list of bytes, numbered from 0; an address is one of those numbers.</dd>
+<dt>aligned</dt><dd>Beginning at a multiple of a given size. A read of 128 neighbouring bytes that begins at a multiple of 32 covers 4 pieces of 32 bytes; one that does not covers 5.</dd>
 <dt>ALU (arithmetic logic unit)</dt><dd>A circuit that does one arithmetic or logic operation, such as an add or a compare, on its inputs. In the Lecture 2 slides an ALU is one exec unit for one 32-bit number: the two 256-bit vector ALUs of a Zen 4 core count as 16 of them.</dd>
 <dt>array</dt><dd>Many values of the same kind stored one after another in memory, reached by their place number: <code>out[5]</code> is the value at place 5 of the array <code>out</code>.</dd>
 <dt>auto-vectorization</dt><dd>The compiler turning an ordinary loop into SIMD instructions on its own; gcc 13.3 turns a plain C loop over floats into vmulps, vcmpltps and vandps on 8 floats at a time.</dd>
 <dt>AVX2</dt><dd>A set of instructions in the laptop's Ryzen processor that act on 256 bits at once, which is 8 fractions of 32 bits each.</dd>
 <dt>AVX-512</dt><dd>A larger set of such instructions, acting on 512 bits at once: 16 fractions of 32 bits. The Lab 1 handout targets it; the laptop's Ryzen 5 4600H does not have it.</dd>
 <dt>bands, turns (splitting work)</dt><dd>Ways to split the values of i between n workers. In bands, each worker takes one stretch of consecutive values, the first worker the first n-th of them, the next worker the next n-th; in turns, worker t takes t, t + n, t + 2n and so on.</dd>
+<dt>barrier, __syncthreads()</dt><dd>A point in a kernel where every thread of a block waits until all of them have arrived; CUDA's __syncthreads() is one. NVIDIA's CUDA programming guide allows it in conditional code only when the condition is the same in every thread of the block; otherwise execution may hang or give wrong results.</dd>
 <dt>base clock, boost clock</dt><dd>The clock speeds a chip maker publishes: the base clock is the speed the chip is promised to hold under load, and the boost clock the highest it reaches when temperature and power allow, for a CPU with a single core busy. The laptop's Ryzen 5 4600H has 3.0 GHz and up to 4.0 GHz; NVIDIA gives the GTX 1650 laptop GPU a boost clock between 1,125 and 1,560 MHz, depending on the laptop.</dd>
 <dt>BRA, BSSY, BSYNC, BMOV, BREAK</dt><dd>GPU machine instructions that control where execution goes: BRA jumps to another instruction; BSSY and BSYNC mark where threads that took different paths meet again; BMOV copies the record of which threads are to meet there into or out of a register; BREAK takes threads that leave a loop out of that record.</dd>
 <dt>bit, byte</dt><dd>A bit holds 0 or 1. A byte is 8 bits. A float or a <code>uint32_t</code> takes 32 bits, which is 4 bytes.</dd>
 <dt>bitwise AND</dt><dd>An operation on two bit patterns that gives 1 at each bit where both have 1, and 0 elsewhere. AND with 32 one-bits leaves a float unchanged; AND with 32 zero-bits turns it into 0.0.</dd>
 <dt>block (CUDA)</dt><dd>A set of GPU threads started together. The launch <code>&lt;&lt;&lt;B, T&gt;&gt;&gt;</code> starts B blocks of T threads each. Each block executes on one SM.</dd>
+<dt>border cell, wall, source (Lab 3)</dt><dd>In the Lab 3 wave simulation: cells on the outer edge of the grid, and wall cells, get height 0 each step without reading any neighbour; source cells get a value from the scene; every other cell is updated from its neighbours.</dd>
 <dt>branch, blt</dt><dd>An instruction that may jump to another instruction instead of going on to the next. blt, branch if less than, in the Lecture 2 loop jumps back while r2 is below 400.</dd>
 <dt>CCD</dt><dd>AMD's chip that holds 8 Zen 4 cores; the Lecture 2 slides give the course CPU's as 70 mm².</dd>
 <dt>chain</dt><dd>A list of operations in which each one needs the value of the one before it, so they cannot overlap.</dd>
@@ -37,6 +40,7 @@
 <dt>compiler flags: -O3, -march=native, -arch=sm_75, -ccbin, -pthread</dt><dd>Options on the compile line. -O3: optimize fully. -march=native: allow every instruction this CPU has, such as AVX2. -arch=sm_75: make nvcc produce machine instructions for compute capability 7.5. -ccbin: tell nvcc which g++ to use. -pthread: add the POSIX threads library.</dd>
 <dt>-Xptxas -v</dt><dd>An nvcc option that hands -v on to ptxas, the step that turns PTX into machine instructions, so that it prints, for each kernel, how many registers each thread uses.</dd>
 <dt>compute capability</dt><dd>A pair of numbers that names an NVIDIA GPU's generation and what it can execute. The GTX 1650 is 7.5; <code>nvidia-smi --query-gpu=compute_cap --format=csv</code> prints yours.</dd>
+<dt>const __restrict__</dt><dd>A pointer declared const and __restrict__ promises the compiler that the memory is only read during the kernel and reached through no other pointer, which, the Lab 3 handout says, lets the loads be cached in L1.</dd>
 <dt>core</dt><dd>A part of a CPU that executes its own sequence of instructions. The Ryzen 5 4600H has 6. The Lecture 2 slides also call each warp scheduler of the course GPU a core, 192 in all.</dd>
 <dt>CPU</dt><dd>The central processor of a computer, built to finish one sequence of instructions as fast as possible.</dd>
 <dt>CS2R, LDG</dt><dd>GPU machine instructions: LDG copies a value from the graphics card's memory into a register; CS2R copies a special register, such as the cycle counter, into an ordinary one.</dd>
@@ -45,9 +49,10 @@
 <dt>cudaOccupancyMaxActiveBlocksPerMultiprocessor</dt><dd>A CUDA call made from the CPU that returns how many blocks of a given kernel, at a given number of threads per block, one SM can hold at once.</dd>
 <dt>cuobjdump</dt><dd>A CUDA toolkit program that prints what is inside a compiled GPU program; <code>cuobjdump -sass</code> prints its machine instructions, the listing.</dd>
 <dt>cycle</dt><dd>A single tick of a processor's clock. Times inside the GPU are counted in cycles.</dd>
+<dt>DDR5, HBM3</dt><dd>Kinds of memory chip in Lecture 3: a DDR5 chip with a 32-bit interface at 6.4 GT/s gives 25.6 GB/s; an HBM3 module with a 2048-bit interface at 3.2 GT/s gives 819 GB/s and sits in the same package as the processor.</dd>
 <dt>difference (the starters' check)</dt><dd>The number the Lab 1 and Lab 2 starters print after each version: the sum over all places of the gap between the version's count and the reference's count, divided by img_size times img_size times max_iters. A correct version prints exactly 0.</dd>
 <dt>DRAM</dt><dd>The memory chips. On a graphics card they sit outside the GPU chip, so reading from them takes many cycles.</dd>
-<dt>exec unit (execution unit)</dt><dd>A circuit that carries out one operation on one number per cycle. The Lecture 2 slides count 16 32-bit exec units in a core of the course CPU and 32 in a warp scheduler of the course GPU.</dd>
+<dt>exec unit (execution unit)</dt><dd>A circuit that carries out one operation on one number per cycle. The Lecture 2 slides count 16 32-bit exec units in a core of the course CPU and 32 in a warp scheduler of the course GPU. The Lecture 3 slides call them EUs.</dd>
 <dt>fat while loop, thin loop</dt><dd>The learner's names: a thin loop carries one set of places in each repetition; a fat while loop carries two or more independent sets in the same repetition and is left only when every set is done, each set's mask still stopping its own counts.</dd>
 <dt>Fetch &amp; Decode, Exec, Program State, State, Shared State</dt><dd>Boxes in the Lecture 2 drawings: Fetch &amp; Decode reads the next instruction and works out what it asks for; Exec carries it out; Program State holds the registers of one stream of instructions; State holds the values a single ALU works on; Shared State holds what all the ALUs under one Fetch &amp; Decode share, such as the address of the next instruction.</dd>
 <dt>FFMA, FADD, FMUL</dt><dd>Names of GPU machine instructions: FFMA multiplies two fractions and adds a third in one step; FADD adds two fractions; FMUL multiplies two.</dd>
@@ -57,10 +62,11 @@
 <dt>FP32 unit</dt><dd>A circuit in the GPU that does one 32-bit multiply-add for one thread. The GTX 1650 has 896 of them; NVIDIA's specifications call them CUDA cores.</dd>
 <dt>FP32, FP64</dt><dd>Numbers stored in 32 bits (float) and in 64 bits (double). On the GTX 1650 an SM produces 64 FP32 results per clock but only 2 FP64 results, according to NVIDIA's CUDA programming guide.</dd>
 <dt>hardware thread (SMT)</dt><dd>An instruction sequence that a CPU core keeps going alongside others, which AMD calls simultaneous multithreading, SMT. The laptop's cores keep 2 each, sharing the core's arithmetic circuits, so either can begin instructions while the other waits. Intel, and the Lecture 2 slides, call them hyperthreads.</dd>
-<dt>GDDR5, GDDR6</dt><dd>Kinds of memory chips used on graphics cards. GDDR6 moves more bytes per second over the same wires.</dd>
+<dt>GDDR5, GDDR6</dt><dd>Kinds of memory chips used on graphics cards. GDDR6 moves more bytes per second over the same wires. Lecture 3: a GDDR6 chip has a 32-bit interface at 18 GT/s, 72 GB/s; the course GPU has 5 of them, 360 GB/s.</dd>
 <dt>Geekbench 6</dt><dd>A published set of benchmark programs that measures CPU speed; the Lecture 2 graph of core size against work per clock uses its combined score.</dd>
 <dt>GPU</dt><dd>A graphics processor: thousands of simple arithmetic circuits that are fast when many of them do the same instruction at the same moment.</dd>
 <dt>graph paper</dt><dd>The learner's word for the mathematical plane with (0, 0) at its center, where the middleman pairs live.</dd>
+<dt>GT/s</dt><dd>Billions of transfers per second; each transfer moves one interface's worth of bits, so a 32-bit interface at 18 GT/s moves 4 bytes x 18 billion = 72 GB/s.</dd>
 <dt>image paper</dt><dd>The learner's word for the 256 by 256 sheet of results, the array <code>out</code>, with i counting down and j counting right.</dd>
 <dt>IEEE 754</dt><dd>The standard that fixes how floats are stored and how a result that falls between two floats is rounded.</dd>
 <dt>ILP (instruction-level parallelism)</dt><dd>Independent instructions inside one thread, which the processor can begin while earlier ones still wait for their results. Lab 2, part 1 creates it by giving each loop several independent sets of places.</dd>
@@ -91,6 +97,7 @@
 <dt>matrix multiply</dt><dd>Computing C from A and B: entry (i, j) of C is the sum, over k, of A's entry (i, k) times B's entry (k, j). With N by N matrices it takes N * N * N multiply-adds.</dd>
 <dt>max_iters</dt><dd>The cap on repetitions, 1000 in the lab measurements on this site.</dd>
 <dt>memory bus</dt><dd>The wires between the GPU chip and its memory chips. On the GTX 1650 it is 128 bits, so 16 bytes move per transfer.</dd>
+<dt>memory channel, striping</dt><dd>Each memory chip with its own connection is a channel. Striping deals addresses out to the channels in small pieces, taking turns (the chip is the address divided by the piece size, mod the number of chips), so neighbouring addresses land on different chips; dealing them out in large unbroken blocks (the address divided by the block size) is the divide rule of Lecture 3.</dd>
 <dt>middleman pair</dt><dd>The learner's word for (cx, cy), the two fractions computed from (i, j) that the Mandelbrot loop actually works on.</dd>
 <dt>normalized</dt><dd>Divided by a reference value, so that the reference becomes 1x.</dd>
 <dt>notes (this site)</dt><dd>The short pages in the notes section: one idea each, a few lines to calculate, and the notes that point to each one.</dd>
@@ -103,12 +110,14 @@
 <dt>outside part (this site)</dt><dd>The cycles of a timing that the timed operations do not explain: measured cycles minus (number of operations - 1) times the cycles per operation. Equal only between two lengths of the same kernel.</dd>
 <dt>owner</dt><dd>On this site: the worker (CPU thread or GPU thread) responsible for writing a given place of the output. A correct split gives every place exactly one owner.</dd>
 <dt>median</dt><dd>The middle value of a list once it is sorted. Of 10, 10, 11, 14, 30 it is 11.</dd>
+<dt>PCIe</dt><dd>PCI Express, the connection between the computer's CPU side and a graphics card; the course machine's PCIe 4.0 moves 32 GB/s.</dd>
 <dt>physical register, logical register</dt><dd>A logical register is a name a program uses, such as r3 or ymm0; a physical register is a storage cell in the chip. The lecturer's simple processor has one physical register for each logical register.</dd>
 <dt>predication</dt><dd>An instruction that is executed for every thread but has effect only where a stated condition is true, so no jump is needed. Shown in a listing with a prefix such as <code>@!P2</code>.</dd>
 <dt>PTX</dt><dd>The instruction language NVIDIA defines for its GPUs, one step above the machine instructions that nvcc finally produces. Code can insert a PTX instruction by hand with <code>asm volatile</code>, as the clock read of the Lab 2 prelab does with <code>mov.u64</code>.</dd>
 <dt>program counter</dt><dd>The address of the next instruction a thread will execute.</dd>
 <dt>POSIX threads (pthreads)</dt><dd>The standard library of thread functions on Linux and other Unix systems, such as pthread_create and pthread_join; g++ needs -pthread to use it.</dd>
 <dt>pthread_create, pthread_join</dt><dd>CPU library calls: the first starts a new thread executing a given function; the second waits until that thread has finished.</dd>
+<dt>race</dt><dd>Threads touching the same place in the same step, at least one of them writing, so that the result depends on which goes first.</dd>
 <dt>Raptor Cove, Core 2 Duo, Pentium Pro</dt><dd>Intel CPU core designs named in Lecture 2: Raptor Cove is the largest core on the slide's graph, and the Core 2 Duo and the Pentium Pro are older ones the lecturer compared.</dd>
 <dt>rax, rcx, rdx, rdi, rsi, rsp</dt><dd>x86 registers of 64 bits that hold one number each, such as a counter or an address; rsp holds the address of the stack.</dd>
 <dt>reduction</dt><dd>Turning many numbers into one, such as adding up an array. The work is easy to split; the dependence between partial results is the hard part.</dd>
@@ -126,14 +135,17 @@
 <dt>SM</dt><dd>Each of the identical blocks of hardware an NVIDIA GPU chip is built from. The GTX 1650 has 14, each with 64 FP32 units.</dd>
 <dt>speedup</dt><dd>The time of one version divided by the time of a faster one: a speedup of 4.72 means the faster version takes 4.72 times less time.</dd>
 <dt>stack</dt><dd>The memory a function keeps for its own values; gcc puts there the variables that do not fit in registers.</dd>
+<dt>std::swap</dt><dd>A C++ function that exchanges the values of two variables; in Lab 3 it exchanges the pointers u0 and u1, not the arrays they point to.</dd>
 <dt>telerun</dt><dd>The course's tool for sending code to its own machines. It needs a course account, so self-learners compile and time on their own computer instead.</dd>
 <dt>TFLOPS</dt><dd>10^12 floating-point operations per second, with a multiply-add counted as 2. The Lecture 2 slides give the course GPU 26.7 and the course CPU 0.97 to 1.4.</dd>
 <dt>threadIdx.x, blockIdx.x, blockDim.x</dt><dd>Numbers every GPU thread can read: its own number inside its block, its block's number, and the number of threads per block.</dd>
+<dt>threadIdx.y, blockIdx.y, blockDim.y, gridDim.x, dim3</dt><dd>The y numbers of a launch whose sizes are given as dim3 values, and gridDim.x, the number of blocks across. The x number changes fastest, so threads with consecutive threadIdx.x share a warp.</dd>
 <dt>tile</dt><dd>A small square piece of a large table, copied into shared memory so many threads can use each value without fetching it again.</dd>
 <dt>thread</dt><dd>A sequence of instructions being executed. On a GPU, thousands can exist at once, each with its own values.</dd>
 <dt>thread-instruction, thread-repetition, warp-repetition</dt><dd>On this site: one GPU thread doing one instruction, or one repetition of a loop; and one repetition of the loop by a whole warp of 32 threads. An instruction that begins for a warp has room for 32 thread-instructions, whether or not every thread has work.</dd>
 <dt>transistor</dt><dd>The tiny electrical switch that chips are built from. The Lecture 2 graph measures a core's size in transistors, as if every core were built with the same transistor size.</dd>
 <dt>Turing, Volta, Ada</dt><dd>Names of NVIDIA GPU generations. The GTX 1650 is Turing; Volta came just before it; the course GPU, an RTX 4000 Ada, is a later generation.</dd>
+<dt>u0, u1 (Lab 3)</dt><dd>The wave simulation's two grids of heights: u0 holds the previous heights and receives the next ones, u1 holds the present heights; after each step the two pointers are swapped.</dd>
 <dt>vaddps, vmulps, vcmpltps, vandps, vblendvps, vmaskmovps</dt><dd>AVX machine instructions on 8 floats in 256-bit ymm registers: add; multiply; compare less-than, giving a mask; bitwise AND; blend, which takes each index from one of two registers as a mask chooses; and a store that writes only the indices whose mask is all ones.</dd>
 <dt>vmovups, vmovaps, vbroadcastss, vxorps, vcomiss, vmulss</dt><dd>More AVX machine instructions: vmovups and vmovaps copy 8 floats between a register and memory; vbroadcastss copies one float into all 8 indices; vxorps of a register with itself makes 0.0 at every index; vcomiss compares two single floats; vmulss multiplies two single floats.</dd>
 <dt>warp scheduler</dt><dd>A circuit in each SM that, every cycle, picks which warp's next instruction begins. Turing and Ada GPUs have 4 per SM.</dd>

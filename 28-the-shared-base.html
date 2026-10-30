@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Shared Base</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>28. Lab 3: the shared base, and who reads which float</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>After seeing that giving each GPU thread its own unbroken stretch of floats scatters the reads of every instruction, the learner had to build the other arrangement of Lab 3's copy kernels, the one in which the threads of an instruction read side by side. A pair of habits got in the way. The first was a picture of indexing as a fixed corner for each worker plus a small step, where the corner belongs to the worker. The second was the count of all threads in the launch, which seemed to fill in every limit in advance and leave nothing for a loop to do.</p>
+<p>Then came a surprise. A second correct version copied exactly the same array as the first, and yet a given thread read different floats in each. The learner had assumed that the same array meant the same reads.</p>
+<p>If the corner does not belong to the thread, what does it belong to, and what does an output that checks out say about who read what?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>A pair of kernels both copy the same array correctly, every float exactly once. Does a given thread read the same floats in both? Yes or no.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "I used to think that, okay, there are things in parallel room. There is a base, which is the corner, which mostly starts at zero, or that fixed number. It keeps on jumping, and we just add the offset and we get the index." / "my brain is unable to think total threads means we are filling in all the limits upfront now itself and nothing is there pending" / "wtf total threads is decided by cuda launch function" / "this is the brain breaking part i did not see it coming that we different reads in both cases even though the array being read is same"</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> NVIDIA's CUDA programming guide: 32 threads with consecutive thread numbers, a warp, execute one instruction together, and the memory system combines only the addresses of one instruction. In the copy kernels every thread receives the same <code>x</code> and loops x times, so the threads of one instruction are always at the same value of i. <span class="from">from: the CUDA programming guide; the Lab 3 starter's kernel arguments</span></p>
+<p class="ln"><b>L02</b> Example numbers for this page: 4 threads, x = 3, 12 floats. Arrangement A is the unbroken stretch per thread, float = tid * 3 + i. Arrangement B builds the base from i alone, the same for all 4 threads at one instant, and adds the thread's own number. <span class="from">from: example numbers</span></p>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> Fill, for the instant i = 0, the floats the 4 threads read. A: ____ . B: ____ . The base of A for threads 0 to 3: ____ ; the base of B for i = 0, 1, 2: ____ . Which base belongs to a thread, and which to an instant? ____ . <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>A at i = 0: floats 0, 3, 6, 9: four separate places
+B at i = 0: floats 0, 1, 2, 3: side by side
+A's bases 0, 3, 6, 9: one per thread, fixed for all time
+B's bases 0, 4, 8: one per instant, the same for all 4 threads</pre>
+</details>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> B's base moves by ____ floats from one instant to the next. Why that number and not x = 3? ____ . <span class="from">from: L02, L03</span></p>
+<details><summary>CHECK</summary>
+<pre>by 4: each instant uses up one float per thread, so the next instant's base must lie past
+4 floats; x only says how many instants there are</pre>
+</details>
+<p class="ln"><b>L05</b> The rule behind B: the base must be what the threads reading together have in common, which at one instant is i, and the small addition must be what tells them apart, their own numbers. A does the reverse: its base is the thread's number, which differs in every thread, and its small addition is the shared i. <span class="from">from: L01, L03, L04</span></p>
+<p class="ln"><b>L06</b> The launch decides how many threads exist: the starter launches 128 blocks of 32. The kernel cannot choose that number; it can only read it, as <code>blockDim.x</code> for one block or <code>gridDim.x * blockDim.x</code> for the whole launch. The code is a rule for one thread, written before anyone knows how many copies of it will execute. <span class="from">from: the Lab 3 starter's launch; the CUDA programming guide</span></p>
+<p class="ln do"><b>L07</b> <b class="x">DO</b> By L04, the jump of the shared base is the number of threads that walk one region together. If the whole launch walks one region (call it W), the jump is ____ . If each block walks a region of its own (call it P), the jump is ____ , and the base also needs ____ . <span class="from">from: L04, L06</span></p>
+<details><summary>CHECK</summary>
+<pre>W: every thread of the launch, gridDim.x * blockDim.x
+P: the threads of one block, blockDim.x; plus a corner for each block, saying which region
+the count of threads is the size of one jump of a shared base, nothing else; that is why
+it appears in the code, and why the code reads it instead of assuming it</pre>
+</details>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> Take 2 blocks of 2 threads and x = 2, so 8 floats. Under W, which floats are read at i = 0 and at i = 1? ____ . Under P, which floats does each block read, in order? ____ . Which floats does the first thread of block 1 read under W, and under P? ____ . Is any float skipped or read twice in either? ____ . <span class="from">from: L06, L07</span></p>
+<details><summary>CHECK</summary>
+<pre>W: i = 0 reads floats 0, 1, 2, 3; i = 1 reads 4, 5, 6, 7
+P: block 0 reads 0, 1, then 2, 3; block 1 reads 4, 5, then 6, 7
+first thread of block 1: floats 2 and 6 under W, floats 4 and 6 under P
+no float is skipped or read twice in either: both copy every float exactly once</pre>
+</details>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> The starter checks each kernel by comparing every float of dst with src and printing whether all of them matched. Could that check tell W from P? ____ . Which arrangement does the handout describe for <code>coalesced_load</code>, where each block copies an unbroken region of x times blockDim.x floats and a thread's floats are blockDim.x apart? ____ . <span class="from">from: L07, L08; the Lab 3 handout</span></p>
+<details><summary>CHECK</summary>
+<pre>no: the check sees only the final dst, which W and P make identical; it cannot see which
+thread copied which float
+the handout describes P: each block its own region</pre>
+</details>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> Ask the two questions of any index line. Hold one thread fixed: which floats does it read over time? Hold one instant fixed: which floats do the threads of one instruction read? Answer both for W and for P from L08. ____ . <span class="from">from: L08</span></p>
+<details><summary>CHECK</summary>
+<pre>one instant: W and P both give the threads of one instruction neighbouring floats
+one thread over time: W's floats are a whole launch apart (2 and 6), P's are a block apart
+(4 and 6)
+the second question decides what the memory system receives; the first decides who owns
+what, which is what the handout fixes</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> Collect L03 (A's bases belong to threads, B's to instants), L04 (the shared base jumps by the number of threads, not by x), L06 (the launch decides that number, the kernel only reads it), L08 (a thread reads different floats under W and P, and every float is read once in both) and L09 (the output check cannot tell W from P). Write one sentence on what the base of an index should be built from, and one on what a matching output proves. <span class="from">from: L03, L04, L06, L08, L09</span></p>
+<details><summary>CHECK</summary>
+<pre>The base must be built from what the threads reading together share, the instant and, if
+each set walks its own region, the set's corner; the thread's own number is only the small
+step; the count of threads is the jump of that shared base, read from the launch.
+A matching output proves that every float was copied once; it says nothing about which
+thread copied which float, and many different hand-outs of the work satisfy the same check.
+
+Tempting answer that fails: "the array is the same, so the threads read the same floats".
+The first thread of block 1 reads floats 2 and 6 under W and 4 and 6 under P (L08), and
+both satisfy the same check (L09).</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>Threads that move together should take neighbouring items at each moment. The place where each moment begins is something they all agree on, which moment it is, and each one adds its own number. Correct ways of handing out the work can copy the same data while each worker touches different items, and checking the result cannot tell them apart.</p>
+<p>For a manager: two programs that give the same result can divide the work completely differently; ask who touches what, not only whether the result matches.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>No. The first thread of block 1 reads floats 2 and 6 in one correct arrangement and floats
+4 and 6 in the other (L08); both copy every float exactly once.</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>Why does arrangement P need a corner for each block in its base, while arrangement W needs none?</p>
+<details><summary>CHECK</summary>
+<pre>Under P each block walks a region of its own, so the base must say which region: the
+block's number times the size of a region, x * blockDim.x floats. Under W all threads walk
+one region together, so the instant alone places the base, and the block's number goes
+into the small step, as part of the thread's number in the whole launch.</pre>
+</details>
+</div>
+
+<nav><a href="27-which-threads-are-neighbours.html">prev: 27 which threads are neighbours in memory</a><a href="29-the-naive-wave-step.html">next: 29 the naive wave step</a></nav>
+</main>
+</body>
+</html>

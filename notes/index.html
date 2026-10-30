@@ -55,6 +55,7 @@
 <li><a href="nearby.html">Nearby: 32 stores in 4 blocks of 32 bytes</a>: The profiler's 2,048 requests and 8,192 sectors derived by hand, and a split of places that would move 8 times more.</li>
 <li><a href="operations-per-byte.html">Operations per byte</a>: Adding two arrays does 0.083 adds per byte moved; the GTX 1650 needs about 10.5 to keep its arithmetic busy, so memory sets the time.</li>
 <li><a href="owner.html">Owner: exactly one writer per place</a>: A correct split gives every place one owner; a fast split also gives every owner similar work: 4.72 against 5.98 on the Lab 2 picture.</li>
+<li><a href="two-buffers.html">Separate buffers and a launch per step</a>: An in-place update is safe when every place has one writer and every shared value is read from a buffer nobody writes; the end of a launch separates the steps.</li>
 <li><a href="simd-avx2.html">SIMD on the CPU: 8 places in one AVX2 instruction</a>: Why 8 places per instruction gave 7.07 times, not 8, and why the picture, not the instructions, decides it.</li>
 <li><a href="sm.html">SM: the block of hardware a GPU chip is built from</a>: What one SM of the GTX 1650 contains, 896 FP32 units against the CPU's 48 floats per instruction, and why the CPU still finished first.</li>
 <li><a href="warp.html">The 32-thread unit</a>: NVIDIA calls it a warp: one instruction begins for 32 threads at once, and threads that are done wait. Why 32 threads gave 22.75 times, not 32.</li>
@@ -68,6 +69,8 @@
 <li><a href="next-iteration.html">What the next iteration can begin without</a>: In the Lecture 2 loop the loads need only the add of 4 to r2, so the waits for memory of many iterations overlap; the price is a storage place for every waiting value.</li>
 <li><a href="checking-the-output.html">What the printed difference can hide</a>: A single wrong place prints 0.000000000477; a missing line of the picture prints 169 times less than a harmless rounding change.</li>
 <li><a href="which-loop-splits.html">Which loop of a loop nest splits</a>: Iterations that write different entries can execute at the same time; iterations that add into one entry form a chain.</li>
+<li><a href="memory-chips.html">Which memory chip holds an address</a>: GPU memory is several chips side by side; dealing addresses out to them by mod puts neighbouring addresses on different chips, and the busiest chip sets the time.</li>
+<li><a href="neighbours-in-memory.html">Which threads are neighbours in memory</a>: In an index line, the variable multiplied by 1 decides who are neighbours: the thread number puts one instruction's floats side by side, the loop variable scatters them.</li>
 </ul>
 <!-- all:end -->
 
@@ -99,6 +102,11 @@
 <li><a href="register-budget.html">The register budget</a></li>
 <li><a href="exec-units.html">What a count of exec units limits</a></li>
 </ul>
+<p><b>Lab 3</b></p>
+<ul class="related">
+<li><a href="two-buffers.html">Separate buffers and a launch per step</a></li>
+<li><a href="neighbours-in-memory.html">Which threads are neighbours in memory</a></li>
+</ul>
 <p><b>Lecture 2</b></p>
 <ul class="related">
 <li><a href="select-not-jump.html">An if-else under one instruction</a></li>
@@ -107,6 +115,10 @@
 <li><a href="register-roles.html">What each register of a loop holds</a></li>
 <li><a href="next-iteration.html">What the next iteration can begin without</a></li>
 <li><a href="which-loop-splits.html">Which loop of a loop nest splits</a></li>
+</ul>
+<p><b>Lecture 3</b></p>
+<ul class="related">
+<li><a href="memory-chips.html">Which memory chip holds an address</a></li>
 </ul>
 <p><b>measuring</b></p>
 <ul class="related">
@@ -120,6 +132,8 @@
 <li><a href="nearby.html">Nearby: 32 stores in 4 blocks of 32 bytes</a></li>
 <li><a href="operations-per-byte.html">Operations per byte</a></li>
 <li><a href="tiles.html">Tiles in shared memory</a></li>
+<li><a href="memory-chips.html">Which memory chip holds an address</a></li>
+<li><a href="neighbours-in-memory.html">Which threads are neighbours in memory</a></li>
 </ul>
 <p><b>splitting work</b></p>
 <ul class="related">
@@ -127,6 +141,7 @@
 <li><a href="core-size.html">Bigger cores or more cores</a></li>
 <li><a href="iters.html">iters: repetitions until the while loop is left</a></li>
 <li><a href="owner.html">Owner: exactly one writer per place</a></li>
+<li><a href="two-buffers.html">Separate buffers and a launch per step</a></li>
 <li><a href="which-loop-splits.html">Which loop of a loop nest splits</a></li>
 </ul>
 <p><b>the picture</b></p>

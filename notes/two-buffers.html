@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="An in-place update is safe when every place has one writer and every shared value is read from a buffer nobody writes; the end of a launch separates the steps.">
+<meta name="keywords" content="Lab 3, splitting work">
+<title>Separate buffers and a launch per step</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="site">
+<a class="brand" href="MIT-6.S894.html">6.S894 self-study</a>
+<nav><a href="MIT-6.S894.html#syllabus">Lessons</a><a href="index.html">Notes</a><a href="../index.html">Lab pages</a><a href="../words.html">Words</a></nav>
+</header>
+<main>
+<p class="crumbs"><a href="../index.html">GPU Learnings</a> / <a href="index.html">notes</a> / <a href="MIT-6.S894.html">MIT 6.S894</a></p>
+<h1>Separate buffers and a launch per step</h1>
+<p class="sub">Topics: Lab 3, splitting work. A single idea, with a few lines to calculate. Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+
+<p class="label">The idea</p>
+<div class="story">
+<p>Lab 3's wave simulation updates every cell of a grid at once, writing each cell's next height into the same array that holds its previous height, while thousands of threads read the grid.</p>
+<p>The question here: what must be true of the reads and writes for the result to be exact, and what separates one step from the next?</p>
+</div>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> From the Lab 3 starter: each ordinary cell's next height reads u0[idx] (its own previous height) and u1 at idx, idx - 1, idx + 1, idx - n_cells_x and idx + n_cells_x, then writes u0[idx]; u0 and u1 come from separate cudaMalloc calls. The handout: kernel launches issued one after another finish one before the next begins. <span class="from">from: the Lab 3 starter code and handout</span></p>
+<p class="ln do"><b>L02</b> <b class="x">DO</b> Does any thread read a place in u0 that another thread writes in the same step? ____ . Does any thread write u1? ____ . So is overwriting u0 during the step a race? ____ . <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>no: each thread reads only its own place in u0, before writing it; no thread writes u1;
+so no race: one writer per place, and every shared height comes from u1</pre>
+</details>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> Why can't a single launch compute two steps? ____ . <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>step n + 1 of a cell needs step n of its neighbours, written by other threads, possibly in
+other blocks; only the end of a launch guarantees that every cell's step n is written</pre>
+</details>
+
+<p class="label">Worked out in full</p>
+<ul class="related">
+<li><a href="../29-the-naive-wave-step.html">29. Lab 3: the naive wave step, why it is correct and what its reads cost</a></li>
+</ul>
+
+<p class="label">Related notes</p>
+<ul class="related">
+<li><a href="owner.html">Owner: exactly one writer per place</a>: what makes a split of the picture correct, and what makes it fast</li>
+<li><a href="neighbours-in-memory.html">Which threads are neighbours in memory</a>: which floats the 32 threads of one instruction read together</li>
+</ul>
+
+<div class="backlinks">
+<p class="label">Lessons and notes that point here</p>
+<!-- backlinks:begin -->
+<ul class="related">
+<li><a href="MIT-6.S894.html">MIT 6.S894 Accelerated Computing, Labs 1 and 2, on your own computer</a></li>
+</ul>
+<!-- backlinks:end -->
+</div>
+
+<nav><a href="index.html">all notes</a><a href="MIT-6.S894.html">MIT 6.S894 course page</a></nav>
+</main>
+<footer class="site">
+<p>Independent self-study material for MIT 6.S894 Accelerated Computing, written from one learner's work, and not affiliated with or endorsed by MIT or the course staff. The course pages are at <a href="https://accelerated-computing.academy/fall25/">accelerated-computing.academy/fall25</a> and the starter code at <a href="https://github.com/accelerated-computing-class">github.com/accelerated-computing-class</a>. Every measured number comes from one laptop, a Ryzen 5 4600H with a GTX 1650, unless a sentence says otherwise.</p>
+</footer>
+</body>
+</html>

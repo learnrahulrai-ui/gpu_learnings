@@ -9,7 +9,7 @@
 <body>
 <main>
 <h1>GPU Learnings: do it, don't read it</h1>
-<p class="sub">Made from real chats working through MIT 6.S894 Lab 1 (Mandelbrot on CPU, CPU SIMD, GPU) and the Lab 2 prelab (fma_latency, warp_scheduler), on a Ryzen 5 4600H and a GTX 1650, and through Lecture 2 (registers, waits, SIMD, if-else, exec units).</p>
+<p class="sub">Made from real chats working through MIT 6.S894 Lab 1 (Mandelbrot on CPU, CPU SIMD, GPU) and the Lab 2 prelab (fma_latency, warp_scheduler), on a Ryzen 5 4600H and a GTX 1650, through Lecture 2 (registers, waits, SIMD, if-else, exec units), and through Lecture 3 and Lab 3 (memory chips, which threads are neighbours, the wave step).</p>
 
 <div class="guess">
 <p class="label">Stuck in the middle of the lab?</p>
@@ -72,7 +72,13 @@
                 22 which loop splits --&gt; 23 the 16 ALUs --&gt; 24 an if-else, one instruction
                                                                                   |
                                                                                   v
-                                                               25 what 32 FP32 units count</pre>
+                                                               25 what 32 FP32 units count
+                                                                                  |
+                                                                                  v
+              26 mod and divide --&gt; 27 which threads are neighbours --&gt; 28 the shared base
+                                                                                  |
+                                                                                  v
+                                                                    29 the naive wave step</pre>
 
 <ol class="topics" start="0">
 <li><a href="00-what-a-gpu-is.html">What a GPU is, measured on one laptop</a>: 896 arithmetic circuits against 48, four timings, and why the fastest result does not prove what it seems to.</li>
@@ -101,8 +107,12 @@
 <li><a href="23-sixteen-alus.html">What the 16 ALUs count</a>: 2 vector adds per cycle, 16 register names, 20 sums with 5 on the stack, and 1,000 vector variables in 32,000 bytes.</li>
 <li><a href="24-if-else-one-instruction.html">An if-else under one instruction</a>: 47.5 percent useful on the slide, gcc's multiply, compare and AND printing 0 30 0 40 50 0 70 0, and when computing both sides breaks a program.</li>
 <li><a href="25-what-32-fp32-counts.html">What 32 FP32 units count</a>: 3 sums in 3 clocks, 15 sums in 30 cycles on the laptop, 64 to 255 registers per thread, and a slide total that recomputes to 96 KiB.</li>
+<li><a href="26-mod-and-divide.html">Mod and divide: which memory chip holds an address</a>: 72 GB/s per chip against 360 for all five, one instruction's 128 bytes in 32 transfers on one chip or 7 spread over five, and the step between reads that undoes the spreading.</li>
+<li><a href="27-which-threads-are-neighbours.html">Which threads are neighbours in memory</a>: the multiplier of the thread number read off your index line, 32 pieces per instruction against 4, and why x = 1 makes the two copy kernels one kernel.</li>
+<li><a href="28-the-shared-base.html">The shared base, and who reads which float</a>: a base built from the instant instead of the thread, the count of threads as the jump of that base, and two correct copies in which one thread reads floats 2 and 6, or 4 and 6.</li>
+<li><a href="29-the-naive-wave-step.html">The naive wave step</a>: one writer per place and every neighbour from u1, a launch per step, three different edges, and lines of 12,804 bytes that make most reads cover 5 pieces.</li>
 </ol>
-<p>And: <a href="failures.html">the failure list</a>, 50 ways a clean-looking result goes wrong, each pointing to the page that works it out.</p>
+<p>And: <a href="failures.html">the failure list</a>, 56 ways a clean-looking result goes wrong, each pointing to the page that works it out.</p>
 </main>
 </body>
 </html>

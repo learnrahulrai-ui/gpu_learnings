@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Naive Wave Step</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>29. Lab 3: the naive wave step, why it is correct and what its reads cost</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>Lab 3 of MIT 6.S894 simulates a wave on a grid of cells. Each cell holds a height; at every time step, each cell's next height is computed from its own previous height and the present heights of itself and its four neighbours. The lab's first GPU version launches one kernel per step and gives every cell its own thread, and the learner wrote it by following the CPU reference in the starter code.</p>
+<p>Copying the reference was easy. Saying why the copy is right was not. The kernel writes its results into the same array that other threads are reading during the same step; it reads cells a whole line of the grid away; it stops threads at the edge of the grid with an early return. The learner wanted what a careful reader would predict from the code, not a list of what each line does.</p>
+<p>When thousands of threads update one grid at the same moment, what has to be true of the code for the result to be exactly the CPU's?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>Your kernel writes each cell's next height into u0 while other threads of the same step are still reading u0. Is that a race, a result that can change with timing? Yes or no.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "And then anyone can say that okay, if things are out of bound, X are out of bound, we will exceed. We will exit. These are not even the problems." / "I am interested in the guess reasoning, the obvious reasoning, the non-obvious reasoning" / "explain all this from scratch ... assume I know as much as I have been told I know basics of physics and math"</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The update of one ordinary cell, from <code>wave_cpu_step</code> in the Lab 3 starter <code>wave.cu</code> (your kernel computes the same): <span class="from">from: the Lab 3 starter code</span></p>
+<pre>u_next_val = (2.0f - damping - 4.0f * coeff) * u1[idx]
+             - (1.0f - damping) * u0[idx]
+             + coeff * (u1[idx - 1] + u1[idx + 1] + u1[idx - n_cells_x] + u1[idx + n_cells_x]);
+u0[idx] = u_next_val;</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>u_next_val = (2.0f - damping - 4.0f * coeff) * u1[idx]</code><span>The next height of this cell: a weight times its present height (from u1),</span></li>
+<li><code>             - (1.0f - damping) * u0[idx]</code><span>minus a weight times its previous height (from u0),</span></li>
+<li><code>             + coeff * (u1[idx - 1] + u1[idx + 1] + u1[idx - n_cells_x] + u1[idx + n_cells_x]);</code><span>plus coeff times the sum of the present heights of its left, right, upper and lower neighbours (all from u1).</span></li>
+<li><code>u0[idx] = u_next_val;</code><span>Write the next height into u0, over this cell's previous height.</span></li>
+</ol>
+</div>
+<p class="ln"><b>L02</b> Also from the starter: a cell on the outer edge of the grid, or on a wall, gets 0 without reading anything; a source cell gets a value from the scene. Cell (<code>idx_x</code>, <code>idx_y</code>) lives at place <code>idx = idx_y * n_cells_x + idx_x</code>, one left-to-right line of cells after another. The large test is 3201 by 3201 cells, the small one 201 by 201. The handout's first GPU version launches one kernel per time step and gives each cell a thread. <span class="from">from: the Lab 3 starter code and handout</span></p>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> Show that different cells never get the same place. If two cells had the same idx, the difference of their idx_y times n_cells_x would equal ____ . That second difference is smaller than ____ , and the only multiple of n_cells_x smaller than that is ____ , so ____ . <span class="from">from: L02</span></p>
+<details><summary>CHECK</summary>
+<pre>the difference of their idx_x values; it is smaller than n_cells_x, because both values lie
+inside one line of cells; the only multiple of n_cells_x smaller than n_cells_x is 0;
+so both differences are 0, and the two cells are the same cell</pre>
+</details>
+<p class="ln"><b>L04</b> The danger with many threads in one step: if one thread writes a place while another reads it in the same step, the reader gets the old or the new value depending on timing. The update is safe only if (a) each place is written by one thread at most, (b) no thread reads a place that another thread writes in the same step, and (c) u0 and u1 are separate memory. <span class="from">from: definition for this page</span></p>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> Check (a), (b) and (c) against L01, and against the starter's <code>run_gpu</code>, which obtains u0 and u1 from two separate <code>cudaMalloc</code> calls. (a) ____ . (b) ____ . (c) ____ . <span class="from">from: L01, L03, L04</span></p>
+<details><summary>CHECK</summary>
+<pre>(a) each thread writes only u0[idx], and by L03 no two threads share an idx
+(b) in u0 each thread reads only its own place, before writing it; every neighbour's height
+    comes from u1, and no thread writes u1 during the step
+(c) two cudaMalloc calls, each the size of the whole grid: writing u0 never changes u1
+so overwriting u0 while other threads read u0 is safe here</pre>
+</details>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> Name what would break if a thread read its left neighbour's height from u0 instead of u1: ____ . And if u0 and u1 were the same memory: ____ . <span class="from">from: L04, L05</span></p>
+<details><summary>CHECK</summary>
+<pre>the left neighbour may already have written its next height into u0: this thread would get
+the previous or the next height depending on timing (a race)
+the same memory: every write of a next height would change a present height that the
+neighbours still have to read</pre>
+</details>
+<p class="ln"><b>L07</b> The Lab 3 handout: kernel launches issued one after another execute one after another, each finishing completely before the next begins. Between launches the starter exchanges the two pointers with <code>std::swap(u0, u1)</code>: the addresses swap, no height is copied. <span class="from">from: the Lab 3 handout; the starter's wave_cpu</span></p>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> Why can't one launch of this kernel compute two time steps? ____ . <span class="from">from: L01, L07</span></p>
+<details><summary>CHECK</summary>
+<pre>step n + 1 of a cell needs step n of its neighbours, written by other threads, possibly in
+other blocks; the only point at which every cell's step n is known to be written is the end
+of the launch (L07), so this version needs a launch per step</pre>
+</details>
+<p class="ln"><b>L09</b> Your first lines: <span class="from">from: your code</span></p>
+<pre>int32_t idx_x = blockIdx.x * blockDim.x + threadIdx.x;
+int32_t idx_y = blockIdx.y * blockDim.y + threadIdx.y;
+if (idx_x &gt;= Scene::n_cells_x || idx_y &gt;= Scene::n_cells_y) {
+    return;
+}</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>int32_t idx_x = blockIdx.x * blockDim.x + threadIdx.x;</code><span>This thread's cell, counted from the left: the cells of the blocks to its left, plus its number inside its block.</span></li>
+<li><code>int32_t idx_y = blockIdx.y * blockDim.y + threadIdx.y;</code><span>The same, counted from the top, with the y numbers of the launch.</span></li>
+<li><code>if (idx_x &gt;= Scene::n_cells_x || idx_y &gt;= Scene::n_cells_y) {</code><span>If that cell lies beyond the grid on the right or at the bottom,</span></li>
+<li><code>    return;</code><span>this thread stops here and does nothing.</span></li>
+<li><code>}</code><span>End of the check.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> Threads come only in whole blocks. With blocks 32 threads across and 3201 cells across, blocks needed across: ____ , and the last of them holds ____ real cell(s) and ____ idle threads. Rounding the number of blocks down instead would leave ____ never computed, with no error printed. <span class="from">from: L02, L09</span></p>
+<details><summary>CHECK</summary>
+<pre>101 blocks across (100 blocks cover 3,200 cells, one cell remains)
+the last block: 1 real cell, 31 idle threads, which the check of L09 sends home
+rounding down: the last cell of every left-to-right line never computed, silently</pre>
+</details>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> Cell (0, 0) satisfies the check of L09. Which reads of L01 would fall outside the array if the edge rule of L02 did not catch it? ____ . What, then, does the check of L09 protect, and what protects the neighbour reads? ____ . <span class="from">from: L01, L02, L09</span></p>
+<details><summary>CHECK</summary>
+<pre>u1[idx - 1] would read place -1, and u1[idx - n_cells_x] place -3201: outside the array
+the check protects only the thread's own cell; the neighbour reads are kept inside the array
+by the edge rule, which gives edge cells 0 without reading any neighbour</pre>
+</details>
+<p class="ln"><b>L12</b> NVIDIA's CUDA programming guide: <code>__syncthreads()</code>, where every thread of a block waits until all have arrived, is allowed in conditional code only if the condition is the same in every thread of the block; otherwise execution may hang or give wrong results. The Lab 3 handout's second GPU version waits at <code>__syncthreads()</code>, and threads at the edge of a block's tile help load data. <span class="from">from: the CUDA programming guide; the Lab 3 handout</span></p>
+<p class="ln do"><b>L13</b> <b class="x">DO</b> Predict what happens if the early return of L09 is copied into that second version: ____ . What should the second version do with a thread whose cell lies beyond the grid? ____ . <span class="from">from: L09, L12</span></p>
+<details><summary>CHECK</summary>
+<pre>threads that returned never reach the barrier while the others wait at it: the condition is
+not the same in every thread, so execution may hang or give wrong results (L12)
+keep every thread going to every barrier, and skip only the work it must not do, such as
+writing a cell that does not exist</pre>
+</details>
+<p class="ln"><b>L14</b> NVIDIA's CUDA programming guide: 32 threads with consecutive thread numbers, a warp, execute one instruction together; the x thread number changes fastest, so with blocks 32 threads across, a warp is 32 neighbouring cells of one left-to-right line. The memory system serves one instruction's addresses in pieces of 32 bytes, each beginning at a multiple of 32, and <code>cudaMalloc</code> returns addresses that are multiples of 256. <span class="from">from: the CUDA programming guide</span></p>
+<p class="ln do"><b>L15</b> <b class="x">DO</b> A warp's reads of u1[idx]: ____ bytes, side by side, covering ____ pieces if they begin at a multiple of 32 and ____ if not. Its reads of u1[idx - n_cells_x]: each thread's address moves back by one line of cells, so are the 32 addresses still side by side? ____ . <span class="from">from: L01, L14</span></p>
+<details><summary>CHECK</summary>
+<pre>128 bytes: 4 pieces if they begin at a multiple of 32, 5 if not
+yes: every thread moves back by the same amount, so the 32 addresses stay neighbours; what
+the memory system sees is how far apart the 32 addresses of one instruction are, not how
+far each thread's neighbour is from it</pre>
+</details>
+<p class="ln do"><b>L16</b> <b class="x">DO</b> A line of the large grid is 3201 floats = ____ bytes, which is ____ bytes more than the multiple of 32 below it, 12,800. So each line begins ____ bytes later within its 32-byte piece than the line above, and a warp's reads of u1[idx] begin at a multiple of 32 on one line in every ____ . Average pieces per such read: (4 + 7 * 5) / 8 = ____ . <span class="from">from: L02, L14, L15</span></p>
+<details><summary>CHECK</summary>
+<pre>12,804 bytes; 4 bytes more than 12,800; each line begins 4 bytes later
+aligned on one line in every 8 (32 / 4); the other 7 lines need 5 pieces
+(4 + 35) / 8 = 4.875 pieces per 128-byte read, on average</pre>
+</details>
+<p class="ln do"><b>L17</b> <b class="x">DO</b> With blocks 16 threads across, a warp is 16 cells of one line and 16 of the next: two stretches of ____ bytes, a whole line apart, each covering 2 pieces if it begins at a multiple of 32 and 3 if not. Pieces per instruction: ____ to ____ , against 4 or 5 for blocks 32 across. Is 32 across required for a correct result? ____ . <span class="from">from: L14, L15</span></p>
+<details><summary>CHECK</summary>
+<pre>two stretches of 64 bytes: 4 to 6 pieces, against 4 or 5: more pieces, not twice as many
+not required: 32 across is a choice made for fewer pieces; the result is the same</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L18</b> <b class="x">DO</b> Collect L05 (one writer per place, neighbours only from u1, separate memory), L06 (a neighbour read from u0 would be a race), L08 (the end of a launch is the only point where a whole step is known to be done), L11 (the check of L09 protects only the thread's own cell), L13 (an early return before a barrier can hang) and L15 and L16 (a warp's reads cover 4 or 5 pieces, mostly 5 in the large grid). Write one sentence each on what makes the kernel correct, what its edges need, and what sets the cost of its reads. <span class="from">from: L05, L06, L08, L11, L13, L15, L16</span></p>
+<details><summary>CHECK</summary>
+<pre>Correct: for every place, one writer per step and no other reader of what it writes in
+that step, which holds because every shared height comes from u1, which nobody writes, and
+because the launch boundary separates the steps.
+Edges: three different rules, the check that stops threads beyond the grid, the edge rule
+that keeps neighbour reads inside the array, and the barrier rule that forbids leaving
+before a __syncthreads().
+Cost: the 32 addresses of one instruction, side by side for every read here, 4 or 5 pieces
+of 32 bytes each, mostly 5 because lines of 12,804 bytes shift by 4 bytes.
+
+Tempting answers that fail: "writing u0 while others read it is a race", refuted by L05;
+"the check of L09 makes the neighbour reads safe", refuted by L11.</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>Each cell's new value depends on its neighbours' current values, which are kept in a separate copy that nobody changes during the step, so all the cells can be updated at the same moment and the result is exact. A step ends only when every cell is done, and the GPU guarantees that between one launch and the next. The edge of the grid needs its own rule, because edge cells have no neighbour on one side.</p>
+<p>For a manager: before executing work in parallel, ask who writes each piece of data and who still needs its old value in the same round; the answer decides whether the parallel version is correct, before any speed is measured.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>No race. Each thread reads only its own place in u0, before writing it, and takes every
+neighbour's height from u1, which no thread writes during the launch (L05).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>The handout's large test executes 12800 steps on 3201 by 3201 cells. How many kernel launches does your version make, and where must every height go between one step and the next?</p>
+<details><summary>CHECK</summary>
+<pre>12,800 launches, one per step (L08). Between steps every height goes back to global
+memory: each step reads all of u0 and u1 from it, through the L2 cache, and writes all of
+u0 back, because no step keeps heights on the chip for the next one. The handout's second
+version keeps a tile of the grid in the on-chip memory of one of the chip's identical
+blocks, which NVIDIA calls an SM, for several steps instead, at the price of a region of
+valid cells that shrinks by one cell per step on every side.</pre>
+</details>
+</div>
+
+<nav><a href="28-the-shared-base.html">prev: 28 the shared base, and who reads which float</a><a href="failures.html">next: the failure list</a></nav>
+</main>
+</body>
+</html>

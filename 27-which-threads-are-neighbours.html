@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Which Threads Are Neighbours</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>27. Lab 3: which threads are neighbours in memory, read off the index line</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>Lab 3 of MIT 6.S894 opens with two small kernels that copy the same array. Both give every thread the same amount of work; they differ only in which floats each thread takes. In the first, each thread copies one unbroken stretch of floats; in the second, a thread's floats are spread out with the other threads' floats between them. The lab asks you to time both.</p>
+<p>The learner wrote the first kernel and could recite what every piece of it does: the thread number, the loop, the multiplication. What was missing was the step from the code to its consequence. Even with the line typed out, it was not visible which of the two cases it was, or what the threads were doing together while it executed.</p>
+<p>From the index line alone, without executing anything, can you tell whether the floats one instruction reads sit side by side in memory?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>In the kernel below, <code>idx = tid * x + i</code>. Do the 32 threads that execute one instruction together read 32 floats that sit side by side in memory? Yes or no.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "Any idiot can say that, okay, people are calculating the thread ID. Any idiot can say that I will use this thread ID." / "Even though I typed it, I didn't see it coming that it is case one." / "How do I just see this code and use my brain to figure out this is the non-coalescing case or coalescing case?"</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> NVIDIA's CUDA programming guide: the GPU executes 32 threads with consecutive thread numbers as one unit, with one instruction for all 32, and calls the unit a warp. The starter <code>coalesced-loads.cu</code> of Lab 3 defines <code>THREADS_PER_WARP 32</code>, <code>WARPS 128</code> and <code>X 1024</code> (floats per thread), launches each kernel as <code>&lt;&lt;&lt;WARPS, THREADS_PER_WARP&gt;&gt;&gt;</code>, 128 blocks of 32 threads, and gives it arrays of 32 * 128 * 1024 floats and the integer <code>x</code>. <span class="from">from: the CUDA programming guide; the Lab 3 starter code, coalesced-loads.cu</span></p>
+<p class="ln"><b>L02</b> The Lab 3 handout: in <code>non_coalesced_load</code> each block copies x times blockDim.x floats, each thread an unbroken stretch of x of them; in <code>coalesced_load</code> each block copies the same amount, but the floats of one thread are blockDim.x apart. After each kernel the starter compares every float of dst with src and prints whether all of them matched. <span class="from">from: the Lab 3 handout; the starter's main</span></p>
+<p class="ln"><b>L03</b> Your <code>non_coalesced_load</code>: <span class="from">from: your code</span></p>
+<pre>int tid = blockIdx.x * blockDim.x + threadIdx.x;
+for (int i = 0; i &lt; x; ++i) {
+    int idx = tid * x + i;
+    dst[idx] = src[idx];
+}</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>int tid = blockIdx.x * blockDim.x + threadIdx.x;</code><span>This thread's number in the whole launch: the threads of all earlier blocks, plus its number inside its own block.</span></li>
+<li><code>for (int i = 0; i &lt; x; ++i) {</code><span>Repeat for i = 0, 1, ..., x - 1.</span></li>
+<li><code>    int idx = tid * x + i;</code><span>The place to copy: tid times x, plus i.</span></li>
+<li><code>    dst[idx] = src[idx];</code><span>Copy the float at that place of src into the same place of dst.</span></li>
+<li><code>}</code><span>End of the loop.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> Why a loop at all? The launch is fixed by the starter, the arrays hold x times as many floats as there are threads (L01), every float must be copied exactly once, and every thread executes the same code. So each thread must copy exactly ____ floats, and since x is known only when the program executes, the repetition must be ____ . <span class="from">from: L01, L03</span></p>
+<details><summary>CHECK</summary>
+<pre>exactly x floats per thread: the bound is the ratio of floats to threads, not a choice
+a loop: a number known only at execution can become an amount of work only by repeating</pre>
+</details>
+<p class="ln"><b>L05</b> NVIDIA's CUDA programming guide: the memory system takes the addresses supplied by the active threads of one instruction of a warp and serves them in pieces of 32 bytes, each beginning at a multiple of 32. Addresses from different instructions are not combined. <span class="from">from: the CUDA programming guide</span></p>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> Expand your index: idx = blockIdx.x * blockDim.x * x + threadIdx.x * ____ + i * ____ . Which variable carries the multiplier 1? ____ . So which floats are neighbours in memory: the floats one thread reads one after another in time, or the floats the 32 threads of one instruction read together? ____ . <span class="from">from: L03, L05</span></p>
+<details><summary>CHECK</summary>
+<pre>threadIdx.x is multiplied by x; i is multiplied by 1
+the 1 sits on i, which is time inside one thread: one thread's floats are neighbours over
+time, and the 32 threads of one instruction read floats x apart</pre>
+</details>
+<p class="ln do"><b>L07</b> <b class="x">DO</b> With the starter's x = 1024, neighbouring threads of one instruction read floats 1024 * 4 = ____ bytes apart. Pieces of 32 bytes needed by one instruction: ____ . If the 32 floats sat side by side and began at a multiple of 32: ____ . Bytes moved per float used now: ____ against ____ . <span class="from">from: L01, L05, L06</span></p>
+<details><summary>CHECK</summary>
+<pre>4,096 bytes apart: every float lies in a piece of its own, 32 pieces per instruction
+side by side: 128 bytes, 4 pieces
+32 bytes moved per float used now, against 4</pre>
+</details>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> Set x = 1. In your kernel thread t copies float ____ . In an arrangement whose threads read side by side, thread t copies float ____ . What does that say about where the difference between the two kernels comes from? ____ . <span class="from">from: L03, L06</span></p>
+<details><summary>CHECK</summary>
+<pre>t in both: with x = 1 the two kernels are the same kernel
+the difference exists only because each thread copies several floats; x is what creates two
+possible orders, and the lab measures which order the memory system rewards</pre>
+</details>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> Each piece your kernel fetches holds 8 floats, and the other 7 are the same thread's floats for its next 7 iterations. Do those 7 cost new transfers? ____ . <span class="from">from: L05, L07</span></p>
+<details><summary>CHECK</summary>
+<pre>only if no cache still holds the piece when the thread comes back for them
+so the line fixes the number of pieces per instruction (32), but not how much slower the
+kernel is: that depends on the cache, and Prelab Question 2 measures it
+not recorded in the chats: measure both kernels on your own GPU</pre>
+</details>
+<p class="ln"><b>L10</b> A smaller case, from your chat, with 32 threads in the block: <span class="from">from: your chat</span></p>
+<pre>if (threadIdx.x &lt; 4)
+    out[threadIdx.x] = in[threadIdx.x];</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>if (threadIdx.x &lt; 4)</code><span>Only threads whose number in the block is 0, 1, 2 or 3 do the next statement.</span></li>
+<li><code>    out[threadIdx.x] = in[threadIdx.x];</code><span>Each of them copies the float at its own number from in to out.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> Addresses the memory system receives from that load instruction: ____ . Bytes: ____ . If in begins at a multiple of 32 (cudaMalloc returns addresses that are multiples of 256, says the CUDA programming guide), pieces: ____ , with ____ of the moved bytes used. A second warp that executes the same instruction later: combined with this one? ____ . <span class="from">from: L05, L10</span></p>
+<details><summary>CHECK</summary>
+<pre>4 addresses, from the 4 active threads only; 16 bytes; 1 piece of 32 bytes, half of it used
+no: the second warp's addresses form a separate request, even if they ask for the same bytes
+(a cache may then answer it, but nothing combined the two)</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L12</b> <b class="x">DO</b> Collect L06 (your index multiplies the thread number by x and the loop variable by 1), L07 (32 pieces per instruction against 4), L08 (with x = 1 the two kernels are one kernel), L09 (the cache decides how much the extra pieces cost) and L11 (only the active threads of one instruction are combined). Write one sentence on how to tell from an index line alone whether the floats of one instruction sit side by side. <span class="from">from: L06, L07, L08, L09, L11</span></p>
+<details><summary>CHECK</summary>
+<pre>Find the variable that carries the multiplier 1 in the final index: if it is the thread's
+number in its block, the threads of one instruction read neighbouring floats and a few
+pieces serve them; if it is the loop variable, each thread is neighbour only to itself over
+time, which the memory system never combines, and each instruction becomes up to one piece
+per thread.
+
+Tempting answer that fails: "each thread reads consecutive floats, so the loads are ideal".
+Consecutive within one thread is consecutive in time; the 32 floats of one instruction are
+4,096 bytes apart (L07).</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>The memory hands data to the 32 threads of one instruction together. If those 32 threads ask for numbers that sit side by side, a few deliveries cover all of them. If each thread walks its own distant stretch, each instruction needs a delivery per thread, even though each thread on its own reads neatly in order.</p>
+<p>For a manager: code that looks orderly for each worker can be the worst order for the hardware; ask what the workers who move together touch at the same moment.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>No. The thread number is multiplied by x, so one instruction's 32 floats are x apart:
+4,096 bytes apart with the starter's x, one 32-byte piece each (L06, L07).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>The Lab 3 handout says that a pointer declared const and __restrict__ may be cached in L1. If src were declared that way, would your kernel of L03 need fewer pieces per instruction, less traffic beyond L1, or both?</p>
+<details><summary>CHECK</summary>
+<pre>Not fewer pieces per instruction: the 32 addresses of one instruction are the same, x apart.
+What can fall is the traffic beyond L1: if L1 keeps each thread's piece until that thread's
+next 7 iterations, those reads are answered without going to L2. Whether L1 keeps them
+depends on how many pieces all the warps of an SM hold at once; only a measurement on your
+GPU settles it.</pre>
+</details>
+</div>
+
+<nav><a href="26-mod-and-divide.html">prev: 26 mod and divide</a><a href="28-the-shared-base.html">next: 28 the shared base, and who reads which float</a></nav>
+</main>
+</body>
+</html>

@@ -45,7 +45,11 @@
 <li>"My core has 16 ALUs: can I declare only 16 vector variables?" <a href="23-sixteen-alus.html">page 23</a>.</li>
 <li>"An if-else cannot jump for some of 8 values and not others, so how is the result correct?", or "why does the compiled code compare the input?" <a href="24-if-else-one-instruction.html">page 24</a>.</li>
 <li>"A GPU thread can hold thousands of floats, so what do 32 FP32 units limit?" <a href="25-what-32-fp32-counts.html">page 25</a>.</li>
-<li>"My result looks fine but I am not sure it measures what I think." <a href="failures.html">the failure list</a>, 50 ways a clean-looking number goes wrong.</li>
+<li>"The memory has 360 GB/s, so why does the order of my reads matter?", or "what do mod and divide have to do with memory?" <a href="26-mod-and-divide.html">page 26</a>.</li>
+<li>"I cannot tell from my index line whether one instruction reads side by side", or "each of my threads reads its floats in order, so why is it slow?" <a href="27-which-threads-are-neighbours.html">page 27</a>.</li>
+<li>"My two versions copy the same array correctly; do their threads read the same floats?", or "why does the base of my index change with the loop variable?" <a href="28-the-shared-base.html">page 28</a>.</li>
+<li>"My wave kernel overwrites the array other threads are reading; is that a race?", or "where does the bounds check go, and may I return early?" <a href="29-the-naive-wave-step.html">page 29</a>.</li>
+<li>"My result looks fine but I am not sure it measures what I think." <a href="failures.html">the failure list</a>, 56 ways a clean-looking number goes wrong.</li>
 <li>"A table printed by a course file looks wrong on my GPU." <a href="12-the-48-trap.html">page 12</a>.</li>
 </ol>
 

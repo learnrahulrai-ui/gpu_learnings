@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mod and Divide</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>26. Lecture 3: which memory chip holds an address, mod and divide</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>Lecture 3 of MIT 6.S894 is about memory. It begins with the course GPU's own numbers: data crosses from the CPU at 32 GB/s, from the graphics card's memory chips at 360 GB/s, from the L2 cache at about 2.5 TB/s, and the chip's 6144 execution units can begin 13.4 trillion instructions a second. Then it explains where the 360 comes from: not from one fast chip, but from several ordinary chips placed side by side, each with its own connection.</p>
+<p>That raises a question the slides answer with two drawings. A program sees one long list of addresses; the memory is several separate chips. Which chip holds which address? In the first drawing each chip holds one long unbroken piece of the list; in the second the chips take turns, a small piece each. The lecturer described the two rules as divide and mod, and that is where the learner stopped.</p>
+<p>Both rules give every address exactly one home. Does it matter which one the hardware uses?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>The memory of the course GPU is 5 chips. Addresses are dealt out to them in unbroken pieces of 4 GB each. The 32 execution units of one instruction read 128 neighbouring bytes. How many of the 5 chips do the work? Write a number.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "mode and divide"</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The slide of the Lecture 3 slides of MIT 6.S894 (18 September 2025, Jonathan Ragan-Kelley) for the course GPU, an RTX 4000 Ada: host memory to GPU memory over PCIe 4.0 at 32 GB/s; GPU memory, 20 GB of GDDR6, to the L2 cache (48 MB) at 360 GB/s; L2 to the L1 caches (6 MB) at 2.5 TB/s, marked "to confirm"; L1 to the registers (12 MB) at 13.4 TB/s; registers to the 6144 execution units, which the slide calls EUs, at about 50 TB/s; the EUs begin 13.4 T instructions per second. Under each arrow it writes the ratio of instructions to bytes and "1 load / 1700 ops", "1 load / 150 ops", "1 load / 20 ops", "1 load / 4 ops", "with 32-bit operands". <span class="from">from: the Lecture 3 slides, accelerated-computing.academy/fall25/lectures/slides/Lecture3.pdf</span></p>
+<p class="ln do"><b>L02</b> <b class="x">DO</b> Instructions per byte from GPU memory: 13.4 x 10^12 / (360 x 10^9) = ____ . A 32-bit operand is 4 bytes, so instructions per float loaded = ____ . For the EUs never to wait on GPU memory, each float loaded from it has to feed about how many instructions? ____ . <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>13.4 x 10^12 / 360 x 10^9 = 37.2 instructions per byte
+37.2 x 4 = 149 instructions per float: the slide's "1 load / 150 ops"
+a program that does fewer instructions per float than that waits on memory, however many
+EUs the chip has</pre>
+</details>
+<p class="ln"><b>L03</b> The next slides build GPU memory out of chips. A DDR5 chip: 32-bit interface, 6.4 GT/s, where GT/s is billions of transfers per second and each transfer moves one interface's worth of bits, giving 25.6 GB/s. A GDDR6 chip: 32-bit interface, 18 GT/s, 4 GB, giving 72 GB/s. The course GPU: 5 GDDR6 chips, 160 bits together, 20 GB, 360 GB/s, limited by the processor's pins, with about 384 to 512 bits (12 to 16 chips) as the practical top. An HBM3 module: 2048-bit interface, 3.2 GT/s, 24 GB; four modules: 3.3 TB/s. <span class="from">from: the Lecture 3 slides</span></p>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> A GDDR6 chip moves 32 bits = ____ bytes per transfer, 18 x 10^9 times a second: ____ GB/s. The course GPU's 5 chips: ____ GB/s. An HBM3 module: 2048 / 8 = ____ bytes per transfer x 3.2 x 10^9 = ____ GB/s. Which of these numbers can a single chip deliver, and which needs every chip delivering at the same time? ____ . <span class="from">from: L03</span></p>
+<details><summary>CHECK</summary>
+<pre>4 bytes x 18 x 10^9 = 72 GB/s per GDDR6 chip; 5 x 72 = 360 GB/s
+256 bytes x 3.2 x 10^9 = 819.2 GB/s per HBM3 module
+a single chip delivers 72 GB/s; the 360 exists only while all 5 deliver at once</pre>
+</details>
+<p class="ln"><b>L05</b> The slides then ask which chip holds which address, with 8 GDDR6 chips of 4 GB in the drawing. First drawing: the first 4 GB of addresses go to the first chip, the next 4 GB to the second, and so on; the chip number is the address divided by 4 GB, rounded down. Second drawing: the chips take turns, one small piece of addresses each, over and over; the chip number is the address divided by the size of a piece, rounded down, then taken mod the number of chips (the remainder after dividing by it). The slides call the second striping, and do not give the size of a piece. <span class="from">from: the Lecture 3 slides "Mapping address space to memory channels"</span></p>
+<p class="ln"><b>L06</b> Then: an EU takes in 32 bits per cycle; the 32 EUs under one instruction take in 32 x 32 = 1024 bits = 128 bytes per cycle, of neighbouring elements i, i + 1, i + 2, and so on. <span class="from">from: the Lecture 3 slides</span></p>
+<p class="ln do"><b>L07</b> <b class="x">DO</b> With the first rule, the divide rule, the 128 neighbouring bytes of L06 lie in ____ chip(s), unless they cross a 4 GB boundary. That chip moves 4 bytes per transfer, so it needs ____ transfers one after another, while the other chips do ____ . <span class="from">from: L04, L05, L06</span></p>
+<details><summary>CHECK</summary>
+<pre>1 chip; 128 / 4 = 32 transfers one after another; the other chips do nothing for this instruction
+the instruction gets one chip's 72 GB/s, not the GPU's 360</pre>
+</details>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> With the mod rule over the slide's 8 chips, and pieces of 4 bytes, one float each, as the drawing's small boxes show: floats per chip ____ ; transfers per chip ____ ; all chips working at the same time, the instruction is served in ____ transfer times, which is ____ times sooner than with the divide rule. <span class="from">from: L05, L06, L07</span></p>
+<details><summary>CHECK</summary>
+<pre>32 floats / 8 chips = 4 floats per chip = 4 transfers each, all 8 chips at once:
+4 transfer times instead of 32, 8 times sooner</pre>
+</details>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> The course GPU has 5 chips. With the mod rule and pieces of 4 bytes, float k of the 128 bytes goes to chip k mod 5. Floats on each chip: ____ . The instruction is done when its last float arrives, so the time is set by ____ : ____ transfer times, which is ____ times sooner than the 32 of the divide rule. <span class="from">from: L04, L05, L07</span></p>
+<details><summary>CHECK</summary>
+<pre>chips 0 and 1: 7 floats each (k = 0, 5, ..., 30 and k = 1, 6, ..., 31); chips 2, 3, 4: 6 each
+the busiest chip sets the time: 7 transfer times; 32 / 7 = 4.6 times sooner
+not 5 times: 32 floats do not split evenly over 5 chips</pre>
+</details>
+<p class="ln"><b>L10</b> Which part of the address chooses the chip? With the divide rule the chip number changes only when the address crosses a 4 GB boundary, so it is decided by the top part of the address. With the mod rule it changes at every piece, so it is decided by the bottom part. Neighbouring addresses differ only in their bottom part. <span class="from">from: L05</span></p>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> The slides do not give the real size of a piece; assume 256 bytes (assumed for this line). The 128 bytes of one instruction, beginning at a multiple of 128, lie in ____ chip(s). The next 40 instructions read the next 40 stretches of 128 bytes: ____ bytes = ____ pieces of 256, which the mod rule deals out as ____ pieces per chip. <span class="from">from: L05, L06, L09, L10</span></p>
+<details><summary>CHECK</summary>
+<pre>1 chip for a single instruction: its 128 bytes sit inside one piece of 256
+40 x 128 = 5,120 bytes = 20 pieces = 4 pieces on each of the 5 chips
+with pieces bigger than one instruction's bytes, the mod rule spreads a stream of
+instructions over all chips, not a single instruction</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L12</b> <b class="x">DO</b> Collect L02 (each float from GPU memory must feed about 150 instructions), L04 (72 GB/s per chip, 360 only with all 5 at once), L07 (the divide rule: 32 transfers on one chip), L08 and L09 (the mod rule: 4 transfer times over 8 chips, 7 over 5), L10 (the bottom part of the address chooses the chip under mod) and L11 (larger pieces spread a stream of instructions). Write one sentence on why the hardware deals addresses out with mod, and one on what sets the time of an instruction. <span class="from">from: L02, L04, L07, L08, L09, L10, L11</span></p>
+<details><summary>CHECK</summary>
+<pre>Programs read neighbouring addresses, and neighbouring addresses differ only in their bottom
+part; dealing addresses out by that bottom part (mod) sends neighbouring addresses to
+different chips, which is the only way a program reading in order keeps all chips busy and
+reaches the 360 GB/s that exists only with every chip delivering at once.
+An instruction is done when its last piece arrives, so the busiest chip sets the time
+(7 transfers, not 32 / 5 = 6.4, on the course GPU's 5 chips).
+
+Tempting answer that fails: "the GPU has 360 GB/s, so any order of reading gets 360 GB/s".
+Under the divide rule one instruction's 128 bytes come from one chip in 32 transfers (L07),
+at one chip's 72 GB/s.</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>A graphics card's memory is several chips working side by side, and its quoted speed is the sum of all of them working at once. Addresses are dealt out to the chips in small turns, so that a program reading neighbouring data keeps every chip busy. Dealt out in large blocks instead, neighbouring data would all sit in one chip, and the program would get one chip's speed.</p>
+<p>For a manager: a memory system's quoted speed assumes the work keeps every chip busy at once; ask whether your data is read in an order that does.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>1 chip: under the divide rule the 128 neighbouring bytes sit in one chip, which moves them
+in 32 transfers one after another while the other 4 do nothing for this instruction (L07).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>With the mod rule over 5 chips and pieces of 4 bytes, the 32 threads of one instruction read floats 0, 5, 10, ..., 155 (each 5 floats from the next). How many chips serve the instruction, and what does that say about steps between reads?</p>
+<details><summary>CHECK</summary>
+<pre>Float 5k goes to chip 5k mod 5 = 0 for every k: all 32 floats on chip 0, 32 transfers,
+as slow as the divide rule. A step that is a multiple of the number of chips sends every
+read to the same chip and undoes the mod rule. The slides do not say whether the course
+GPU scrambles its choice of chip to avoid this; a measurement that reads with different
+steps and times each one would show it.</pre>
+</details>
+</div>
+
+<nav><a href="25-what-32-fp32-counts.html">prev: 25 what 32 FP32 units count</a><a href="27-which-threads-are-neighbours.html">next: 27 which threads are neighbours in memory</a></nav>
+</main>
+</body>
+</html>
