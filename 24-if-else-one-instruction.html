@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>An If Under One Instruction</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>24. Lecture 2: an if-else when one instruction serves 8 indices</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>Lecture 2 of MIT 6.S894 shows 8 ALUs that all receive the same instruction, beside code with an if: if x is greater than 0, three statements; otherwise, two others. Above the ALUs it writes T T F T F F F F, one answer of the test for each, and down the page, in time, it shades the ALUs that do useful work and crosses out the others. Under it: not every ALU does useful work every cycle, and in the worst case only one in n does.</p>
+<p>The learner had always seen an if as a jump: test, then do one side or the other. With one instruction for all 8, there is nothing to jump with, so choosing per index seemed impossible, and "useful" made no sense: every result is computed, so every result is useful. If both sides are executed, does that not break the program? And why does the compiled code compare the input instead of the result of the computation?</p>
+<p>What, exactly, does the hardware do when 8 indices disagree about one if, and what keeps the result correct?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>For the slide's T T F T F F F F, with 3 statements on the if side and 2 on the else side, what percentage of the ALU work during the if-else is useful? Write a number.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "This is where my confusion lies. It is impossible to have a branch and it is impossible to be selective." / "But there is no such thing as useful or useless res-, right? That is impossible" / "are you saying unlike normal programs even if something is false we do the else that will break program correctness" / "why compare with input not output my brain always thinks we do a computation and compare the results and so on" / "So this is called compiler auto vectorization, and it has got nothing to do with SIMD. Right?"</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The slide "SIMD execution requires coherent control" of the Lecture 2 slides of MIT 6.S894 (11 September 2025): time goes down, in clocks; across are ALU 1 to ALU 8, under one stream of instructions. After the unconditional code, the test gives T T F T F F F F. The code beside it: <span class="from">from: the Lecture 2 slides, accelerated-computing.academy/fall25/lectures/slides/Lecture2.pdf</span></p>
+<pre>&lt;unconditional code&gt;
+if (x &gt; 0) {
+    y = pow(x, exp);
+    y *= Ks;
+    refl = y + Ka;
+} else {
+    x = 0;
+    refl = Ka;
+}
+&lt;resume unconditional code&gt;</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>&lt;unconditional code&gt;</code><span>Instructions that every index executes, before the if.</span></li>
+<li><code>if (x &gt; 0) {</code><span>Test whether this index's x is greater than 0.</span></li>
+<li><code>    y = pow(x, exp);</code><span>If so: y becomes x raised to the power exp,</span></li>
+<li><code>    y *= Ks;</code><span>then y is multiplied by Ks,</span></li>
+<li><code>    refl = y + Ka;</code><span>then refl becomes y plus Ka.</span></li>
+<li><code>} else {</code><span>If not:</span></li>
+<li><code>    x = 0;</code><span>x becomes 0,</span></li>
+<li><code>    refl = Ka;</code><span>and refl becomes Ka.</span></li>
+<li><code>}</code><span>End of the if-else.</span></li>
+<li><code>&lt;resume unconditional code&gt;</code><span>Instructions that every index executes again.</span></li>
+</ol>
+</div>
+<p class="ln"><b>L02</b> On the slide, during the three if statements, ALUs 1, 2 and 4 are shaded and the other five crossed out; during the two else statements, ALUs 3, 5, 6, 7 and 8 are shaded and 1, 2 and 4 crossed out. Under it: "Not all ALUs do useful work every cycle! Worst case: 1/n peak performance". <span class="from">from: the Lecture 2 slides</span></p>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> Take each statement as one step of the time axis, as drawn. ALU-steps on the if side: 3 * 8 = ____ , of which useful (shaded): 3 * 3 = ____ . On the else side: 2 * 8 = ____ , useful 2 * 5 = ____ . Useful share of the whole if-else: ____ / ____ = ____ percent. <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>if side:   24 ALU-steps, 9 useful
+else side: 16 ALU-steps, 10 useful
+19 / 40 = 47.5 percent
+if all 8 indices took the if side and the else side were skipped: 24 / 24 = 100 percent</pre>
+</details>
+<p class="ln"><b>L04</b> The laptop's AVX2 has no instruction that jumps for some indices and not for others: a jump changes the address of the next instruction, and the 8 indices share one stream of instructions (L01). What AVX2 has is a compare, <code>vcmpltps</code>, whose result at each index is 32 bits all 1 where the test is true and all 0 where it is false, called a mask, and a bitwise AND, <code>vandps</code>. <span class="from">from: L01; Intel's intrinsics guide</span></p>
+<p class="ln"><b>L05</b> A loop written for this page, plain C with an ordinary if-else: <span class="from">from: written for this page</span></p>
+<pre>for (int i = 0; i &lt; n; i++) {
+    float v;
+    if (x[i] &gt; 0) v = x[i] * 10;
+    else          v = 0;
+    y[i] = v;
+}</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>for (int i = 0; i &lt; n; i++) {</code><span>Repeat for i = 0 to n - 1.</span></li>
+<li><code>    float v;</code><span>A float named v, for this repetition.</span></li>
+<li><code>    if (x[i] &gt; 0) v = x[i] * 10;</code><span>If x[i] is greater than 0, v becomes x[i] times 10;</span></li>
+<li><code>    else          v = 0;</code><span>otherwise v becomes 0.</span></li>
+<li><code>    y[i] = v;</code><span>Store v as y[i].</span></li>
+<li><code>}</code><span>End of the loop.</span></li>
+</ol>
+</div>
+<p class="ln"><b>L06</b> Compiled with gcc 13.3.0 on the machine that built this site, <code>gcc -O3 -mavx2</code> reports "not vectorized: control flow in loop". With <code>-fno-trapping-math</code> added, which lets gcc assume that floating-point operations raise no signal the program watches (division by zero, overflow and others), the loop for 8 floats at a time becomes this, after <code>vbroadcastss</code> has put 10.0 into all 8 indices of ymm3 and <code>vxorps</code> has put 0.0 into all 8 of ymm2: <span class="from">from: gcc 13.3.0 output, on the machine that built this site</span></p>
+<pre>.L5:
+    vmulps    (%rcx,%rdx), %ymm3, %ymm1
+    vcmpltps  (%rcx,%rdx), %ymm2, %ymm0
+    vandps    %ymm1, %ymm0, %ymm0
+    vmovups   %ymm0, (%rsi,%rdx)
+    addq      $32, %rdx
+    cmpq      %rdi, %rdx
+    jne       .L5</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>.L5:</code><span>The name of the loop's first instruction.</span></li>
+<li><code>    vmulps    (%rcx,%rdx), %ymm3, %ymm1</code><span>Read 8 floats of x from memory (the address in rcx plus rdx), multiply each by the 10.0 in ymm3, and put the 8 products in ymm1, at every index, whatever its x.</span></li>
+<li><code>    vcmpltps  (%rcx,%rdx), %ymm2, %ymm0</code><span>Compare the same 8 floats of x with the 0.0 in ymm2: at each index where 0.0 is less than x, put 32 one-bits into ymm0, elsewhere 32 zero-bits.</span></li>
+<li><code>    vandps    %ymm1, %ymm0, %ymm0</code><span>AND the products with those bits, bit by bit, and put the result in ymm0.</span></li>
+<li><code>    vmovups   %ymm0, (%rsi,%rdx)</code><span>Store the 8 results as 8 floats of y.</span></li>
+<li><code>    addq      $32, %rdx</code><span>Move on by 32 bytes, 8 floats.</span></li>
+<li><code>    cmpq      %rdi, %rdx</code><span>Compare with the end of the arrays.</span></li>
+<li><code>    jne       .L5</code><span>If not at the end, jump back to .L5. This jump is the same for all 8 indices.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L07</b> <b class="x">DO</b> Execute it by hand on x = -2, 3, -1, 4, 5, -6, 7, -8 at index 0 to 7. Fill, down the indices: the products in ymm1, the mask in ymm0 (one-bits or zero-bits), and the AND: ____ . <span class="from">from: L06</span></p>
+<details><summary>CHECK</summary>
+<pre>index    x    ymm1 = x * 10   mask: 0 &lt; x ?        ymm1 AND mask
+  0     -2       -20          32 zero-bits   F        0
+  1      3        30          32 one-bits    T       30
+  2     -1       -10          32 zero-bits   F        0
+  3      4        40          32 one-bits    T       40
+  4      5        50          32 one-bits    T       50
+  5     -6       -60          32 zero-bits   F        0
+  6      7        70          32 one-bits    T       70
+  7     -8       -80          32 zero-bits   F        0
+the compiled program, executed with this x on the same machine, printed:
+0 30 0 40 50 0 70 0</pre>
+</details>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> Why does an AND select? As floats, 30.0 is the bit pattern 0 10000011 11100000000000000000000 and -20.0 is 1 10000011 01000000000000000000000. A bitwise AND gives 1 only where both bits are 1. 30.0 AND 32 one-bits = ____ . -20.0 AND 32 zero-bits = ____ , which as a float is ____ . <span class="from">from: L07; IEEE 754 single precision</span></p>
+<details><summary>CHECK</summary>
+<pre>30.0 AND 11111111111111111111111111111111 = 0 10000011 11100000000000000000000 = 30.0
+-20.0 AND 00000000000000000000000000000000 = 0 00000000 00000000000000000000000 = 0.0
+AND with all ones leaves a value unchanged; AND with all zeros turns it into 0.0, which is
+exactly what the else side assigns</pre>
+</details>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> Your question: is this auto-vectorization, with nothing to do with SIMD? Count the instructions in the loop of L06 that act on 8 floats at once: ____ . Who wrote them? ____ . <span class="from">from: L06</span></p>
+<details><summary>CHECK</summary>
+<pre>4: vmulps, vcmpltps, vandps and vmovups, each an AVX instruction on 8 floats
+the compiler wrote them from plain C: auto-vectorization is the compiler producing SIMD
+instructions, the same instructions that intrinsics such as _mm256_mul_ps produce</pre>
+</details>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> The else side gave 0, so an AND was enough. Change it to <code>v = 5;</code>. gcc 13.3.0 with the same flags then puts 10.0 into all 8 indices of ymm4 and 5.0 into ymm3, and the loop becomes <code>vmulps</code>, <code>vcmpltps</code>, <code>vblendvps %ymm0, %ymm1, %ymm3, %ymm0</code>, <code>vmovups</code>, where <code>vblendvps</code> takes, at each index, the value from ymm1 (the products) where the mask is all ones and from ymm3 (the 5.0s) where it is all zeros. For the x of L07, fill y: ____ . <span class="from">from: gcc 13.3.0 output, on the machine that built this site; L07</span></p>
+<details><summary>CHECK</summary>
+<pre>index    x    product   mask    y
+  0     -2      -20      F      5
+  1      3       30      T     30
+  2     -1      -10      F      5
+  3      4       40      T     40
+  4      5       50      T     50
+  5     -6      -60      F      5
+  6      7       70      T     70
+  7     -8      -80      F      5
+the compiled program printed: 5 30 5 40 50 5 70 5
+both sides are computed at all 8 indices; the mask decides, index by index, which of the
+two computed values is kept</pre>
+</details>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> Your question, why compare the input and not the output. The C source tests x, so the compiled code must test x. In plain C the test comes first because a jump then skips the multiply; gcc's own loop for single leftover floats, in the same listing, does exactly that: <code>vcomiss</code> compares, then <code>jbe</code> jumps past the <code>vmulss</code>. In L06 nothing is skipped: <code>vmulps</code> and <code>vcmpltps</code> both read only x and a constant, so their order ____ (matters / does not matter). The AND needs ____ and ____ . <span class="from">from: L05, L06</span></p>
+<details><summary>CHECK</summary>
+<pre>their order does not matter: neither needs the other's result
+the AND needs both, the products (ymm1) and the mask (ymm0)
+with no jump there is nothing for an early test to save: the multiply executes either way,
+and its value must be ready when the mask chooses</pre>
+</details>
+<p class="ln do"><b>L12</b> <b class="x">DO</b> Your question whether both sides break correctness. The C program never multiplies an x that is not above 0; the compiled loop multiplies -2, -1, -6 and -8 by 10 and then ____ the products. Name a case where executing the side that was not chosen would change what the program does: ____ . <span class="from">from: L06, L07</span></p>
+<details><summary>CHECK</summary>
+<pre>it discards them: the AND writes 0.0 at those indices, so y is exactly the C program's y
+it would not be correct if the side not chosen could fault or write memory, for example
+    if (p != 0) v = *p;      (reading through p = 0 at every index would crash)
+or a side that stores to memory; then the compiler must keep the jump or use stores that
+write only where the mask is all ones. With floats, a discarded multiply can still raise
+an overflow signal, which is what -fno-trapping-math (L06) lets gcc ignore.</pre>
+</details>
+<p class="ln"><b>L13</b> With no else at all, <code>if (x[i] &gt; 0) y[i] = x[i] * 10;</code>, the C program leaves y[i] unchanged where x[i] is not above 0. gcc 13.3.0 with the same flags compiles it with <code>vmaskmovps</code>, a store that writes only the indices whose mask is all ones. <span class="from">from: gcc 13.3.0 output, on the machine that built this site</span></p>
+<p class="ln do"><b>L14</b> <b class="x">DO</b> Useful work. In L07, products computed: ____ ; products kept in y: ____ ; useful share of the <code>vmulps</code>: ____ percent. Is that the same kind of count as the slide's 47.5 percent of L03? ____ . <span class="from">from: L03, L07</span></p>
+<details><summary>CHECK</summary>
+<pre>8 products computed, 4 kept (index 1, 3, 4, 6): 50 percent of the vmulps is useful
+yes: "useful" means kept in the result; a value the mask discards is work an exec unit
+did for nothing, although it was computed</pre>
+</details>
+<p class="ln do"><b>L15</b> <b class="x">DO</b> The slide's worst case, 1/n. A loop repeats until every index is done; of 8 indices, one needs 1,000 repetitions and seven need 1. Repetitions the 8 indices need in all: ____ . The instruction stream repeats ____ times, each for 8 indices: ____ index-steps. Useful share: ____ . <span class="from">from: L02, L14</span></p>
+<details><summary>CHECK</summary>
+<pre>1,000 + 7 * 1 = 1,007 repetitions needed
+the loop repeats 1,000 times for all 8 indices: 8,000 index-steps
+1,007 / 8,000 = 12.6 percent, close to 1/8 = 12.5 percent: the worst case 1/n with n = 8</pre>
+</details>
+<p class="ln do"><b>L16</b> <b class="x">DO</b> Whose compiler? Your laptop's hardware audit lists gcc 15.2.0; every listing on this page came from gcc 13.3.0 on the machine that built this site. On your laptop, compile the loop of L05 with <code>gcc -O3 -mavx2 -S</code>, once without and once with <code>-fno-trapping-math</code>, and search each .s file for <code>vcmpltps</code>, <code>vandps</code> or <code>vblendvps</code>. Does each of the two results of L06 hold for your compiler? ____ . <span class="from">from: L05, L06; your hardware audit (gcc 15.2.0)</span></p>
+<details><summary>CHECK</summary>
+<pre>not recorded in the chats: no listing from your laptop exists yet
+a newer gcc may vectorize the loop even without the flag, or choose other instructions;
+clang 18 on the machine that built this site vectorized it with no flag at all, using the
+same vcmpltps, vmulps and vandps
+until your own .s file shows it, L06 is a fact about gcc 13.3.0, not about your compiler</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L17</b> <b class="x">DO</b> Collect L03 (47.5 percent useful on the slide), L06 (gcc's loop: a multiply, a compare, an AND, and no jump that differs per index), L07 (0 30 0 40 50 0 70 0), L08 (AND with all ones keeps, with all zeros gives 0.0), L10 (vblendvps picks between two computed values), L12 (correct because a discarded multiply changes nothing visible) and L15 (12.6 percent for one long index). Twist from the data: if the else side assigned -1 instead of 0, could a single AND still do the selection? ____ . Then write one sentence on how one stream of instructions makes a choice per index. <span class="from">from: L03, L06, L07, L08, L10, L12, L15</span></p>
+<details><summary>CHECK</summary>
+<pre>No: an AND can only keep a value or turn it into 0.0 (L08); -1 must come from a second
+computed set of values, so the selection needs a blend (L10).
+
+One stream of instructions cannot choose which instructions an index executes, so it
+executes both sides at every index and chooses which value each index keeps, with a mask
+computed from the same test: the choice moves from the next instruction's address into
+the data. The price is the work of the side not taken (47.5 percent useful on the slide,
+12.6 percent for one long index), and it is correct only when the discarded work cannot
+be seen: no faults, no stores (L12).
+
+Tempting answer that fails: "SIMD has no if, so it cannot do an if-else". The loop of L06
+does the if-else of L05 exactly and prints 0 30 0 40 50 0 70 0.</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>When one instruction drives eight arithmetic circuits, it cannot send some of them one way and the rest another. So the machine does both sides of an if for all eight, and at the end each of the eight keeps the answer its own test chose; the other answer is thrown away. The result is exactly right, but the time spent on the thrown-away side is lost.</p>
+<p>For a manager: code that branches differently for neighbouring data executes at a fraction of the hardware's speed on vector and GPU hardware; ask how often neighbouring items take different branches.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>47.5 percent: 9 useful of 24 ALU-steps on the if side and 10 of 16 on the else side,
+19 / 40, with each statement taken as one step, as the slide draws it (L03).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>A GPU gives one instruction to a set of 32 threads. For the slide's if-else, what does it execute when all 32 threads have x above 0, and what changes when one thread's x is not?</p>
+<details><summary>CHECK</summary>
+<pre>All 32 true: every thread agrees. If the compiler kept a jump, all 32 take it and the
+else side is never executed, so all of the work is useful, unlike gcc's AVX loop of L06,
+which executes both sides every time; if it used predication instead, the else side's
+instructions still begin, and change no thread.
+One thread false: both sides execute for the set of 32, the if side changing 31 threads
+and the else side 1, the others' results discarded; a GPU listing shows this either as
+instructions carrying a condition (a prefix such as @P0) or as jumps with BSSY and BSYNC
+around the two sides.
+Data that agrees costs nothing extra; a single thread that disagrees costs the whole
+other side for all 32.</pre>
+</details>
+</div>
+
+<nav><a href="23-sixteen-alus.html">prev: 23 what the 16 ALUs count</a><a href="25-what-32-fp32-counts.html">next: 25 what 32 FP32 units count</a></nav>
+</main>
+</body>
+</html>

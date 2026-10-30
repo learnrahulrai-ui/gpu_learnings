@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Which Loop Splits</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>22. Lecture 2: which loop of a matrix multiply can be split, and which cannot</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>Lecture 2 of MIT 6.S894 returns to a matrix multiply: three loops, one inside another, over i, k and j, and in the middle a single statement that adds a product into one entry of the result C. The lecturer pointed at the innermost loop, over j, said that all of its iterations are independent of each other, rewrote it as "for all j", and drew two cores executing the same instructions, with only the loop variable different between them.</p>
+<p>The learner asked how the lecturer could see that at a glance when they could not. Then came a second split, by i instead of j, described as a different way of dividing the matrix. So the same statement could be split by j or by i, with no visible rule for either.</p>
+<p>What in the statement says that the iterations of a loop can execute at the same time, and is there a loop whose iterations cannot?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>In <code>C[i*N + j] += A[i*N + k] * B[k*N + j]</code> with N = 3, the loop over k has 3 iterations for each pair (i, j). Can those 3 iterations execute at the same time without changing C? Yes or no.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "So why does he make this claim? I mean, how can he see but I cannot see? What exactly is his IQ that he can see but I cannot see?" / "this is where my brain will break"</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> From the Lecture 2 slides of MIT 6.S894 (11 September 2025): <span class="from">from: the Lecture 2 slides, accelerated-computing.academy/fall25/lectures/slides/Lecture2.pdf</span></p>
+<pre>for (int i = 0; i &lt; N; ++i)
+  for (int k = 0; k &lt; N; ++k)
+    for (int j = 0; j &lt; N; ++j)
+      C[i*N + j] += A[i*N + k] * B[k*N + j];</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>for (int i = 0; i &lt; N; ++i)</code><span>Repeat for i = 0, 1, ..., N - 1.</span></li>
+<li><code>  for (int k = 0; k &lt; N; ++k)</code><span>Inside that, repeat for k = 0, 1, ..., N - 1.</span></li>
+<li><code>    for (int j = 0; j &lt; N; ++j)</code><span>Inside that, repeat for j = 0, 1, ..., N - 1.</span></li>
+<li><code>      C[i*N + j] += A[i*N + k] * B[k*N + j];</code><span>Multiply entry i*N + k of A by entry k*N + j of B, and add the product into entry i*N + j of C.</span></li>
+</ol>
+</div>
+<p class="ln"><b>L02</b> The slides then show the innermost loop alone, rewrite it as <code>for all (int j = 0; j &lt; N; ++j)</code>, and draw two cores, each with its own Fetch &amp; Decode, Exec and Program State, executing the same instructions. The lecturer, as pasted in your chat: "Every iteration of this loop over j is going to ... accumulate into a different entry in the output C." <span class="from">from: the Lecture 2 slides; the lecture's spoken words in your chat</span></p>
+<p class="ln"><b>L03</b> Each matrix is stored as a list of N * N numbers, and entry i*N + j of C is the number at down-number i and right-number j of C: with N = 3, entry 5 is down-number 1, right-number 2, since 1 * 3 + 2 = 5. <span class="from">from: L01</span></p>
+<p class="ln"><b>L04</b> Example for this page, N = 3: A holds 1, 2, 3, 4, 5, 6, 7, 8, 9 in entries 0 to 8; B holds 1, 0, 2, 0, 1, 0, 3, 0, 1; C begins as all 0. <span class="from">from: example data</span></p>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> Fix i = 0 and k = 0 and follow the j loop. For j = 0, 1, 2, which entry of C is written? ____ , ____ , ____ . Which entries of A and of B are read? ____ . Do two of the three iterations write the same entry, or does one read an entry that another writes? ____ . <span class="from">from: L01, L03, L04</span></p>
+<details><summary>CHECK</summary>
+<pre>j = 0:  C[0] += A[0] * B[0] = 1 * 1 = 1
+j = 1:  C[1] += A[0] * B[1] = 1 * 0 = 0
+j = 2:  C[2] += A[0] * B[2] = 1 * 2 = 2
+all three read A[0]; they read B[0], B[1], B[2] and write C[0], C[1], C[2]
+no entry is written by two of them, and none reads what another writes:
+the 3 iterations can execute in any order, or at the same time, and leave the same C</pre>
+</details>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> Now fix i = 0 and j = 0 and follow k, the middle loop. For k = 0, 1, 2, which entry of C is written? ____ , ____ , ____ . The value of C[0] after each: ____ , ____ , ____ . <span class="from">from: L01, L04</span></p>
+<details><summary>CHECK</summary>
+<pre>k = 0:  C[0] += A[0] * B[0] = 1 * 1 = 1     C[0] = 0 + 1 = 1
+k = 1:  C[0] += A[1] * B[3] = 2 * 0 = 0     C[0] = 1 + 0 = 1
+k = 2:  C[0] += A[2] * B[6] = 3 * 3 = 9     C[0] = 1 + 9 = 10
+every k writes the same C[0], and each += reads the C[0] that the previous k wrote</pre>
+</details>
+<p class="ln do"><b>L07</b> <b class="x">DO</b> Let the three k iterations of L06 execute at the same time: each reads C[0] = 0 before any of them writes, then writes 0 plus its own product. Which value can C[0] hold at the end, depending on which write lands last? ____ , ____ or ____ . The correct value: ____ . <span class="from">from: L06</span></p>
+<details><summary>CHECK</summary>
+<pre>the last write wins: 1, 0 or 9, never the correct 10
+the k iterations form a chain through C[0]: each needs the value the one before wrote;
+the j iterations of L05 form no chain, since each has its own entry of C</pre>
+</details>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> The second split: give different values of i to different cores. With N = 3, which entries of C does the core doing i = 0 write? ____ . The core doing i = 1? ____ . Is any entry of C written by both? ____ . Which entries of A does each read? ____ . <span class="from">from: L01, L03</span></p>
+<details><summary>CHECK</summary>
+<pre>i = 0 writes C[0], C[1], C[2] (down-number 0) and reads A[0], A[1], A[2]
+i = 1 writes C[3], C[4], C[5] (down-number 1) and reads A[3], A[4], A[5]
+no entry of C is written by both; both read all of B, and two cores reading the same
+value change nothing</pre>
+</details>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> The rule from L05 to L08: iterations can execute at the same time when no two of them write the same entry and none reads an entry another writes. Apply it to each loop variable: j ____ ; i ____ ; k ____ . Which variable is missing from the left side, <code>C[i*N + j]</code>? ____ . <span class="from">from: L05, L06, L07, L08</span></p>
+<details><summary>CHECK</summary>
+<pre>j: for fixed i and k, iteration j writes only C[i*N + j]: independent
+i: iteration i writes only C[i*N] to C[i*N + N - 1]: independent
+k: for fixed i and j, every k adds into the same C[i*N + j]: a chain
+k is the variable missing from the left side, and it is exactly the loop that chains</pre>
+</details>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> Sizes for N = 1024. One "for all j" has ____ independent iterations of one multiply-add, and it is repeated once for each pair (i, k): ____ times. One "for all i" has ____ independent iterations of ____ multiply-adds each. Along k, each of the ____ entries of C has a chain of ____ adds. <span class="from">from: L01, L09</span></p>
+<details><summary>CHECK</summary>
+<pre>for all j: 1024 independent iterations of 1 multiply-add, repeated 1024 * 1024 = 1,048,576 times
+for all i: 1024 independent iterations of 1024 * 1024 = 1,048,576 multiply-adds each
+along k:   1024 * 1024 = 1,048,576 entries of C, each with a chain of 1024 adds
+total multiply-adds either way: 1024 * 1024 * 1024 = 1,073,741,824</pre>
+</details>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> The slides' assembly loop (two loads, a multiply, an add into r5, an add of 4 to r2, a compare-and-jump, and once the loop is left a store of r5) keeps one total in one register for the whole loop. In the j loop of L05, is there one total that every iteration adds into? ____ . In the k loop of L06? ____ . Which loop has the shape of the assembly loop? ____ . <span class="from">from: L05, L06; the Lecture 2 slides for the assembly loop</span></p>
+<details><summary>CHECK</summary>
+<pre>j loop: no; each iteration adds into its own entry of C, so each must read that entry
+and write it back
+k loop: yes, C[i*N + j] for fixed (i, j), which can stay in one register like r5 and be
+stored once at the end
+one total and one store at the end is the k loop's shape: a core given its own i (L08)
+can order its work as one such k loop for each of its entries of C</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L12</b> <b class="x">DO</b> Collect L05 (the j iterations write C[0], C[1], C[2]), L06 and L07 (the k iterations all write C[0]; at the same time they leave 1, 0 or 9 instead of 10), L08 (i = 0 and i = 1 write separate entries), L09 (the rule, and the variable missing from the left side) and L10 (1024 independent j iterations; 1024 independent i iterations of a million multiply-adds each; chains of 1024 along k). Write one sentence on what the lecturer read off the statement at a glance. <span class="from">from: L05, L06, L07, L08, L09, L10</span></p>
+<details><summary>CHECK</summary>
+<pre>The lecturer read which entry each iteration writes: the left side C[i*N + j] does not
+contain k, so iterations that differ only in j, or only in i, write different entries and
+can execute at the same time, while iterations that differ only in k all write the same
+entry and must follow one another.
+Splitting by j or by i hands out the same independent writes in two sizes: by j, single
+multiply-adds; by i, whole down-numbers of C.
+
+Tempting answer that fails: "every iteration of every loop is independent, because each
+computes its own product". L07 leaves 1, 0 or 9 in C[0] instead of 10 when the k
+iterations execute at the same time: the products are independent, the += into one entry
+is not.</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>To know whether pieces of work can be done at the same time, look at where each piece writes its result. Pieces that write to different places can go in any order, or all at once. Pieces that add into the same place must take turns, or the place ends up holding only one of their contributions.</p>
+<p>For a manager: the question to ask about any plan to split work is whether two workers ever write the same thing; if not, the work splits, and if so, someone must combine their results, and that step costs time.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>No. All 3 k iterations add into the same entry C[0] (L06); executed at the same time they
+leave 1, 0 or 9 in it instead of 10 (L07).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>Can the k loop be split anyway? Take one entry of C with N = 1024 and 4 cores, and say what the split costs.</p>
+<details><summary>CHECK</summary>
+<pre>Yes, if each core keeps its own total: core 0 adds k = 0 to 255, core 1 k = 256 to 511,
+core 2 k = 512 to 767, core 3 k = 768 to 1023, each into a separate total; then the 4
+totals are added, 3 more adds that must wait for all 4 cores.
+Each core's chain is 256 adds instead of 1024. The cost is the 4 extra totals, the final
+combining step, and a changed order of adds, so float rounding can make the last bits
+differ from those of the single chain of 1024.</pre>
+</details>
+</div>
+
+<nav><a href="21-from-where-is-three.html">prev: 21 from where is the 3</a><a href="23-sixteen-alus.html">next: 23 what the 16 ALUs count</a></nav>
+</main>
+</body>
+</html>

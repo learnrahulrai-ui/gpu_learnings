@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>From Where Is Three</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>21. Lecture 2: a core 12 times bigger, 4 times faster per clock, and the 3</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>Lecture 2 of MIT 6.S894 shows a graph of CPU cores from many years. Across the graph goes how big each core is, counted in transistors; up the graph goes how much work it finishes per tick of its clock, measured with a benchmark. A red straight line rises from the smallest core. The black points of the real cores bend away under it, and the last and largest point, labelled Raptor Cove, sits at about 12 times the size and 4 times the work per tick of the first. Beside the gap the slide writes "3x off trend".</p>
+<p>The learner had been following the lecturer back through the processors of past decades, lost the thread at the Core 2 Duo, and could not say where the 3 came from. A slide later the lecturer concluded that for work with plenty of independent pieces, more and simpler cores use the same silicon better than fewer complex ones, and the learner could not see the step that led there.</p>
+<p>What does the 3 compare, and what decides whether one big core or many small ones finishes a job first?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>In the area of one core 12 times bigger than a small core, 12 small cores fit. On work that splits evenly into 12 independent pieces, how many times more work per clock tick do the 12 small cores finish than the one big core? Write a number.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "I have no way why he's making the three of three claim. From where is three coming? What? My brain just got lost at Core 2 Duo." / "What is the inference he just made? That's where I lost him, so I have to pause the video."</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The slide "Diminishing returns to scaling single-core performance" of the Lecture 2 slides of MIT 6.S894 (11 September 2025): up, performance per clock, normalized, "based on Geekbench 6 benchmark composite"; across, core size at the same transistor size ("iso-process"), normalized, with area scaled by "WikiChip-estimated process node transistor density". The first black point is at 1x size and 1x performance; the last, labelled Raptor Cove, at 12x size and 4x performance. A red straight line rises from the first point, and a bracket between the red line and Raptor Cove is labelled "3x off trend". <span class="from">from: the Lecture 2 slides, accelerated-computing.academy/fall25/lectures/slides/Lecture2.pdf</span></p>
+<p class="ln"><b>L02</b> Per clock means work finished per tick of the core's own clock, so a faster clock does not count. Normalized means each value is divided by the first core's, so the first core is 1x on both scales. <span class="from">from: L01</span></p>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> The red line is where performance grows in step with size: twice the size, twice the performance. At 12x size the red line is at ____ . Raptor Cove is at ____ . The red line's value divided by Raptor Cove's: ____ . <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>red line at 12x size: 12x performance
+Raptor Cove: 4x
+12 / 4 = 3: the 3 of "3x off trend"</pre>
+</details>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> Work per clock for each unit of size: the first core gives 1x / 1x = ____ ; Raptor Cove gives 4x / 12x = ____ . Each transistor of Raptor Cove therefore does ____ of the work per clock that a transistor of the first core does. <span class="from">from: L01, L03</span></p>
+<details><summary>CHECK</summary>
+<pre>first core: 1 per unit of size; Raptor Cove: 4 / 12 = 0.333 per unit
+each transistor of the big core finishes a third of the work per clock</pre>
+</details>
+<p class="ln"><b>L05</b> The lecturer added, as pasted in your chat, that the Core 2 Duo is many times larger than the Pentium Pro it was based on and is not five times as fast per clock, so the curve has been nearly flat for about three decades. The next slide, "What to do with twice the silicon?": one core of twice the area gives "≪2x the performance of smaller core", much less than twice; two cores of the original size, "equal area", give "Double the performance of one core". <span class="from">from: the lecture's spoken words in your chat; the Lecture 2 slides</span></p>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> In the area of one Raptor Cove, ____ cores of the first size fit (L01). Work that splits evenly into that many independent pieces: together they finish ____ x per clock, against Raptor Cove's ____ x, which is ____ times more. Work that cannot be split at all: only ____ of the small cores is busy, giving ____ x against ____ x. <span class="from">from: L01, L04, L05</span></p>
+<details><summary>CHECK</summary>
+<pre>12 small cores in the area of one Raptor Cove
+split 12 ways: 12 * 1x = 12x against 4x: 3 times more work per clock
+not split: 1 small core busy, 1x against 4x: the big core is 4 times faster</pre>
+</details>
+<p class="ln do"><b>L07</b> <b class="x">DO</b> Most jobs are partly split. Take a job of 1 unit of work, of which a share p splits evenly 12 ways and the rest, 1 - p, must be done by one core. Clocks per unit on Raptor Cove: 1 / 4 = ____ . On 12 small cores: (1 - p) / 1 + p / 12. At p = 0.5 that is ____ ; at p = 0.9, ____ . Solve (1 - p) + p / 12 = 0.25 for the share at which both take equal time: p = ____ . <span class="from">from: L06</span></p>
+<details><summary>CHECK</summary>
+<pre>Raptor Cove: 0.25
+p = 0.5: 0.5 + 0.0417 = 0.542   (the big core is 0.542 / 0.25 = 2.17 times faster)
+p = 0.9: 0.1 + 0.075  = 0.175   (the small cores are 0.25 / 0.175 = 1.43 times faster)
+(1 - p) + p / 12 = 0.25  -&gt;  1 - 11p / 12 = 0.25  -&gt;  11p / 12 = 0.75  -&gt;  p = 9 / 11 = 0.818
+above 82 percent of the work split 12 ways, the 12 small cores finish first</pre>
+</details>
+<p class="ln"><b>L08</b> The lecturer's step that you paused on, as pasted in your chat: for work with plenty of available parallelism, more simple cores, each executing its own independent stream of instructions, tend to use the same amount of silicon better than fewer complex cores that each fight to get speed out of a single stream. <span class="from">from: the lecture's spoken words in your chat</span></p>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> The course machines, from the slides "Our CPU" and "Our GPU": the CPU's 8 cores share 70 mm² (the CCD chip only), 70 / 8 = ____ mm² per core; the GPU gives about 200 mm² to 192 of what the slide calls cores, each a scheduler with 32 exec units, about 200 / 192 = ____ mm² per core (the slide writes 1.05). Under the CPU core the slide writes "6-7x faster on Mandelbrot", and under the GPU core "8x smaller". Size ratio from the areas: 8.75 / 1.05 = ____ . Mandelbrot speed per mm² of a GPU core against a CPU core: 8.3 / 7 = ____ to 8.3 / 6 = ____ . <span class="from">from: the Lecture 2 slides "Our CPU" and "Our GPU"</span></p>
+<details><summary>CHECK</summary>
+<pre>CPU: 70 / 8 = 8.75 mm² per core; GPU: 200 / 192 = 1.04 mm² (the slide's 1.05 comes from
+its "about 200")
+8.75 / 1.05 = 8.3 times smaller
+per mm²: 8.3 / 7 = 1.19 to 8.3 / 6 = 1.39 times the Mandelbrot speed of a CPU core
+the GPU core plays the part of L06's small cores: 6 to 7 times slower alone, ahead per
+mm² on work that splits into many independent pieces</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> Collect L03 (12 / 4 = 3), L04 (a third of the work per transistor), L06 (12x against 4x when split, 1x against 4x when not), L07 (equal time at 82 percent split) and L09 (a GPU core 8.3 times smaller and 6 to 7 times slower than a CPU core). Write one sentence on what the 3 measures, and one on what decides between one big core and many small ones. <span class="from">from: L03, L04, L06, L07, L09</span></p>
+<details><summary>CHECK</summary>
+<pre>The 3 is how far a single core's work per clock falls below growing in step with its
+size: 12 times the transistors bought 4 times the work per clock, a third per transistor.
+Many small cores turn area into speed in step with size, but only for the share of a job
+that splits into independent pieces; that share decides (82 percent, for 12 small cores
+against one core 12 times bigger).
+
+Tempting answer that fails: "the big core is 3 times worse, so big cores are a mistake".
+L06's unsplit job gives the big core 4 times the speed, and L07 shows it finishing first
+whenever less than 82 percent of the job splits.</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>Making a single processor bigger has stopped paying in proportion: twelve times the transistors gave four times the work per clock tick. The same area spent on twelve small processors gives twelve times the work per tick, but only on work that can be cut into twelve independent pieces. A job that cannot be cut goes faster on the one big processor.</p>
+<p>For a manager: before buying more processors, find the share of the job that can be split; below a break-even share one fast processor wins, and above it many small ones do.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>3 times: 12 small cores finish 12x per clock on work split 12 ways, against the big
+core's 4x (L06). On work that cannot be split, the big core is 4 times faster.</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>The slides give one CPU core of the course machine 16 exec units at 3.8 to 5.3 GHz on 8.75 mm², and one GPU core 32 exec units at 2.175 GHz on 1.05 mm². How many exec units per mm² does each have, and how would you find out why the CPU core is still 6 to 7 times faster on Mandelbrot?</p>
+<details><summary>CHECK</summary>
+<pre>CPU: 16 / 8.75 = 1.8 exec units per mm²; GPU: 32 / 1.05 = 30.5 per mm², 16.7 times more
+The CPU core's clock ticks 3.8 / 2.175 = 1.7 to 5.3 / 2.175 = 2.4 times as often, which
+accounts for a factor of 1.7 to 2.4 of the 6 to 7. Two measurements separate the rest: (1) compare per
+clock, not per second; (2) count how many of the GPU core's 32 exec units do useful work
+per instruction on Mandelbrot, where neighbouring places need different numbers of
+repetitions and 32 threads that share one instruction repeat until the slowest is done;
+also count how many independent sets of 32 threads each GPU core had to fill its waits.</pre>
+</details>
+</div>
+
+<nav><a href="20-which-instruction-waits.html">prev: 20 which instruction waits for which</a><a href="22-which-loop-splits.html">next: 22 which loop splits</a></nav>
+</main>
+</body>
+</html>

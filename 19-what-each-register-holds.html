@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What Each Register Holds</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>19. Lecture 2: what each register of the slide's loop holds</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>Lecture 2 of MIT 6.S894 opens with a loop of seven instructions for a simple processor: two loads from memory, a multiply, an add, an add of the number 4, a compare-and-jump, and a store. The lecturer read it aloud in a few seconds: it goes through two lists of numbers, multiplies each pair, and adds the products into one total.</p>
+<p>The learner could read each instruction alone. What did not follow was the address inside the loads, <code>mem[r0+r2]</code>: why add two registers to say where to read, whether mem is an array, and how anyone can tell from the code that r0 must be a large address while r2 stays a small number. Knowing what every instruction does had not said what the loop does.</p>
+<p>The code never states the size or the purpose of any register. Which facts in seven instructions decide what each register holds?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>In this loop, does any instruction change the registers r0 or r1? Yes or no.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "When you say mul L3 R3, what does it mean? The first argument is the result and the second and third are the inputs?" / "Why would anyone do R0 plus R2 inside the mem? Mem is an array or...?" / "So how can a person guess that, okay, R0 will be supposed to be like a real address. R1 is supposed to be like a real address, and R2 is just going to be an offset. I mean, don't use the word offset, or it is a count, or whatever, but it is a small number, right?" / "r5 is never overwritten but by itself and nothing else, finally we store this at the end"</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The loop, exactly as on the slide "A simple processor" of the Lecture 2 slides of MIT 6.S894 (11 September 2025, Jonathan Ragan-Kelley, credited "Slides inspired by Kayvon Fatahalian"): <span class="from">from: the Lecture 2 slides, accelerated-computing.academy/fall25/lectures/slides/Lecture2.pdf</span></p>
+<pre>ld     r3, mem[r0+r2]
+ld     r4, mem[r1+r2]
+mul    r3, r3, r4
+add    r5, r5, r3
+addi   r2, r2, 4
+blt    r2, $400, LOOP
+st     addr[r6], r5
+...</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>ld     r3, mem[r0+r2]</code><span>Add the numbers in r0 and r2; the sum is an address. Read the value stored at that address in memory and put it in r3.</span></li>
+<li><code>ld     r4, mem[r1+r2]</code><span>The same with r1 and r2; the value goes into r4.</span></li>
+<li><code>mul    r3, r3, r4</code><span>Multiply r3 by r4 and put the product in r3.</span></li>
+<li><code>add    r5, r5, r3</code><span>Add r3 to r5 and put the sum in r5.</span></li>
+<li><code>addi   r2, r2, 4</code><span>Add the number 4, written inside the instruction (the i of addi), to r2 and put the sum in r2.</span></li>
+<li><code>blt    r2, $400, LOOP</code><span>If r2 is less than 400, jump to the instruction named LOOP; otherwise go on to the next one. blt stands for branch if less than.</span></li>
+<li><code>st     addr[r6], r5</code><span>Store the value in r5 into memory, at the address held in r6.</span></li>
+<li><code>...</code><span>More instructions follow on the slide; they are not shown.</span></li>
+</ol>
+</div>
+<p class="ln"><b>L02</b> The lecturer, as pasted in your chat: "branching based on the value of R2 ... going back to the beginning, or exiting, and if I exit, then I'm going to store this ultimate value we accumulated in R5 into some place in memory." So LOOP names the first <code>ld</code>, and the store executes once, when <code>blt</code> no longer jumps. <span class="from">from: the lecture's spoken words, as pasted in your chat</span></p>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> Which name in an instruction receives the result? In <code>ld r3, mem[r0+r2]</code> the value read from memory can go to only one place: ____ . In <code>addi r2, r2, 4</code> the sum can go only into ____ , because 4 is a number written in the instruction, not a place. So in <code>mul r3, r3, r4</code> the product goes into ____ , and the inputs are ____ and ____ . <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>ld:   the value from memory goes into r3 (mem[r0+r2] is where it comes from)
+addi: the sum goes into r2 (4 is written inside the instruction)
+so the first name receives the result:
+  mul r3, r3, r4   means   r3 = r3 * r4    (inputs r3 and r4, result in r3)
+  add r5, r5, r3   means   r5 = r5 + r3</pre>
+</details>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> For each register r0 to r6, list the instructions inside the loop that write it (the first name, L03) and those that read it (the other names, and the names inside <code>mem[...]</code> and <code>addr[...]</code>). <span class="from">from: L01, L02, L03</span></p>
+<details><summary>CHECK</summary>
+<pre>register   written inside the loop by    read inside the loop by
+  r0       nothing                       ld r3 (r0 + r2)
+  r1       nothing                       ld r4 (r1 + r2)
+  r2       addi (r2 + 4)                 ld r3, ld r4, addi, blt
+  r3       ld r3, then mul               mul, add
+  r4       ld r4                         mul
+  r5       add (r5 + r3)                 add; st once the loop is left
+  r6       nothing                       st once the loop is left</pre>
+</details>
+<p class="ln"><b>L05</b> The slide does not show the instructions before the loop. Assume r2 holds 0 when the loop begins, and take as example values r0 = 1000 and r1 = 2000, the numbers you used in your chat. <span class="from">from: assumed; the example values are yours</span></p>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> Addresses read. Only <code>addi</code> writes r2 (L04), adding 4 each iteration. Iteration 1 reads addresses ____ and ____ ; iteration 2 reads ____ and ____ ; iteration 3 reads ____ and ____ . After which iteration is r2 equal to 400, so that <code>blt</code> no longer jumps? ____ . Addresses read by that last iteration: ____ and ____ . <span class="from">from: L01, L04, L05</span></p>
+<details><summary>CHECK</summary>
+<pre>iteration   r2 when its loads execute   addresses read
+    1               0                   1000 and 2000
+    2               4                   1004 and 2004
+    3               8                   1008 and 2008
+   ...
+  100             396                   1396 and 2396
+after iteration 100, r2 = 400; 400 &lt; 400 is false, so blt does not jump: 100 iterations
+r0 and r1 never change (L04): r2 alone moves both addresses, by 4 each iteration</pre>
+</details>
+<p class="ln do"><b>L07</b> <b class="x">DO</b> Why 4? Suppose each value in memory took 8 bytes. Iteration 1 would read the 8 bytes at addresses 1000 to ____ , and iteration 2 the 8 bytes from 1004, which are 1004 to ____ . Bytes the two reads share: ____ . Now with 4-byte values: iteration 1 reads 1000 to ____ , iteration 2 reads 1004 to ____ . Bytes shared: ____ . <span class="from">from: L06; a float or a 32-bit integer takes 4 bytes</span></p>
+<details><summary>CHECK</summary>
+<pre>8-byte values: 1000..1007 and 1004..1011 share 1004..1007, so each read would take half of
+one value and half of the next, which is no value the program stored
+4-byte values: 1000..1003 and 1004..1007 share nothing: iteration k reads value number k
+So the 4 in addi is the size of one value. r2 does not count iterations; it says how many
+bytes into each list the current iteration reads: 4 * (k - 1) in iteration k.</pre>
+</details>
+<p class="ln"><b>L08</b> So <code>mem</code> is not an array that the program declared: it is the whole memory, a long list of bytes numbered from 0, and <code>mem[1004]</code> is the value stored at address 1004. The two lists begin at the addresses held in r0 and r1, and r2 says how far into both lists the current iteration reads. <span class="from">from: L06, L07</span></p>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> Example data: the list at address 1000 holds 1, 2, 3, ..., 100, and the list at 2000 holds 100 values, all 2. Assume r5 holds 0 when the loop begins. Fill r3 after the <code>mul</code> and r5 after the <code>add</code> for iterations 1, 2, 3 and 100: ____ . What does <code>st</code> write, and where? ____ . <span class="from">from: L02, L03, L04, L06; example data and r5 = 0 assumed</span></p>
+<details><summary>CHECK</summary>
+<pre>iteration   r3 after ld   r4 after ld   r3 after mul   r5 after add
+    1            1             2              2               2
+    2            2             2              4               6
+    3            3             2              6              12
+   ...
+  100          100             2            200           10100
+r5 after iteration k = 2 * (1 + 2 + ... + k); after 100: 2 * 5050 = 10100
+st writes 10100 at the address held in r6, once, after blt stops jumping (L02)</pre>
+</details>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> Whose values do the <code>mul</code> and the <code>add</code> of iteration 3 read? <code>mul</code> reads r3 and r4 written by the loads of iteration ____ . <code>add</code> reads r3 written by the <code>mul</code> of iteration ____ and r5 written by the <code>add</code> of iteration ____ . Is the r3 loaded in iteration 2 read by anything in iteration 3? ____ . <span class="from">from: L04, L09</span></p>
+<details><summary>CHECK</summary>
+<pre>mul of iteration 3: r3 = 3 and r4 = 2, both loaded in iteration 3
+add of iteration 3: r3 = 6 from iteration 3's mul, and r5 = 6 from iteration 2's add
+iteration 2's r3 is overwritten by iteration 3's load before anything reads it
+r3 and r4 hold one iteration's pair only; apart from r2, r5 is the only value that one
+iteration hands to the next</pre>
+</details>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> Name the role of each register from L04 alone, choosing among: never written (a fixed address); increased by a fixed step and compared with a limit (how far into the lists); loaded fresh before each read (this iteration's value); added to itself (the total so far). r0 ____ , r1 ____ , r2 ____ , r3 ____ , r4 ____ , r5 ____ , r6 ____ . <span class="from">from: L04, L07, L10</span></p>
+<details><summary>CHECK</summary>
+<pre>r0   never written            fixed address of list 1 (1000 in the example)
+r1   never written            fixed address of list 2 (2000)
+r2   + 4, compared with 400   how far into both lists, in bytes (0, 4, ..., 396)
+r3   loaded fresh, then mul   this iteration's value of list 1, then its product
+r4   loaded fresh             this iteration's value of list 2
+r5   added to itself          the total so far (10100 at the end)
+r6   never written            fixed address where the total is stored</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L12</b> <b class="x">DO</b> Collect L03 (the first name receives the result), L04 (which instructions write each register), L06 (addresses 1000, 1004, ..., 1396), L07 (the step 4 is the size of one value), L09 (r5 ends at 10100) and L10 (r3 and r4 are refilled before any later read). Twist: put list 1 at address 200 instead, so r0 = 200, and list 2 at r1 = 600. In which iterations is r2 then larger than r0? ____ . Does any register change its role? ____ . Write one sentence on what decides a register's role. <span class="from">from: L03, L04, L06, L07, L09, L10</span></p>
+<details><summary>CHECK</summary>
+<pre>r2 in iteration k is 4 * (k - 1); it is larger than 200 from k = 52 (r2 = 204) to k = 100
+(r2 = 396): in 49 of the 100 iterations the "small" number is the larger one, and every
+role stays the same, because no instruction treats r0 or r2 differently for being large
+
+A register's role comes from how the loop treats it, not from how big its number is:
+never written: a fixed address (r0, r1, r6); increased by a fixed step and compared with a
+limit: how far into the lists (r2); refilled before each read: this iteration's value
+(r3, r4); added to itself: the total (r5).
+
+Tempting answer that fails: "r0 and r1 are addresses because they are big, and r2 is a
+count because it is small". The code never says how big r0 is (L05 had to assume it), and
+r2 is not a count: it reaches 396 in iteration 100, because the step 4 is the size of one
+value (L07).</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>A short loop can be read without knowing any of its numbers. For each storage place, ask whether the loop changes it and how. A place the loop never changes says where the data lives. A place that grows by a fixed step and is compared with a limit says how far through the data the loop has come. A place refilled every time holds the current item, and a place that adds to itself keeps the total.</p>
+<p>For a manager: ask a candidate which values a loop never changes and which one it keeps adding to; the answer shows whether they read the code or only recognised its words.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>No. No instruction in the loop writes r0 or r1 (L04). They hold the same two addresses
+in all 100 iterations; only r2 moves the addresses, by 4 each time (L06).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>Which instructions of iteration 2 need a value that iteration 1 computed, and which need nothing from iteration 1?</p>
+<details><summary>CHECK</summary>
+<pre>need a value from iteration 1:
+  ld r3 and ld r4   r2 = 4, written by iteration 1's addi
+  addi              r2, written by iteration 1's addi
+  add               r5 = 2, written by iteration 1's add
+need nothing from iteration 1:
+  mul               only iteration 2's two loads
+  blt               only iteration 2's addi
+So iteration 2's loads wait only for iteration 1's addi, not for its loads, its mul or
+its add: the written order of the instructions is not the order the values need.</pre>
+</details>
+</div>
+
+<nav><a href="18-two-places-per-thread.html">prev: 18 two places per thread</a><a href="20-which-instruction-waits.html">next: 20 which instruction waits for which</a></nav>
+</main>
+</body>
+</html>

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Iterations that write different entries can execute at the same time; iterations that add into one entry form a chain.">
+<meta name="keywords" content="Lecture 2, splitting work">
+<title>Which loop of a loop nest splits</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="site">
+<a class="brand" href="MIT-6.S894.html">6.S894 self-study</a>
+<nav><a href="MIT-6.S894.html#syllabus">Lessons</a><a href="index.html">Notes</a><a href="../index.html">Lab pages</a><a href="../words.html">Words</a></nav>
+</header>
+<main>
+<p class="crumbs"><a href="../index.html">GPU Learnings</a> / <a href="index.html">notes</a> / <a href="MIT-6.S894.html">MIT 6.S894</a></p>
+<h1>Which loop of a loop nest splits</h1>
+<p class="sub">Topics: Lecture 2, splitting work. A single idea, with a few lines to calculate. Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+
+<p class="label">The idea</p>
+<div class="story">
+<p>The matrix multiply of Lecture 2 has three loops, over i, k and j, around one statement that adds a product into an entry of C. The lecturer said the iterations of the j loop are independent and could be spread over cores, and described splitting by i as another way.</p>
+<p>The question here: what in the statement says which loop's iterations can execute at the same time, and which loop's cannot?</p>
+</div>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The statement of the Lecture 2 slides of MIT 6.S894 (11 September 2025), inside loops over i, then k, then j: <code>C[i*N + j] += A[i*N + k] * B[k*N + j];</code>. Example for this note, N = 3: A holds 1 to 9 in entries 0 to 8, B holds 1, 0, 2, 0, 1, 0, 3, 0, 1, and C begins at 0. <span class="from">from: the Lecture 2 slides; example data</span></p>
+<p class="ln do"><b>L02</b> <b class="x">DO</b> For i = 0 and k = 0, the j iterations write which entries of C? ____ . For i = 0 and j = 0, the k iterations write which? ____ , and C[0] after each k: ____ . <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>j = 0, 1, 2 write C[0], C[1], C[2] (adding 1, 0 and 2): different entries
+k = 0, 1, 2 all write C[0]: 1, then 1 + 2 * 0 = 1, then 1 + 3 * 3 = 10</pre>
+</details>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> Let the three k iterations execute at the same time, each reading C[0] = 0 before any writes. Which values can C[0] end with? ____ . <span class="from">from: L02</span></p>
+<details><summary>CHECK</summary>
+<pre>the last write wins: 1, 0 or 9, never 10
+k is the one variable missing from the left side C[i*N + j]: iterations differing only in k
+write the same entry and form a chain; iterations differing in j or in i write different
+entries and split</pre>
+</details>
+
+<p class="label">Worked out in full</p>
+<ul class="related">
+<li><a href="../22-which-loop-splits.html">22. Lecture 2: which loop of a matrix multiply can be split, and which cannot</a></li>
+</ul>
+
+<p class="label">Related notes</p>
+<ul class="related">
+<li><a href="core-size.html">Bigger cores or more cores</a>: when the same area does more work as many small cores</li>
+<li><a href="reduction.html">Adding up an array: chain or tree</a>: how a chain of adds into one total can be broken into a tree</li>
+<li><a href="owner.html">Owner: exactly one writer per place</a>: what makes a split of the picture correct, and what makes it fast</li>
+</ul>
+
+<div class="backlinks">
+<p class="label">Lessons and notes that point here</p>
+<!-- backlinks:begin -->
+<ul class="related">
+<li><a href="core-size.html">Bigger cores or more cores</a></li>
+<li><a href="MIT-6.S894.html">MIT 6.S894 Accelerated Computing, Labs 1 and 2, on your own computer</a></li>
+</ul>
+<!-- backlinks:end -->
+</div>
+
+<nav><a href="index.html">all notes</a><a href="MIT-6.S894.html">MIT 6.S894 course page</a></nav>
+</main>
+<footer class="site">
+<p>Independent self-study material for MIT 6.S894 Accelerated Computing, written from one learner's work, and not affiliated with or endorsed by MIT or the course staff. The course pages are at <a href="https://accelerated-computing.academy/fall25/">accelerated-computing.academy/fall25</a> and the starter code at <a href="https://github.com/accelerated-computing-class">github.com/accelerated-computing-class</a>. Every measured number comes from one laptop, a Ryzen 5 4600H with a GTX 1650, unless a sentence says otherwise.</p>
+</footer>
+</body>
+</html>

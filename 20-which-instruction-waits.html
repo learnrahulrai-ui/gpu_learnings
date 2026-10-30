@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Which Instruction Waits</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>20. Lecture 2: which instruction waits for which, and how the next loads begin early</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>Lecture 2 of MIT 6.S894 shows how a processor can go faster on the same loop of seven instructions: it can begin more than one instruction per cycle, and it can begin an instruction before others written above it, as long as the program's result stays the same as if everything had executed in written order. The lecturer added that a value from main memory arrives hundreds of cycles after the load asks for it.</p>
+<p>The learner accepted that the loop's two loads do not depend on each other. The thinking stopped at the loop itself: this iteration's multiply and add are still waiting for memory, so how can the processor already fetch the next iteration's values? And since the total is stored at the end, does the processor not need every earlier product before it moves on?</p>
+<p>An iteration cannot finish until its values arrive. What, exactly, can the next iteration begin without?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>Assume each load's value arrives 200 cycles after the load begins, and the loop has 100 iterations. Strictly in written order, the processor waits for memory once per iteration. A processor that may begin any instruction whose inputs are ready: how many 200-cycle waits long is the whole loop? Write a number.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "so what if an instruction separates them, what does it mean" / "ADDI cannot run before the load store, that is impossible." / "How can you even think of fetching new memory values when your previous for loop internals are not complete?" / "And to be able to store that multiplication result at the end, you need to have all the previous multiplication results, right?" / "Everybody knows that, okay, there will be problems if you execute a wrong instruction. That is not the IQ part."</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The loop, exactly as on the slide "A simple processor" of the Lecture 2 slides of MIT 6.S894 (11 September 2025): <span class="from">from: the Lecture 2 slides, accelerated-computing.academy/fall25/lectures/slides/Lecture2.pdf</span></p>
+<pre>ld     r3, mem[r0+r2]
+ld     r4, mem[r1+r2]
+mul    r3, r3, r4
+add    r5, r5, r3
+addi   r2, r2, 4
+blt    r2, $400, LOOP
+st     addr[r6], r5
+...</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>ld     r3, mem[r0+r2]</code><span>Add the numbers in r0 and r2; the sum is an address. Read the value stored at that address in memory and put it in r3.</span></li>
+<li><code>ld     r4, mem[r1+r2]</code><span>The same with r1 and r2; the value goes into r4.</span></li>
+<li><code>mul    r3, r3, r4</code><span>Multiply r3 by r4 and put the product in r3.</span></li>
+<li><code>add    r5, r5, r3</code><span>Add r3 to r5 and put the sum in r5.</span></li>
+<li><code>addi   r2, r2, 4</code><span>Add the number 4, written inside the instruction (the i of addi), to r2 and put the sum in r2.</span></li>
+<li><code>blt    r2, $400, LOOP</code><span>If r2 is less than 400, jump to the instruction named LOOP; otherwise go on to the next one. blt stands for branch if less than.</span></li>
+<li><code>st     addr[r6], r5</code><span>Store the value in r5 into memory, at the address held in r6.</span></li>
+<li><code>...</code><span>More instructions follow on the slide; they are not shown.</span></li>
+</ol>
+</div>
+<p class="ln"><b>L02</b> In each instruction the first name receives the result: in <code>ld r3, mem[r0+r2]</code> the value from memory can only go into r3, and in <code>addi r2, r2, 4</code> the sum can only go into r2, since 4 is a number written in the instruction. No instruction of the loop writes r0, r1 or r6. <span class="from">from: L01</span></p>
+<p class="ln"><b>L03</b> Assume r2 holds 0 when the loop begins (the slide does not show the instructions before it). r2 is then 4 after iteration 1, 8 after iteration 2, and 400 after iteration 100, when 400 &lt; 400 is false and <code>blt</code> stops jumping: 100 iterations of 6 instructions, 600 in all, then the store. <span class="from">from: L01, L02; r2 = 0 assumed</span></p>
+<p class="ln"><b>L04</b> An instruction needs another if it reads a register that the other wrote, with no instruction writing that register in between. Name the instructions of iteration k, in written order, ka <code>ld r3</code>, kb <code>ld r4</code>, kc <code>mul</code>, kd <code>add</code>, ke <code>addi</code>, kf <code>blt</code>: 1a is the first load of iteration 1, 2e the <code>addi</code> of iteration 2. <span class="from">from: names made for this page; L01</span></p>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> Fill what each instruction of iterations 1 and 2 needs. 1a needs r2 from before the loop. 1b ____ . 1c ____ . 1d ____ . 1e ____ . 1f ____ . 2a ____ . 2b ____ . 2c ____ . 2d ____ . 2e ____ . 2f ____ . <span class="from">from: L01, L02, L04</span></p>
+<details><summary>CHECK</summary>
+<pre>iteration 1                        needs
+  1a  ld   r3, mem[r0+r2]          r2 from before the loop
+  1b  ld   r4, mem[r1+r2]          r2 from before the loop
+  1c  mul  r3, r3, r4              1a, 1b
+  1d  add  r5, r5, r3              1c, and r5 from before the loop
+  1e  addi r2, r2, 4               r2 from before the loop
+  1f  blt  r2, $400, LOOP          1e
+iteration 2
+  2a  ld   r3, mem[r0+r2]          1e
+  2b  ld   r4, mem[r1+r2]          1e
+  2c  mul  r3, r3, r4              2a, 2b
+  2d  add  r5, r5, r3              2c, 1d
+  2e  addi r2, r2, 4               1e
+  2f  blt  r2, $400, LOOP          2e</pre>
+</details>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> Follow the needs from one iteration into the next. Which instruction of iteration 2 needs an instruction of iteration 1 that itself waits for a load? ____ . Which instructions of iteration 2 need only 1e? ____ . Draw the two lists of instructions in which each needs the one of the previous iteration. <span class="from">from: L05</span></p>
+<details><summary>CHECK</summary>
+<pre>only 2d: it needs 1d, which needs 1c, which needs the loads 1a and 1b
+2a, 2b and 2e need only 1e, and 1e needs only r2
+
+chain of r2:   1e -----&gt; 2e -----&gt; 3e -----&gt; ... -----&gt; 100e
+                |         |         |
+                v         v         v
+              2a, 2b    3a, 3b    4a, 4b       the loads hang from the r2 chain
+
+chain of r5:   1d -----&gt; 2d -----&gt; 3d -----&gt; ... -----&gt; 100d -----&gt; st
+                ^         ^         ^
+               1c        2c        3c          each add also needs its own mul,
+                ^         ^         ^          each mul its own two loads
+              1a, 1b    2a, 2b    3a, 3b
+
+no arrow goes from the r5 chain, or from any load, into the r2 chain</pre>
+</details>
+<p class="ln"><b>L07</b> Timing rules for this page, assumed: a load's value arrives 200 cycles after the load begins (the slides give a value from DRAM as arriving after 100s of cycles); every other instruction's result is ready 1 cycle after it begins; at most one instruction begins per cycle. Strictly in order means an instruction begins only after the instruction written before it has begun, and only once its inputs are ready. <span class="from">from: assumed; the Lecture 2 slide "Interleaving requires more state storage" for DRAM</span></p>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> Strictly in order, iteration 1: 1a begins at cycle 0 and 1b at cycle ____ ; their values arrive at cycles ____ and ____ , so 1c begins at ____ ; 1d at ____ ; 1e at ____ ; 1f at ____ ; 2a at ____ . Cycles per iteration: ____ . The store's result after 100 iterations: cycle ____ . <span class="from">from: L05, L07</span></p>
+<details><summary>CHECK</summary>
+<pre>1a 0, 1b 1; values arrive at 200 and 201; 1c 201, 1d 202, 1e 203, 1f 204; 2a 205
+205 cycles per iteration, 200 of them spent waiting for memory
+100 iterations end at 100 * 205 = 20,500; st begins at 20,500, its result at 20,501
+1e waits for 1d although it needs nothing from it (L05): that is the in-order rule,
+not a need</pre>
+</details>
+<p class="ln"><b>L09</b> Out of order: an instruction may begin as soon as its inputs are ready (L05), even while instructions written above it still wait. The rules of L07 still hold: 200 cycles for a load, 1 for the rest, at most one instruction begins per cycle. Assume also that the processor fetches the instructions after <code>blt</code> as soon as <code>blt</code>'s input is ready. <span class="from">from: L05, L07; the last rule assumed</span></p>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> In the first 200 cycles no load's value has arrived. Which of ka to kf can begin in those cycles? ____ . Which cannot? ____ . At one instruction per cycle, the loads of how many iterations begin before cycle 200? ____ . How many load values are waiting at once at cycle 199? ____ . <span class="from">from: L05, L06, L09</span></p>
+<details><summary>CHECK</summary>
+<pre>can begin: ka, kb, ke, kf (they need only r2, through the r2 chain)
+cannot: kc, kd (they need a load's value)
+4 instructions per iteration: 200 / 4 = 50 iterations' loads begin before cycle 200
+50 * 2 = 100 load values waiting at once
+1e can begin at cycle 2 and 1f at cycle 3: where the loop goes next is known
+about 200 cycles before iteration 1's product exists</pre>
+</details>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> A lower limit out of order: 601 instructions (L03), at most one beginning per cycle, so at least ____ cycles. A schedule of the rules of L09, computed for this page by beginning in each cycle the oldest instruction whose inputs are ready, gives 732 cycles, and its last load begins at cycle 529. Check 732 from that load: 529 + ____ (its wait) + ____ (the <code>mul</code>, the <code>add</code> and the store, one cycle each) = ____ . In-order time over out-of-order time: 20,501 / 732 = ____ . <span class="from">from: L03, L08, L09; the schedule computed for this page</span></p>
+<details><summary>CHECK</summary>
+<pre>at least 601 cycles; 529 + 200 + 3 = 732
+20,501 / 732 = 28.0 times faster
+in order: 100 waits of 200 cycles, one after the other
+out of order: the waits overlap; the time is about the 601 cycles of beginning
+instructions, plus the last load's own wait</pre>
+</details>
+<p class="ln do"><b>L12</b> <b class="x">DO</b> Your objection: the store needs every earlier product. Following L06, <code>st</code> needs 100d, which needs 99d, and so on: a chain of 100 adds. Under L07 that chain alone takes ____ cycles. Which is longer, the whole chain of adds or one load's wait? ____ . Does any load or any <code>mul</code> need an <code>add</code>? ____ . <span class="from">from: L06, L07</span></p>
+<details><summary>CHECK</summary>
+<pre>100 adds * 1 cycle = 100 cycles, shorter than one 200-cycle load wait
+no load and no mul needs an add (L06): the products of different iterations need
+nothing from each other
+the store does need every product, through the chain of adds, and that chain trails
+behind the arriving products; it never stops the next loads from beginning</pre>
+</details>
+<p class="ln do"><b>L13</b> <b class="x">DO</b> Storage. The program has one r3 and one r4. At cycle 199, L10 counted ____ load values waiting, each to be written into r3 or into r4. If all of them used the one r3, the load of iteration 2 would overwrite the r3 that ____ has not read yet. Storage places needed at that moment for values named r3 or r4: ____ , against ____ registers in the program. <span class="from">from: L05, L10</span></p>
+<details><summary>CHECK</summary>
+<pre>100 values waiting; iteration 2's load (2a) would overwrite the r3 that 1c, the mul of
+iteration 1, still has to read
+100 storage places at once instead of 2: 50 for values named r3, 50 for values named r4
+Keeping a separate storage place for each instruction that writes a register, while
+earlier readers of that register still wait, is called register renaming.</pre>
+</details>
+<p class="ln"><b>L14</b> The lecturer, as pasted in your chat: "The simple processor is going to have one physical register for each logical register." The slide on the course CPU, a Ryzen 7 7700 with Zen 4 cores, gives each core 192 vector registers, while AVX-512, which Zen 4 executes, lets a program name 32 vector registers, zmm0 to zmm31. <span class="from">from: the lecture's spoken words in your chat; the Lecture 2 slide "Our CPU"; Intel's software developer's manual for the 32 names</span></p>
+<p class="ln do"><b>L15</b> <b class="x">DO</b> Storage places per vector register name in one Zen 4 core: 192 / 32 = ____ . Does the simple processor of the lecturer's sentence have any spare place for a second value named r3? ____ . <span class="from">from: L13, L14</span></p>
+<details><summary>CHECK</summary>
+<pre>192 / 32 = 6 storage places for every name a program can write
+the simple processor has one place per name, so a second value named r3 must wait until
+every reader of the first has read it: out of order needs the extra places of L13</pre>
+</details>
+<p class="ln do"><b>L16</b> <b class="x">DO</b> The wrong guess. A processor that guesses <code>blt</code>'s outcome before its input is ready, and always guesses "jump back", is wrong ____ times in 100. After the wrong guess it begins loads at addresses r0 + ____ and r1 + ____ , one value past the end of each list. Which results must it throw away so that the program's result is unchanged? ____ . <span class="from">from: L03, L05, L06</span></p>
+<details><summary>CHECK</summary>
+<pre>wrong once, at iteration 100; the 99 jumps back are right
+the guessed iteration 101 loads from r0 + 400 and r1 + 400, past both lists
+it must throw away every result of the guessed instructions: the two loads, the mul and
+above all the add into r5 and anything that would reach memory, so that st still writes
+the total of 100 products
+the guess decides what to fetch before blt executes; blt itself needs only the r2 chain
+(L06), so the outcome is known long before any product is</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L17</b> <b class="x">DO</b> Collect L06 (no arrow from the r5 chain or any load into the r2 chain), L08 (205 cycles per iteration in order, 20,501 in all), L10 (4 of the 6 instructions need no load; 100 values waiting at cycle 199), L11 (732 cycles, 28.0 times faster), L12 (the chain of adds takes 100 cycles, less than one load's wait) and L13 (100 storage places instead of 2). Write one sentence on what lets the next iteration's loads begin while this iteration's multiply waits, and one on what it costs. <span class="from">from: L06, L08, L10, L11, L12, L13</span></p>
+<details><summary>CHECK</summary>
+<pre>The loop holds two chains, r2's (addi to addi, 1 cycle each) and r5's (add to add), and
+the loads hang only from the r2 chain: where to read next never depends on what was read,
+so the 200-cycle waits of 50 iterations overlap instead of following one another.
+The cost is storage, one place for each waiting value (100 instead of the program's r3 and
+r4), and the work of making the result come out as if nothing had been reordered.
+
+Tempting answer that fails: "an iteration must finish before the next one begins, so out of
+order can only overlap the 1-cycle instructions inside one iteration, which still leaves
+100 waits of 200 cycles, about 20,000 cycles". L05 shows 2a and 2b need only 1e, and the
+schedule of L11 finishes in 732 cycles.</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>A processor waiting for memory can keep asking for the next items, as long as asking does not depend on the answer it is waiting for. In this loop, where to read next comes from a counter, never from the values read, so dozens of requests can be waiting at once and their waits overlap. The price is room to hold every answer that has not been used yet, and the bookkeeping that makes the result come out as if nothing had been reordered.</p>
+<p>For a manager: when work waits on slow memory, ask whether the next request depends on the previous answer; if it does not, the waits can overlap, and the same hardware can finish tens of times sooner.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>Under this page's assumptions: 732 cycles, 732 / 200 = 3.7 load waits, against 20,501
+cycles, about 102.5 waits, strictly in order (L08, L11).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>Suppose the processor can hold at most 60 instructions counted from the oldest unfinished one, which is 10 iterations of this loop. Under the same rules, about how many cycles does the loop take?</p>
+<details><summary>CHECK</summary>
+<pre>The loads of only 10 iterations can be waiting at once, so 100 iterations need about
+100 / 10 = 10 rounds of one 200-cycle wait: about 10 * 205 = 2,050 cycles.
+The schedule computed for this page with that limit gives 2,090 cycles: about 10 times
+faster than in order (20,501), about 3 times slower than without a limit (732).
+How many unfinished instructions the processor can hold sets how many waits overlap.</pre>
+</details>
+</div>
+
+<nav><a href="19-what-each-register-holds.html">prev: 19 what each register holds</a><a href="21-from-where-is-three.html">next: 21 from where is the 3</a></nav>
+</main>
+</body>
+</html>

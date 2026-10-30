@@ -45,6 +45,8 @@
 <li><a href="program-counter.html">A program counter for every thread</a>: Since Volta, each thread keeps its own program counter; the 32-thread unit still matters, because equal program counters let one instruction serve 32 threads.</li>
 <li><a href="second-round.html">A second round of blocks</a>: On the course GPU, 12.5 percent more work took 87 percent more time. Blocks that do not fit wait for a second round.</li>
 <li><a href="reduction.html">Adding up an array: chain or tree</a>: A plain loop over 20 million floats is a chain of 20 million adds and stops counting at 16,777,216; a tree has 25 levels and gets 20,000,000.</li>
+<li><a href="select-not-jump.html">An if-else under one instruction</a>: With one instruction for 8 indices, both sides of an if-else execute and a mask keeps one value per index; the work of the side not kept is the cost.</li>
+<li><a href="core-size.html">Bigger cores or more cores</a>: On the Lecture 2 graph, 12 times the transistors gave 4 times the work per clock; 12 small cores in the same area give 12 times, but only on work that splits.</li>
 <li><a href="combining-speedups.html">Combining speedups</a>: The product of step-by-step speedups always equals the total, so it tests nothing. Compare a technique's gain alone with its gain on top of the others.</li>
 <li><a href="filling-the-wait.html">Filling the 4-cycle wait: needed against held</a>: A scheduler of the GTX 1650 holds up to 8 sets of 32 threads, but chains of multiply-adds need only 2. Why filling the chip to its maximum is not the target.</li>
 <li><a href="independent-chains.html">Independent chains inside one thread</a>: A multiply-add that needs the previous result waits 4 cycles; a second chain fills the wait; a fourth chain finds nothing left to fill.</li>
@@ -60,8 +62,12 @@
 <li><a href="middleman-pair.html">The middleman pair (cx, cy)</a>: How a place (i, j) on the image paper becomes a point (cx, cy) on the graph paper, and what img_size does and does not change.</li>
 <li><a href="register-budget.html">The register budget</a>: Every SM has 65,536 registers, shared by all the threads it holds: 64 each at 1,024 threads, and when using more actually slows a kernel.</li>
 <li><a href="tiles.html">Tiles in shared memory</a>: The plain matrix multiply reads 8.6 billion bytes for 2.1 billion operations; tiles of T by T divide that by T; T = 84 would need 55 KB of an SM's 64 KB.</li>
+<li><a href="exec-units.html">What a count of exec units limits</a>: 16 ALUs in a CPU core and 32 FP32 units in a GPU scheduler count operations that begin per clock, not the numbers a program can hold.</li>
+<li><a href="register-roles.html">What each register of a loop holds</a>: Which instructions write a register, and how, decide its role; the size of its number never does.</li>
 <li><a href="clock-reads.html">What sits between two clock reads</a>: The source code put an add before the timer; the machine listing put it after. How to know what a timing contains, and how giving the clock read inputs fixes it.</li>
+<li><a href="next-iteration.html">What the next iteration can begin without</a>: In the Lecture 2 loop the loads need only the add of 4 to r2, so the waits for memory of many iterations overlap; the price is a storage place for every waiting value.</li>
 <li><a href="checking-the-output.html">What the printed difference can hide</a>: A single wrong place prints 0.000000000477; a missing line of the picture prints 169 times less than a harmless rounding change.</li>
+<li><a href="which-loop-splits.html">Which loop of a loop nest splits</a>: Iterations that write different entries can execute at the same time; iterations that add into one entry form a chain.</li>
 </ul>
 <!-- all:end -->
 
@@ -71,11 +77,15 @@
 <ul class="related">
 <li><a href="reduction.html">Adding up an array: chain or tree</a></li>
 <li><a href="independent-chains.html">Independent chains inside one thread</a></li>
+<li><a href="next-iteration.html">What the next iteration can begin without</a></li>
 </ul>
 <p><b>CPU</b></p>
 <ul class="related">
+<li><a href="select-not-jump.html">An if-else under one instruction</a></li>
 <li><a href="simd-avx2.html">SIMD on the CPU: 8 places in one AVX2 instruction</a></li>
 <li><a href="mask.html">The mask, and why all ones reads as -1</a></li>
+<li><a href="exec-units.html">What a count of exec units limits</a></li>
+<li><a href="register-roles.html">What each register of a loop holds</a></li>
 </ul>
 <p><b>GPU chip</b></p>
 <ul class="related">
@@ -87,6 +97,16 @@
 <li><a href="sm.html">SM: the block of hardware a GPU chip is built from</a></li>
 <li><a href="warp.html">The 32-thread unit</a></li>
 <li><a href="register-budget.html">The register budget</a></li>
+<li><a href="exec-units.html">What a count of exec units limits</a></li>
+</ul>
+<p><b>Lecture 2</b></p>
+<ul class="related">
+<li><a href="select-not-jump.html">An if-else under one instruction</a></li>
+<li><a href="core-size.html">Bigger cores or more cores</a></li>
+<li><a href="exec-units.html">What a count of exec units limits</a></li>
+<li><a href="register-roles.html">What each register of a loop holds</a></li>
+<li><a href="next-iteration.html">What the next iteration can begin without</a></li>
+<li><a href="which-loop-splits.html">Which loop of a loop nest splits</a></li>
 </ul>
 <p><b>measuring</b></p>
 <ul class="related">
@@ -104,8 +124,10 @@
 <p><b>splitting work</b></p>
 <ul class="related">
 <li><a href="second-round.html">A second round of blocks</a></li>
+<li><a href="core-size.html">Bigger cores or more cores</a></li>
 <li><a href="iters.html">iters: repetitions until the while loop is left</a></li>
 <li><a href="owner.html">Owner: exactly one writer per place</a></li>
+<li><a href="which-loop-splits.html">Which loop of a loop nest splits</a></li>
 </ul>
 <p><b>the picture</b></p>
 <ul class="related">

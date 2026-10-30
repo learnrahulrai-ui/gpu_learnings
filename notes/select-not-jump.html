@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="With one instruction for 8 indices, both sides of an if-else execute and a mask keeps one value per index; the work of the side not kept is the cost.">
+<meta name="keywords" content="Lecture 2, CPU">
+<title>An if-else under one instruction</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="site">
+<a class="brand" href="MIT-6.S894.html">6.S894 self-study</a>
+<nav><a href="MIT-6.S894.html#syllabus">Lessons</a><a href="index.html">Notes</a><a href="../index.html">Lab pages</a><a href="../words.html">Words</a></nav>
+</header>
+<main>
+<p class="crumbs"><a href="../index.html">GPU Learnings</a> / <a href="index.html">notes</a> / <a href="MIT-6.S894.html">MIT 6.S894</a></p>
+<h1>An if-else under one instruction</h1>
+<p class="sub">Topics: Lecture 2, CPU. A single idea, with a few lines to calculate. Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+
+<p class="label">The idea</p>
+<div class="story">
+<p>An if usually becomes a jump to one side or the other. When one instruction serves 8 indices, a jump would move all 8 together, so it cannot send some indices one way and the rest the other.</p>
+<p>The question here: what does the machine execute instead, what keeps the result correct, and what fraction of the work is kept?</p>
+</div>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The slide "SIMD execution requires coherent control" of the Lecture 2 slides of MIT 6.S894 (11 September 2025): 8 ALUs under one instruction, the test <code>x &gt; 0</code> giving T T F T F F F F, then 3 statements on the if side with ALUs 1, 2 and 4 shaded, and 2 on the else side with the other five shaded. <span class="from">from: the Lecture 2 slides</span></p>
+<p class="ln do"><b>L02</b> <b class="x">DO</b> Taking each statement as one step: ALU-steps in the if-else ____ ; shaded ____ ; useful share ____ percent. <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>3 * 8 + 2 * 8 = 40 ALU-steps; 3 * 3 + 2 * 5 = 19 shaded; 19 / 40 = 47.5 percent</pre>
+</details>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> gcc 13.3.0 with <code>-O3 -mavx2 -fno-trapping-math</code> compiles <code>if (x[i] &gt; 0) v = x[i] * 10; else v = 0;</code> into <code>vmulps</code> (x times 10 at all 8 indices), <code>vcmpltps</code> (32 one-bits where 0 &lt; x, zero-bits elsewhere) and <code>vandps</code>. For x = -2, 3, -1, 4, 5, -6, 7, -8, y = ____ . With <code>else v = 5;</code> it uses <code>vblendvps</code> instead; y = ____ . <span class="from">from: L01; gcc 13.3.0 output on the machine that built this site</span></p>
+<details><summary>CHECK</summary>
+<pre>AND: 0 30 0 40 50 0 70 0 (the compiled program printed exactly this)
+blend: 5 30 5 40 50 5 70 5 (printed exactly this)
+both sides are computed at all 8 indices and the mask keeps one value per index: correct
+as long as the side not kept cannot fault or write memory</pre>
+</details>
+
+<p class="label">Worked out in full</p>
+<ul class="related">
+<li><a href="../24-if-else-one-instruction.html">24. Lecture 2: an if-else when one instruction serves 8 indices</a></li>
+</ul>
+
+<p class="label">Related notes</p>
+<ul class="related">
+<li><a href="mask.html">The mask, and why all ones reads as -1</a>: how each of 8 indices keeps its own count in the Lab 1 vector loop</li>
+<li><a href="program-counter.html">A program counter for every thread</a>: why the 32-thread unit still matters when every GPU thread has its own program counter</li>
+<li><a href="exec-units.html">What a count of exec units limits</a>: whether 16 ALUs or 32 FP32 units limit how many numbers a program holds</li>
+</ul>
+
+<div class="backlinks">
+<p class="label">Lessons and notes that point here</p>
+<!-- backlinks:begin -->
+<ul class="related">
+<li><a href="MIT-6.S894.html">MIT 6.S894 Accelerated Computing, Labs 1 and 2, on your own computer</a></li>
+<li><a href="exec-units.html">What a count of exec units limits</a></li>
+</ul>
+<!-- backlinks:end -->
+</div>
+
+<nav><a href="index.html">all notes</a><a href="MIT-6.S894.html">MIT 6.S894 course page</a></nav>
+</main>
+<footer class="site">
+<p>Independent self-study material for MIT 6.S894 Accelerated Computing, written from one learner's work, and not affiliated with or endorsed by MIT or the course staff. The course pages are at <a href="https://accelerated-computing.academy/fall25/">accelerated-computing.academy/fall25</a> and the starter code at <a href="https://github.com/accelerated-computing-class">github.com/accelerated-computing-class</a>. Every measured number comes from one laptop, a Ryzen 5 4600H with a GTX 1650, unless a sentence says otherwise.</p>
+</footer>
+</body>
+</html>

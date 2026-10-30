@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sixteen ALUs</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>23. Lecture 2: what the 16 ALUs count, and how many vector variables a program can declare</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>Lecture 2 of MIT 6.S894 draws one box labelled Fetch &amp; Decode above a long line of boxes labelled ALU 1, ALU 2 and so on to ALU 16 and beyond, each above its own box labelled State, and under all of them one wide box labelled Shared State. This way of executing, one instruction for many arithmetic circuits, is called SIMD, and the slide says it can be written into the instruction set, as in Intel's AVX and ARM's NEON, or be built invisibly into many GPUs.</p>
+<p>The learner had already written AVX code: vectors of 8 floats in a 256-bit type, added pairwise by one instruction. The drawing still made no sense. If one core has 16 ALUs, can a program declare only 16 vector variables? Why 16, when an AVX add takes 8 pairs? And what is a state that each ALU owns, next to a state they all share?</p>
+<p>The drawing counts something about one core. Is it how many numbers the core can hold, or how many it can work on in one tick of its clock?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>The course CPU has 16 ALUs in each core. How many vector variables of 8 floats each can one function on it declare and use: 16, 192, or more than 1,000?</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "So that means SIMD means one core as of now. But he has drawn sixteen ALUs. So are you saying that my one core has sixteen ALUs" / "So if the professor is saying on single core, the number of ALUs are constant, he is drawing sixteen. Does that mean I can declare only sixteen of those variables" / "so at a time I can do how many vector additions -- 16 of them -- each needing 3 - two input and one output" / "I was under the impression a lane is a highway" / "tell me here what is a shared state and what is state why so many states and one shared state"</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The slide "Idea 2: amortize control overhead with SIMD execution" of the Lecture 2 slides of MIT 6.S894 (11 September 2025): one Fetch &amp; Decode box; under it ALU 1 to ALU 16, then "…"; under each ALU its own State 1 to State 16; under all of them one Shared State. Beside it: "SIMD can be explicit in ISA (Intel AVX, ARM NEON, etc.) or implicit in many GPUs", where ISA, the instruction set, is the list of instructions a processor accepts. <span class="from">from: the Lecture 2 slides, accelerated-computing.academy/fall25/lectures/slides/Lecture2.pdf</span></p>
+<p class="ln"><b>L02</b> The slide "Our CPU", about one core of the course CPU, a Ryzen 7 7700 with Zen 4 cores: "Two 256-bit vector ALUs = 16 x 32-bit exec. units", "192 vector registers", "1 MB cache", "2 hyperthreads". The slide for the course GPU writes "32 x 32-bit Exec. Units" and calls them ALUs. <span class="from">from: the Lecture 2 slides "Our CPU" and "Our GPU"</span></p>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> A float takes 32 bits. Each 256-bit vector ALU works on 256 / 32 = ____ floats at once; the core's pair of them makes ____ 32-bit exec units. Is that the same count as the drawing's 16? ____ . <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>256 / 32 = 8 floats per vector ALU; 2 * 8 = 16 32-bit exec units in one Zen 4 core
+the same count: in the slides' own words, one ALU of the drawing is one 32-bit exec unit,
+a circuit for one 32-bit number, and one Zen 4 core has 16 of them inside its two 256-bit
+vector ALUs</pre>
+</details>
+<p class="ln"><b>L04</b> On your laptop's Ryzen 5 4600H (Zen 2, with AVX2), the instruction <code>vaddps</code> on 256-bit registers adds two sets of 8 floats index by index: index k of the result is index k of the first input plus index k of the second, for k = 0 to 7. In C++ it is written <code>_mm256_add_ps(a, b)</code>. <span class="from">from: Intel's intrinsics guide; your hardware audit (Ryzen 5 4600H, AVX2)</span></p>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> a holds 1.5, 2, 3, 4, 5, 6, 7, 8 and b holds 10, 20, 30, 40, 50, 60, 70, 80, at index 0 to 7. Fill one <code>vaddps</code>, down the indices: ____ . Floats read: ____ . Floats written: ____ . 32-bit exec units used: ____ . <span class="from">from: L03, L04</span></p>
+<details><summary>CHECK</summary>
+<pre>index    a      b      a + b
+  0     1.5    10      11.5
+  1     2      20      22
+  2     3      30      33
+  3     4      40      44
+  4     5      50      55
+  5     6      60      66
+  6     7      70      77
+  7     8      80      88
+one instruction: 16 floats read, 8 written, 8 exec units used, one per index</pre>
+</details>
+<p class="ln"><b>L06</b> Agner Fog's instruction tables for Zen 2: two 256-bit vector float adds can begin per cycle, and two 256-bit vector float multiplies; an add's result is ready 3 cycles after it begins. <span class="from">from: Agner Fog's instruction tables, Zen 2</span></p>
+<p class="ln do"><b>L07</b> <b class="x">DO</b> Your count, 16 vector additions at a time, each needing 3. On one Zen 2 core, vector adds begun per cycle: ____ . Float additions inside them: 2 * 8 = ____ . Floats read per cycle: ____ ; written: ____ . Registers named by each vector add: ____ . <span class="from">from: L05, L06</span></p>
+<details><summary>CHECK</summary>
+<pre>2 vector adds per cycle, not 16; they hold 2 * 8 = 16 float additions
+2 * 16 = 32 floats read and 2 * 8 = 16 written per cycle
+each vector add names 3 registers of 8 floats (2 inputs, 1 result): 24 floats
+16 counts float additions per cycle; vector additions per cycle are 2</pre>
+</details>
+<p class="ln"><b>L08</b> AVX2 in 64-bit mode gives a program 16 vector register names, ymm0 to ymm15, each 256 bits. A C++ variable of type <code>__m256</code> holds 8 floats, 32 bytes. The course CPU slide (L02) gives one Zen 4 core 192 vector registers. <span class="from">from: Intel's software developer's manual; L02</span></p>
+<p class="ln"><b>L09</b> A function written for this page keeps 20 <code>__m256</code> sums: each repetition of its loop adds 8 new floats into each sum with <code>_mm256_add_ps</code>. Compiled with gcc 13.3.0 (<code>-O3 -mavx2</code>) on the machine that built this site, its loop has 34 instructions: 20 <code>vaddps</code>, 4 for the counter and the jump back, and 10 that copy between registers and memory, in this pattern for each of 5 sums, with other instructions between: <span class="from">from: gcc 13.3.0 output, on the machine that built this site</span></p>
+<pre>vmovaps 8(%rsp), %ymm0
+vaddps  64(%rdi), %ymm0, %ymm0
+vmovaps %ymm0, 8(%rsp)</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>vmovaps 8(%rsp), %ymm0</code><span>Copy 32 bytes, one sum of 8 floats, from memory 8 bytes past the address in rsp (the stack, the function's own memory) into the register ymm0.</span></li>
+<li><code>vaddps  64(%rdi), %ymm0, %ymm0</code><span>Add the 8 floats found 64 bytes past the address in rdi to ymm0, index by index, and keep the result in ymm0.</span></li>
+<li><code>vmovaps %ymm0, 8(%rsp)</code><span>Copy ymm0 back to the same 32 bytes of the stack.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> Sums that stay in registers the whole time: ymm1 to ymm15 hold ____ of them. The other ____ sums live on the stack and take turns in ymm0. Extra instructions per repetition for them: ____ loads and ____ stores. Does the function compile and give 20 sums? ____ . <span class="from">from: L08, L09</span></p>
+<details><summary>CHECK</summary>
+<pre>15 sums stay in ymm1..ymm15; 20 - 15 = 5 live in memory and take turns in ymm0
+5 loads + 5 stores = 10 extra instructions per repetition (34 = 20 + 10 + 4)
+yes: 20 variables compile; the 16 names limit how many sit in registers at once, and each
+of the rest costs a trip to memory every time it is used</pre>
+</details>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> Memory for variables: 1,000 <code>__m256</code> variables take 1,000 * 32 = ____ bytes. Your laptop's hardware audit lists L1d: 192 KiB over 6 cores, so ____ KiB = ____ bytes per core of the fastest data cache. Do 1,000 such variables fit in one core's L1 data cache? ____ . <span class="from">from: L08; your hardware audit (L1d 192 KiB, 6 cores)</span></p>
+<details><summary>CHECK</summary>
+<pre>1,000 * 32 = 32,000 bytes; 192 / 6 = 32 KiB = 32 * 1024 = 32,768 bytes per core
+32,000 &lt; 32,768: they fit, with 768 bytes to spare
+the number of variables is limited by memory, not by the 16 ALUs or the 16 names</pre>
+</details>
+<p class="ln"><b>L12</b> The 4 other instructions of the loop of L09 are <code>addq $160, %rax</code>, <code>addq $640, %rdi</code>, <code>cmpq %rax, %rdx</code> and <code>jg .L3</code>: they move the counter on by 160 floats and the address on by 640 bytes, and jump back while floats remain. <span class="from">from: gcc 13.3.0 output, as L09</span></p>
+<p class="ln do"><b>L13</b> <b class="x">DO</b> Sort the storage of L09 to L12 by whether it holds a different number at each index 0 to 7: ymm0 to ymm15 ____ ; rax, rdx, rdi, rsp ____ ; the address of the next instruction ____ . Read the drawing of L01 with this: State k is ____ ; Shared State is ____ . <span class="from">from: L01, L05, L09, L12</span></p>
+<details><summary>CHECK</summary>
+<pre>ymm0..ymm15: a different float at each index; index k of each is read and written only
+by exec unit k
+rax, rdx, rdi, rsp: one number for all 8 indices (a counter, addresses)
+the next instruction's address: one for all, which is why one Fetch &amp; Decode suffices
+State k: index k of every vector register
+Shared State: the one-number registers and the instruction address, used by all
+(a reading of the drawing on AVX2; the slide does not name the registers)</pre>
+</details>
+<p class="ln do"><b>L14</b> <b class="x">DO</b> A single core or several? A program with one <code>_mm256_add_ps</code> and no threads. The laptop has 6 cores (your hardware audit), and by the slides' counting each Zen 2 core has 2 * 8 = 16 exec units for vector float adds (L06). Exec units the program can use: ____ of ____ . <span class="from">from: L06; your hardware audit (6 cores)</span></p>
+<details><summary>CHECK</summary>
+<pre>16 of 6 * 16 = 96: one stream of instructions executes on one core; its vector
+instructions use that core's exec units, and the other 5 cores stay idle unless the
+program creates threads of its own</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L15</b> <b class="x">DO</b> Collect L03 (16 = 2 * 8 exec units per core), L05 (one vaddps: 16 floats in, 8 out, 8 exec units), L07 (2 vector adds per cycle, 16 float additions), L10 (20 sums compile; 5 live on the stack), L11 (1,000 variables in 32,000 bytes) and L14 (one program without threads uses 16 of 96). Write one sentence on what the drawing's 16 counts and what it does not. <span class="from">from: L03, L05, L07, L10, L11, L14</span></p>
+<details><summary>CHECK</summary>
+<pre>The 16 counts float operations one core can begin per cycle (2 vector instructions of 8);
+it does not count how many numbers a program can hold. Variables live in memory; the 16
+ymm names are what instructions can name at once (with 192 storage places behind them in
+a Zen 4 core); a variable that is not in a register costs a load and a store when used.
+
+Tempting answer that fails: "16 ALUs, so 16 vector variables". L10's 20 sums compile and
+give 20 results, and L11's 1,000 variables fit in 32,000 bytes of memory.</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>A processor core has a fixed number of arithmetic circuits, and that number says how many number operations can begin in one tick of its clock. It says nothing about how many numbers a program can keep. Those live in memory, and a small set of fast holding places inside the core keeps the ones in use right now; when there are more, the rest wait in memory and are fetched when needed.</p>
+<p>For a manager: arithmetic circuits set peak speed and memory sets capacity; an estimate that mixes the two will be wrong on both.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>More than 1,000: 1,000 variables of 8 floats take 32,000 bytes of memory (L11).
+16 is the count of float operations a core can begin per cycle (L03, L07); 16 register
+names, with 192 vector registers behind them on the course CPU, hold the ones in use.</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>On Zen 2, a vector float add's result is ready 3 cycles after it begins, and 2 can begin per cycle. A loop adds a long array into independent __m256 sums. How many sums are needed to begin 2 adds in every cycle, and are the 16 register names enough?</p>
+<details><summary>CHECK</summary>
+<pre>Each sum's next add waits 3 cycles for its previous result; to begin 2 adds in each of
+those 3 cycles, 2 * 3 = 6 independent sums are needed. 6 sums use 6 of the 16 names, so
+none has to live in memory; 20 sums would add the loads and stores of L10 without
+beginning more than 2 adds per cycle.</pre>
+</details>
+</div>
+
+<nav><a href="22-which-loop-splits.html">prev: 22 which loop splits</a><a href="24-if-else-one-instruction.html">next: 24 an if-else under one instruction</a></nav>
+</main>
+</body>
+</html>

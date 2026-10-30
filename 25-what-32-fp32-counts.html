@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What 32 FP32 Counts</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>25. Lecture 2: what 32 FP32 exec units count, and how many floats a thread can hold</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>Lecture 2 of MIT 6.S894 describes one "core" of the course GPU, an NVIDIA RTX 4000 Ada. NVIDIA calls a set of 32 threads that execute one instruction together a warp, and the circuit that picks which warp's next instruction begins a warp scheduler; the slide's core is one warp scheduler, with 32 exec units for 32-bit numbers, 512 registers of 32 times 32 bits, one instruction for a warp per clock, and up to 12 warps kept at once.</p>
+<p>The learner heard FP32, warp scheduler and one instruction per clock together and could not connect them. A thread can hold thousands of float variables, so how can there be only one exec unit per thread? If each of 32 threads computes three independent sums, or fifteen, does some of the work leak into another thread's hardware? And what do these numbers look like on the laptop's GTX 1650?</p>
+<p>What does a count of exec units limit: how many floats a thread can have, or how many float operations can begin in one clock?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>On the laptop's GTX 1650, one warp scheduler has 16 FP32 exec units. Each of 32 threads adds 15 independent pairs of floats. At least how many cycles does the scheduler need to begin all of these additions? Write a number.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "In a NVIDIA thread I can have thousands and thousands of floating point variables. Why are you saying there is only one?" / "That is leaking of data between threads, right?" / "what if i have float x = 15 sums in each of the 32 threads" / "A warp scheduler just schedules threads, right, or schedules warps, right? It is got nothing to do with the data type, right" / "max ilp = 1 means what? in one cycle"</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> NVIDIA's CUDA programming guide: the GPU executes threads in sets of 32 called warps, one instruction at a time for the whole warp. A warp scheduler is the circuit that, each clock, picks which warp's next instruction begins. <span class="from">from: the CUDA programming guide</span></p>
+<p class="ln"><b>L02</b> The slide "Our GPU" of the Lecture 2 slides of MIT 6.S894 (11 September 2025), about one "core" of the course GPU, a warp scheduler of the RTX 4000 Ada (AD104 chip): "32 x 32-bit Exec. Units", "512 x 32 x 32-bit regs", "1 warp instruction / clock", "Up to 12 live threads (independent warps)". Each SM, a block of the chip, holds 4 such schedulers, and the GPU has 48 SMs. <span class="from">from: the Lecture 2 slides, accelerated-computing.academy/fall25/lectures/slides/Lecture2.pdf</span></p>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> FP32 means a float of 32 bits. An FP32 add instruction for a warp is 32 additions, one for each thread (L01). On the scheduler of L02, exec units each thread's addition uses: ____ . Warp instructions begun per clock: ____ , so float additions per clock: ____ . <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>1 exec unit per thread for one instruction; 1 warp instruction per clock;
+32 additions per clock
+"32 x 32-bit exec units" counts additions that begin per clock, one for each thread of a warp</pre>
+</details>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> Your example: 32 threads, each computing three independent sums a + b, c + d and e + f of floats. Additions in all: ____ . Each sum is one FP32 add instruction for the warp, so instructions: ____ . Clocks to begin them on the scheduler of L02: ____ . Which exec unit does thread 5's c + d use? ____ . <span class="from">from: L02, L03</span></p>
+<details><summary>CHECK</summary>
+<pre>32 * 3 = 96 additions = 3 warp instructions = 3 clocks to begin
+thread 5's c + d uses exec unit 5 in the clock of the second instruction, and its a + b
+used the same unit one clock earlier
+no thread's numbers go to another thread's exec unit, so nothing leaks between threads;
+the 3 sums take turns on the thread's own unit</pre>
+</details>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> Fifteen independent sums in each of the 32 threads: additions ____ ; warp instructions ____ ; clocks to begin them on the course GPU's scheduler ____ . <span class="from">from: L03, L04</span></p>
+<details><summary>CHECK</summary>
+<pre>32 * 15 = 480 additions = 15 warp instructions = 15 clocks</pre>
+</details>
+<p class="ln"><b>L06</b> Your laptop's GTX 1650 is a Turing GPU: NVIDIA's Turing tuning guide gives an SM 64 FP32 units and 4 warp schedulers, 64 / 4 = 16 per scheduler. Measured on your GTX 1650 in the Lab 2 prelab: with four independent chains of multiply-adds, 2 cycles per warp multiply-add, (1031 - 519) / 256 = 2; with one chain, where each multiply-add needs the previous result, 4 cycles each, (1055 - 281) / 192 = 4.03. <span class="from">from: the Turing tuning guide; your output</span></p>
+<p class="ln do"><b>L07</b> <b class="x">DO</b> On 16 FP32 units, a warp instruction of 32 additions needs 32 / 16 = ____ cycles to begin. Does that match the measured 2? ____ . The 15 independent sums of L05 on one laptop scheduler: at least ____ cycles. <span class="from">from: L05, L06</span></p>
+<details><summary>CHECK</summary>
+<pre>32 / 16 = 2 cycles per warp instruction, the measured 2
+15 * 2 = 30 cycles to begin the 15 additions of all 32 threads</pre>
+</details>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> Now make it a chain in each thread: x = a + b + c + ... over 16 values, 15 adds, each needing the previous sum. Assume each add waits for the one before as long as the measured multiply-add of L06, 4 cycles. With this warp alone on the scheduler, cycles for the chain: about ____ . Against the 30 of L07, the exec units are busy ____ percent of the time. <span class="from">from: L06, L07; the 4 cycles assumed for an add</span></p>
+<details><summary>CHECK</summary>
+<pre>15 adds * 4 cycles = about 60 cycles, against 30 cycles of beginning instructions
+busy 30 / 60 = 50 percent: in each 4-cycle wait, 2 cycles begin this warp's add, and the
+other 2 have nothing to begin unless another warp, or another independent sum, is there</pre>
+</details>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> The number of a thread's instructions whose inputs are ready at the same moment is called its instruction-level parallelism, ILP. ILP of L05's 15 independent sums: ____ . ILP of L08's chain: ____ . Does "ILP = 1" mean one instruction per cycle? ____ . <span class="from">from: L05, L08</span></p>
+<details><summary>CHECK</summary>
+<pre>15 independent sums: up to 15 ready at once; the chain of L08: 1 at a time
+no: ILP = 1 means each instruction needs the one before it, so only one is ready at any
+moment; here that one begins every 4 cycles, not every cycle (L08)</pre>
+</details>
+<p class="ln"><b>L10</b> Registers, from L02: each scheduler holds 512 registers of 32 * 32 bits, that is 512 * 32 = 16,384 registers of 32 bits, one 32-bit value of one thread in each. On the laptop, the CUDA programming guide gives compute capability 7.5 64 K = 65,536 32-bit registers per SM, at most 255 per thread, and at most 32 warps per SM; 65,536 / 4 = 16,384 per scheduler. <span class="from">from: L02; the CUDA programming guide, version 12.4</span></p>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> How many floats can each thread keep in registers? With a single warp on a scheduler: 16,384 / 32 = ____ , but at most ____ per thread. With 8 warps on a laptop scheduler (32 warps per SM / 4 schedulers): 16,384 / (8 * 32) = ____ per thread. A thread with thousands of float variables: where do the rest live? ____ . <span class="from">from: L10</span></p>
+<details><summary>CHECK</summary>
+<pre>a single warp: 16,384 / 32 = 512, but the limit is 255 registers per thread
+8 warps: 16,384 / 256 = 64 registers per thread
+the rest live in memory (NVIDIA calls the memory for a thread's values that do not fit in
+its registers local memory), and the compiler loads them when an instruction needs them
+thousands of variables is storage; 32 exec units is additions begun per clock</pre>
+</details>
+<p class="ln do"><b>L12</b> <b class="x">DO</b> Your question whether a warp scheduler has nothing to do with the data type. The CUDA programming guide's table of arithmetic instructions gives compute capability 7.5, per SM per clock, 64 results of 32-bit float add, multiply or multiply-add, and 2 results of the 64-bit (double) ones. Results per clock for the whole SM, FP32 against FP64: 64 / 2 = ____ times as many. Clocks for one warp's 32 FP64 results at the SM's 2 per clock: at least ____ , against ____ for one warp's FP32 add on its scheduler (L07). Is the count of exec units tied to the number type? ____ . <span class="from">from: L06, L07; the CUDA programming guide, version 12.4</span></p>
+<details><summary>CHECK</summary>
+<pre>64 / 2 = 32 times as many FP32 results per clock as FP64 for the whole SM
+one warp's 32 FP64 results: at least 32 / 2 = 16 clocks, against 2 clocks for FP32
+the scheduler only picks which warp's instruction begins; the exec units are built for
+one number type, and "32 FP32" names the units for 32-bit floats</pre>
+</details>
+<p class="ln do"><b>L13</b> <b class="x">DO</b> Whole chips. Course GPU, from the slide: 48 SMs * 4 = ____ schedulers; * 32 = ____ exec units; at 2.175 GHz, counting a multiply-add as 2 operations, ____ x 10^12 operations per second. Its registers, "96k 1024-bit registers": 98,304 * 128 bytes = ____ MiB. Laptop GTX 1650: 14 SMs (your own query), 16 FP32 units per scheduler, and NVIDIA gives a boost clock between 1,125 and 1,560 MHz depending on the laptop: ____ exec units, ____ to ____ x 10^12 operations per second. <span class="from">from: the Lecture 2 slides; L06; your output; NVIDIA's GTX 1650 specifications</span></p>
+<details><summary>CHECK</summary>
+<pre>course GPU: 48 * 4 = 192 schedulers, 192 * 32 = 6,144 exec units
+6,144 * 2 * 2.175 x 10^9 = 26.7 x 10^12: the slide's 26.7 TFLOPS
+98,304 * 128 = 12,582,912 bytes = 12 MiB
+GTX 1650: 14 * 4 = 56 schedulers * 16 = 896 exec units
+896 * 2 * 1.125 x 10^9 = 2.02 x 10^12; at 1.560 GHz, 2.80 x 10^12</pre>
+</details>
+<p class="ln do"><b>L14</b> <b class="x">DO</b> The same slide gives the course CPU "1.5k 512-bit registers = 24 KB". Recompute from its own inputs: 8 cores * 192 = 1,536 registers * 512 bits = ____ bits = ____ bytes = ____ KiB. Does the slide's 24 KB follow? ____ . GPU against CPU register storage, recomputed: 12,582,912 / ____ = ____ . <span class="from">from: the Lecture 2 slides "Our CPU" (192 vector registers per core) and "Our CPU vs Our GPU"; L13</span></p>
+<details><summary>CHECK</summary>
+<pre>1,536 * 512 = 786,432 bits = 98,304 bytes = 96 KiB, not 24 KB
+24 KB is what 1,536 registers of 128 bits would give; with the slide's own 512 bits it is 96 KiB
+GPU against CPU: 12,582,912 / 98,304 = 128 times more register storage
+(the slide's 24 KB would make it 512 times, four times too many)</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L15</b> <b class="x">DO</b> Collect L03 (32 additions per clock, one per thread), L04 (3 sums in 32 threads: 3 instructions, 3 clocks; thread 5 always on unit 5), L07 (15 sums: 30 cycles on the laptop), L08 (a chain of 15: about 60 cycles, units busy half the time), L11 (64 to 255 registers per thread, the rest in memory) and L12 (32 times fewer FP64 results than FP32 per clock on the laptop). Twist from these numbers: if each of 32 threads holds 1,000 float variables, can the course GPU's scheduler still begin 32 additions per clock? ____ . Write one sentence on what "32 x 32-bit exec units" counts. <span class="from">from: L03, L04, L07, L08, L11, L12</span></p>
+<details><summary>CHECK</summary>
+<pre>Yes, whenever the values each addition needs are in registers and ready: the 1,000
+variables live mostly in memory (L11) and cost loads, but they do not change how many
+additions can begin per clock.
+
+"32 x 32-bit exec units" counts the 32-bit float operations that can begin per clock,
+one for each thread of a warp; it says nothing about how many floats a thread may hold
+(registers, then memory), and nothing about doubles, which use other units (L12).
+
+Tempting answer that fails: "one exec unit per thread means one float per thread". L04's
+3 sums and L05's 15 sums are 3 and 15 instructions on the same units, and L11 gives each
+thread 64 to 255 registers before memory.</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>On a graphics chip, one control circuit gives the same instruction to 32 threads, and 32 arithmetic circuits carry it out, one per thread. That count says how many number operations begin per clock tick, not how many numbers a thread can keep: a thread may have thousands of numbers, held in fast storage and in memory, and they take turns on the arithmetic circuits.</p>
+<p>For a manager: a chip's count of arithmetic units sets its peak rate for one kind of number; the same chip can be 32 times slower on another kind, and how much it can hold is a separate figure.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>30 cycles: 15 additions per thread = 15 warp instructions, each needing 32 / 16 = 2
+cycles on a GTX 1650 scheduler (L07).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>On the laptop, the 15-add chain of L08 leaves a scheduler's FP32 units idle half the time. Without changing the arithmetic, how many warps per scheduler fill that idle half, and do registers limit it?</p>
+<details><summary>CHECK</summary>
+<pre>Each add waits 4 cycles and needs 2 cycles to begin, so 4 / 2 = 2 warps per scheduler keep
+the units busy: one begins its add while the other waits.
+Registers: 16,384 per scheduler / (2 warps * 32 threads) = 256 per thread, above the
+255 limit, so registers do not limit 2 warps; with 8 warps, the most a laptop scheduler
+holds, a thread may use at most 64 (L11).</pre>
+</details>
+</div>
+
+<nav><a href="24-if-else-one-instruction.html">prev: 24 an if-else under one instruction</a><a href="failures.html">next: the failure list</a></nav>
+</main>
+</body>
+</html>

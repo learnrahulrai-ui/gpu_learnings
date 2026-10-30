@@ -38,7 +38,14 @@
 <li>"Each technique helped alone, but together they gain much less than the product." <a href="16-combining-speedups.html">page 16</a>.</li>
 <li>"I cannot tell which of SM, block, scheduler and the 32-thread unit are hardware and which only exist in my program", or "is 14 x 4 x 32 the most threads my GPU holds?" <a href="17-hardware-or-launch.html">page 17</a>.</li>
 <li>"Giving each GPU thread two places made it slower, or no faster", or "my two-places indexing misses or repeats places." <a href="18-two-places-per-thread.html">page 18</a>.</li>
-<li>"My result looks fine but I am not sure it measures what I think." <a href="failures.html">the failure list</a>, 41 ways a clean-looking number goes wrong.</li>
+<li>"I can read every instruction of a loop but cannot say what the loop does", or "I cannot tell which register holds an address and which a count." <a href="19-what-each-register-holds.html">page 19</a>.</li>
+<li>"I do not see how a processor can fetch the next values while this iteration still waits for memory." <a href="20-which-instruction-waits.html">page 20</a>.</li>
+<li>"I cannot see where the 3 of '3x off trend' comes from, or why more simple cores beat one big core." <a href="21-from-where-is-three.html">page 21</a>.</li>
+<li>"I cannot tell which loop of a loop nest can be split across cores." <a href="22-which-loop-splits.html">page 22</a>.</li>
+<li>"My core has 16 ALUs: can I declare only 16 vector variables?" <a href="23-sixteen-alus.html">page 23</a>.</li>
+<li>"An if-else cannot jump for some of 8 values and not others, so how is the result correct?", or "why does the compiled code compare the input?" <a href="24-if-else-one-instruction.html">page 24</a>.</li>
+<li>"A GPU thread can hold thousands of floats, so what do 32 FP32 units limit?" <a href="25-what-32-fp32-counts.html">page 25</a>.</li>
+<li>"My result looks fine but I am not sure it measures what I think." <a href="failures.html">the failure list</a>, 50 ways a clean-looking number goes wrong.</li>
 <li>"A table printed by a course file looks wrong on my GPU." <a href="12-the-48-trap.html">page 12</a>.</li>
 </ol>
 
