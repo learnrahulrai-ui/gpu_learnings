@@ -1,0 +1,27 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lecture 4: memory requests</title><link rel="stylesheet" href="../style.css"></head><body><main>
+<p class="crumbs"><a href="../index.html">GPU Learnings</a> / Lecture 4</p><h1>Lecture 4: which requests can travel together?</h1>
+<p class="sub"><a href="https://accelerated-computing.academy/fall25/lectures/slides/Lecture4.pdf">Original slides, 24 PDF pages</a> · MIT 6.S894</p>
+<div class="story"><p>One ordinary wave thread calculates one output from six source-level inputs. This does not prove six physical DRAM transfers. Different threads also execute the source expression. How do their requested input entries relate?</p></div>
+<div class="guess"><p class="label">Guess first</p><p class="do">DO: With idx=idx_y*201+idx_x and threads (3,2),(4,2),(5,2), write each requested u1[idx-201] entry: ____, ____, ____.</p></div>
+<p class="you">"One thread calculates one output using six inputs." Which inputs do DIFFERENT threads request for ONE expression?</p>
+<h2>Work it out</h2><pre>idx = idx_y * 201 + idx_x;
+read = u1[idx - 201];</pre>
+<div class="english"><p class="label">Read the code in English, piece by piece</p><p>The first expression selects a stored index using the two numbers for one wave place. The second expression selects one input value from the array. There is no second physical grid.</p></div>
+<p class="ln"><b>L01</b> The first thread uses idx_y=2 and idx_x=3. <span class="from">Given input.</span></p>
+<p class="ln do"><b>L02</b> DO: Substitute into the first expression: ____. <span class="from">L01 and code.</span></p>
+<p class="ln do"><b>L03</b> DO: Substitute into the second expression: ____. <span class="from">L02 and code.</span></p>
+<p class="ln do"><b>L04</b> DO: Repeat for the other two threads: ____, ____. <span class="from">Given and code.</span></p>
+<details><summary>CHECK the pencil work</summary><p>All three indices must follow from the one selected expression. No physical memory traffic has been measured.</p></details>
+<p><img src="diagrams/01-wave-one-expression.svg" alt="Three threads select three flat-array inputs." width="900"></p>
+<h2>Trace byte addresses</h2><p>Assume 0x100 as the first byte address, 4 bytes per float, and 32 bytes per sector. These are teaching assumptions.</p><p class="do">DO: List addresses for src[t] and src[t*8], for t from 0 to 7. Mark distinct aligned sectors.</p>
+<p><img src="diagrams/02-byte-sector-requests.svg" alt="Nearby and spaced float requests under the stated assumed base." width="900"></p>
+<h2>Observe cached data separately</h2><p>The slides depict 128-byte cache lines and 32-byte sectors. A read expression does not prove a cache hit or DRAM transfer.</p><p class="do">DO: Name the counter or instrument needed to prove each claim.</p>
+<p><img src="diagrams/03-cache-versus-dram.svg" alt="Two reads may address one cached line; actual DRAM activity unknown." width="900"></p>
+<h2>Give each block its own scratchpad</h2><p>In CUDA, a __shared__ array belongs to one software block, not an entire SM.</p><p class="do">DO: Add writes, a block-wide barrier and later reads to the unfinished CUDA source, then verify every output.</p>
+<p><img src="diagrams/04-block-tile.svg" alt="Two CUDA blocks with separate tile arrays." width="900"></p>
+<div class="connect"><p class="label">Connect the numbers</p><p>Keep array indices, byte addresses, sector estimates, actual instructions and hardware counters separate. Which conclusions require more than the source code?</p></div>
+<div class="plain"><p class="label">In plain words</p><p>Software asks for input values. Hardware serves those requests through several storage levels. The value's input address does not establish where the hardware obtained it. Measure before explaining a performance difference.</p></div>
+<p class="label">Preparation files</p><p><a href="00-lecture04-listening.md">Pencil guide</a> | <a href="01-evidence-ledger.md">Slide evidence</a> | <a href="02-prediction-sheet.md">Measurement sheet</a> | <a href="03-interview-questions.md">Questions</a> | <a href="04-laptop-check.md">GTX 1650 commands</a></p>
+<p><a href="01-access-pattern.cu">Input-address CUDA exercise</a> | <a href="02-block-scratchpad.cu">Shared-scratchpad CUDA exercise</a></p>
+<p class="label">Your guess against the machine</p><p>No new GPU measurement has been taken. Unfinished kernel work must not be interpreted as correct output.</p>
+<div class="interview"><p class="label">The next question</p><p>If every output is correct, does that prove an optimal number of DRAM transfers? Which measurement would be needed?</p></div><nav><a href="../lecture03/index.html">Lecture 3</a><a href="../index.html">GPU Learnings</a></nav></main></body></html>
