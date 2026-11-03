@@ -105,3 +105,8 @@ nav.pager { gap: 12px; }
 nav.pager a { display: block; max-width: 48%; border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; text-decoration: none; }
 nav.pager a.next { margin-left: auto; text-align: right; }
 nav.pager small { display: block; color: var(--dim); font: 12px "DejaVu Sans Mono", Menlo, Consolas, monospace; text-transform: uppercase; letter-spacing: .05em; }
+
+/* narrated video of the page (videos/*.mp4, made in ~/gpu-videos) */
+.video { margin: 8px 0 28px; }
+.video video { display: block; width: 100%; height: auto; border-radius: 6px; background: #000; }
+.video .vnote { color: var(--dim); font-size: 14px; margin-top: 6px; }

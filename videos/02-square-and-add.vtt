@@ -1,0 +1,287 @@
+WEBVTT
+
+00:00:01.800 --> 00:00:08.476
+In the 256 by 256 picture, about a quarter of the places need the full 1000
+
+00:00:08.476 --> 00:00:09.544
+repetitions.
+
+00:00:09.890 --> 00:00:13.517
+What share of all the arithmetic in the picture do those places take?
+
+00:00:13.870 --> 00:00:15.555
+Pause and write a percentage.
+
+00:00:23.710 --> 00:00:37.102
+Each place (i, j) becomes a middleman pair through two lines: cx = j/256 × 2.5 − 2.0
+
+00:00:37.102 --> 00:00:41.566
+and cy = i/256 × 2.5 − 1.25.
+
+00:00:41.910 --> 00:00:43.531
+Now the arithmetic itself.
+
+00:00:43.880 --> 00:00:49.309
+The code keeps a second, moving pair of numbers, begins it at (0, 0), and repeats a
+
+00:00:49.309 --> 00:00:54.672
+handful of lines on it: square it in a particular way, add the middleman pair, and
+
+00:00:54.672 --> 00:00:56.765
+check how far it is from (0, 0).
+
+00:00:57.120 --> 00:01:01.826
+When it gets farther than 2, the loop is left, and the number of repetitions done is
+
+00:01:01.826 --> 00:01:02.219
+stored.
+
+00:01:02.570 --> 00:01:03.999
+I objected twice.
+
+00:01:04.350 --> 00:01:09.440
+First: if the moving pair begins at zero, and squaring zero gives zero, how can
+
+00:01:09.440 --> 00:01:10.793
+anything ever change?
+
+00:01:11.140 --> 00:01:16.066
+Second: the explanations used a word for what the point does, and a point does not
+
+00:01:16.066 --> 00:01:16.367
+move.
+
+00:01:16.720 --> 00:01:21.755
+Both questions are settled only by executing the code by hand, with real numbers.
+
+00:01:22.100 --> 00:01:26.572
+Keep one question in mind while you calculate: could you have predicted any of these
+
+00:01:26.572 --> 00:01:28.116
+counts before doing the work?
+
+00:01:35.270 --> 00:01:41.115
+In English: x2, y2 and w begin at 0, and the counter iters at 0.
+
+00:01:41.460 --> 00:01:48.013
+Before each repetition, test two things: is x2 + y2 at most 4, and is iters below
+
+00:01:48.013 --> 00:01:50.036
+max_iters, which is 1000?
+
+00:01:50.390 --> 00:01:54.507
+If both are true, do lines A to F once and add 1 to iters.
+
+00:01:54.860 --> 00:01:59.873
+If either is false, leave the loop, and store iters, the number of repetitions done.
+
+00:02:00.220 --> 00:02:03.740
+Line A: subtract y2 from x2 and add cx.
+
+00:02:04.090 --> 00:02:08.485
+Line B: from w subtract x2, then y2, then add cy.
+
+00:02:08.830 --> 00:02:15.998
+Line C squares x, line D squares y, line E adds x and y into z, and line F squares z
+
+00:02:15.998 --> 00:02:16.595
+into w.
+
+00:02:22.950 --> 00:02:25.617
+x = cx and y = cy.
+
+00:02:25.970 --> 00:02:30.834
+Beginning at 0 does change things: the first repetition lands exactly on the
+
+00:02:30.834 --> 00:02:31.794
+middleman pair.
+
+00:02:32.140 --> 00:02:32.908
+Pause.
+
+00:02:33.260 --> 00:02:35.116
+Fill the table to 6 decimals.
+
+00:02:41.460 --> 00:02:56.785
+The x column is 0.730564, 1.023958, 1.538725, 2.857909, and the x2 column is
+
+00:02:56.785 --> 00:03:04.649
+0.533724, 1.048491, 2.367675, 8.167644.
+
+00:03:05.000 --> 00:03:11.720
+Before repetition 6 the check is 8.167644, above 4, so the loop is left.
+
+00:03:12.070 --> 00:03:17.446
+The count is iters = 5, stored at out[33023].
+
+00:03:17.800 --> 00:03:18.568
+Pause.
+
+00:03:18.920 --> 00:03:20.883
+Write every subtraction on paper.
+
+00:03:27.230 --> 00:03:41.118
+After repetition 1: x2 = 1.890625, y2 = 0.390625, z = −2.0, w = 4.0.
+
+00:03:41.470 --> 00:03:45.758
+Before repetition 2 the check is 2.281250.
+
+00:03:46.110 --> 00:04:06.739
+Then x = 1.890625 − 0.390625 − 1.375 = 0.125, and y = 4.0 − 1.890625 − 0.390625 −
+
+00:04:06.739 --> 00:04:10.814
+0.625 = 1.09375.
+
+00:04:11.160 --> 00:04:15.491
+Before repetition 3 the check is 1.211914.
+
+00:04:15.840 --> 00:04:24.373
+Then x = −2.555664 and y = −0.351562.
+
+00:04:24.720 --> 00:04:33.222
+Before repetition 4 the check is 6.655015, above 4, so the loop is left with iters =
+
+00:04:33.222 --> 00:04:33.424
+3.
+
+00:04:33.780 --> 00:04:43.657
+Copy the three checks in order: 2.281250, 1.211914, 6.655015.
+
+00:04:44.000 --> 00:04:45.856
+The check went down before it went up.
+
+00:04:46.210 --> 00:04:51.351
+Getting bigger every repetition is not guaranteed; only "above 4" is final.
+
+00:04:51.700 --> 00:04:57.844
+Line C makes x2 = x × x, and line D makes y2 = y × y.
+
+00:04:58.200 --> 00:05:01.443
+So the check is the square of the distance from (0, 0).
+
+00:05:01.790 --> 00:05:08.025
+Distance above 2 means check above 4, because 2 × 2 = 4, and the comparison needs no
+
+00:05:08.025 --> 00:05:08.915
+square root.
+
+00:05:09.260 --> 00:05:15.063
+The square root of 6.655015 is 2.5797.
+
+00:05:21.420 --> 00:05:36.439
+At 256, x2 = 3.731236 and y2 = 1.350498, so the check is 5.081734 and iters = 1.
+
+00:05:36.790 --> 00:05:40.886
+At 32, the same table as before gives iters = 3.
+
+00:05:41.230 --> 00:05:47.502
+It is the same (9, 7) on the image paper with two different counts: iters belongs to
+
+00:05:47.502 --> 00:05:49.443
+(cx, cy), never to (i, j).
+
+00:05:51.590 --> 00:05:52.358
+Pause.
+
+00:05:52.710 --> 00:05:53.798
+Fill everything.
+
+00:06:00.150 --> 00:06:03.499
+The average is 248.3 repetitions.
+
+00:06:03.850 --> 00:06:11.423
+Places at 1000 are 24.3 percent of the places but do 97.7 percent of the work.
+
+00:06:11.770 --> 00:06:20.959
+The four bands carry 2.8, 46.4, 47.6 and 3.1 percent of the work, so the speedup is
+
+00:06:20.959 --> 00:06:22.287
+2.10, not 4.
+
+00:06:22.640 --> 00:06:30.211
+Collect: 5, 3, a check that went down then up, 1 and 3 for the same (9, 7), 97.7
+
+00:06:30.211 --> 00:06:31.536
+percent, 2.10.
+
+00:06:31.890 --> 00:06:32.658
+Pause.
+
+00:06:33.000 --> 00:06:34.877
+Write the one fact they all point to.
+
+00:06:41.230 --> 00:06:45.113
+The cost of a place ranges from 1 to 1000 repetitions.
+
+00:06:45.460 --> 00:06:50.877
+It cannot be read off (i, j) or (cx, cy) before the loop is done; even the check
+
+00:06:50.877 --> 00:06:52.841
+value does not move steadily.
+
+00:06:53.200 --> 00:06:56.677
+And the costly places sit together in the middle of the picture.
+
+00:06:57.020 --> 00:07:01.948
+Any plan that splits by count of places, not by work, is wrong before it starts.
+
+00:07:02.300 --> 00:07:08.224
+The tempting answer, "each place is one task, so equal numbers of places are equal
+
+00:07:08.224 --> 00:07:10.897
+work", measures at 2.10 instead of 4.
+
+00:07:13.050 --> 00:07:17.597
+This picture is used in the course for one reason: its work is uneven and
+
+00:07:17.597 --> 00:07:18.469
+unpredictable.
+
+00:07:18.820 --> 00:07:20.719
+Most real workloads are the same.
+
+00:07:21.070 --> 00:07:25.786
+Some customer requests are cheap and some are expensive, and nobody knows which
+
+00:07:25.786 --> 00:07:26.979
+until they are done.
+
+00:07:27.330 --> 00:07:31.661
+Splitting work into equal piles of items does not split the effort equally.
+
+00:07:32.010 --> 00:07:35.253
+Any speed trick for this picture has to deal with that fact.
+
+00:07:37.400 --> 00:07:41.539
+The answer is 97.7 percent of all the arithmetic.
+
+00:07:41.890 --> 00:07:42.935
+Mark your tally.
+
+00:07:47.900 --> 00:07:52.551
+You must share the picture among 4 workers without knowing any iters in advance.
+
+00:07:52.900 --> 00:07:55.076
+Bands of i gave 2.10.
+
+00:07:55.430 --> 00:07:57.926
+What would you use instead, and what do you expect?
+
+00:07:58.270 --> 00:07:59.038
+Pause.
+
+00:08:05.390 --> 00:08:11.854
+Interleave: worker k takes every 4th value of i, so k, k + 4, k + 8, and so on.
+
+00:08:12.200 --> 00:08:16.381
+Each worker then gets a slice of every band, cheap and costly alike.
+
+00:08:16.730 --> 00:08:26.879
+On the real iters the shares are 25.2, 25.0, 24.9 and 25.0 percent: a speedup of
+
+00:08:26.879 --> 00:08:28.655
+3.97 out of 4.
+
+00:08:29.010 --> 00:08:33.831
+That needs no knowledge of iters, only the fact that costly places sit together.
+

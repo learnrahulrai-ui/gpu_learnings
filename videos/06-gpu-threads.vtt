@@ -1,0 +1,317 @@
+WEBVTT
+
+00:00:01.800 --> 00:00:07.688
+Going from 1 GPU thread to 32 GPU threads, what speedup did my laptop measure?
+
+00:00:08.040 --> 00:00:09.512
+Pause and write a number.
+
+00:00:17.660 --> 00:00:25.247
+The graphics card in my laptop, a GTX 1650, has 896 small arithmetic units arranged
+
+00:00:25.247 --> 00:00:28.903
+in 14 SMs, identical blocks of hardware.
+
+00:00:29.250 --> 00:00:36.209
+Lab 1 computes the 256 by 256 Mandelbrot picture: for each place (i, j), a loop
+
+00:00:36.209 --> 00:00:39.469
+whose count, iters, is stored in out.
+
+00:00:39.820 --> 00:00:45.774
+It does this first with a single GPU thread, which takes 403 milliseconds, more than
+
+00:00:45.774 --> 00:00:48.609
+six times slower than a single CPU core.
+
+00:00:48.960 --> 00:00:54.860
+Then it changes one line so that 32 threads share the work, and the time falls to
+
+00:00:54.860 --> 00:00:56.171
+17.7 milliseconds.
+
+00:00:56.520 --> 00:01:03.956
+The changed line makes thread number t take the places j = t, t + 32, t + 64, and so
+
+00:01:03.956 --> 00:01:04.221
+on.
+
+00:01:04.570 --> 00:01:09.351
+The explanation I was given was that this makes memory access efficient, because
+
+00:01:09.351 --> 00:01:11.802
+neighbouring threads touch nearby memory.
+
+00:01:12.150 --> 00:01:13.750
+I refused it without proof.
+
+00:01:14.100 --> 00:01:19.751
+Inside thread 7, the places 7 and 39 are far apart, and threads do not talk to each
+
+00:01:19.751 --> 00:01:21.929
+other, so where is the "nearby"?
+
+00:01:22.280 --> 00:01:29.670
+The only evidence that settles it is a pair of profiler counts my machine printed:
+
+00:01:29.670 --> 00:01:31.112
+2,048 and 8,192.
+
+00:01:31.470 --> 00:01:36.706
+And once that is settled, there is a second question nobody asked: did the same line
+
+00:01:36.706 --> 00:01:38.638
+decide anything besides memory?
+
+00:01:45.780 --> 00:01:51.308
+In English: this is a GPU function receiving img_size, max_iters, and out, the
+
+00:01:51.308 --> 00:01:54.356
+address of the output in the card's memory.
+
+00:01:54.710 --> 00:02:00.499
+For every i, j's first value is this thread's own number, threadIdx.x, and j keeps
+
+00:02:00.499 --> 00:02:05.936
+going up by blockDim.x, the number of threads in the block, while it is below
+
+00:02:05.936 --> 00:02:06.571
+img_size.
+
+00:02:06.920 --> 00:02:12.011
+The comment stands for the cx and cy lines and the plain while loop; then iters is
+
+00:02:12.011 --> 00:02:12.445
+stored.
+
+00:02:12.800 --> 00:02:18.824
+The last line, on the CPU, launches 1 block of 32 threads, each executing the whole
+
+00:02:18.824 --> 00:02:19.477
+function.
+
+00:02:19.820 --> 00:02:20.588
+Pause.
+
+00:02:26.940 --> 00:02:37.031
+Thread 7 takes 7, 39, 71, 103, 135, 167, 199 and 231.
+
+00:02:37.380 --> 00:02:43.567
+Since 103 = 7 + 32 × 3, that is t = 7, k = 3.
+
+00:02:43.920 --> 00:02:48.272
+Inside thread 7, the places 7 and 39 are 32 apart.
+
+00:02:48.620 --> 00:02:51.116
+For a single thread, "far apart" is right.
+
+00:02:51.470 --> 00:02:58.014
+Hardware fact: the GTX 1650 executes threads 0 to 31 of this launch together, one
+
+00:02:58.014 --> 00:03:03.993
+instruction at a time for all 32, each thread with its own i, j and iters.
+
+00:03:04.340 --> 00:03:07.455
+NVIDIA calls such a set of 32 threads a warp.
+
+00:03:07.800 --> 00:03:15.726
+So the store line, out[i × 256 + j] = iters, executes once for the whole warp, with
+
+00:03:15.726 --> 00:03:19.832
+the same i, the same k, and t from 0 to 31.
+
+00:03:20.190 --> 00:03:22.110
+Each value of out is 4 bytes.
+
+00:03:22.460 --> 00:03:23.228
+Pause.
+
+00:03:23.570 --> 00:03:29.990
+For i = 0 and k = 0, give the byte number of thread 0, the byte number of thread 31,
+
+00:03:29.990 --> 00:03:32.359
+and the bytes covered together.
+
+00:03:38.710 --> 00:03:45.238
+Thread 0 writes byte 0 and thread 31 writes bytes 124 to 127.
+
+00:03:45.590 --> 00:03:51.371
+Together that is bytes 0 to 127: 128 bytes with no gap.
+
+00:03:51.720 --> 00:03:56.541
+"Far apart" is a left-right line of the table; "nearby" is an up-down strip.
+
+00:03:56.890 --> 00:03:57.807
+Both hold.
+
+00:03:58.160 --> 00:03:58.928
+Pause.
+
+00:04:05.280 --> 00:04:08.480
+Bytes 0 to 127 fill 4 blocks.
+
+00:04:08.830 --> 00:04:16.580
+There are 2048 store instructions, and 2048 × 4 = 8192 blocks: exactly the
+
+00:04:16.580 --> 00:04:20.350
+profiler's numbers, derived by hand.
+
+00:04:20.700 --> 00:04:27.193
+The other obvious way to share the work is for thread t to take j = 8t to 8t + 7,
+
+00:04:27.193 --> 00:04:28.636
+one after another.
+
+00:04:28.990 --> 00:04:33.449
+Each thread still gets 8 values of j, and every place is still done once.
+
+00:04:33.790 --> 00:04:34.558
+Pause.
+
+00:04:34.910 --> 00:04:37.641
+At the first store, which byte does thread t write?
+
+00:04:37.990 --> 00:04:41.853
+How many blocks does that one store touch, and how many does the whole picture
+
+00:04:41.853 --> 00:04:42.150
+touch?
+
+00:04:48.500 --> 00:04:56.521
+Thread t writes byte 32t: thread 0 at 0, thread 1 at 32, thread 31 at 992.
+
+00:04:56.870 --> 00:05:02.374
+Every byte number is in a different 32-byte block, so each store touches 32 blocks.
+
+00:05:02.730 --> 00:05:09.109
+The picture touches 65,536 blocks, 8 times more for the same output.
+
+00:05:09.460 --> 00:05:14.118
+The plain while loop inside the kernel executes for the whole warp together, so it
+
+00:05:14.118 --> 00:05:18.719
+continues until the last of the 32 threads leaves, and the finished threads wait.
+
+00:05:19.070 --> 00:05:19.838
+Pause.
+
+00:05:20.180 --> 00:05:21.268
+Fill everything.
+
+00:05:27.620 --> 00:05:35.627
+A single GPU thread is 6.55 times slower than a CPU core, and 32 threads are 22.75
+
+00:05:35.627 --> 00:05:37.775
+times faster than one.
+
+00:05:38.130 --> 00:05:49.038
+For the i = 40 strip, 32 × 1000 = 32,000 thread-repetitions do 1334 useful ones: 4.2
+
+00:05:49.038 --> 00:05:50.077
+percent.
+
+00:05:50.420 --> 00:06:00.389
+Over the whole picture, 68.9 percent is useful, which predicts 32 × 0.689 = 22.06
+
+00:06:00.389 --> 00:06:03.220
+against 22.75 measured.
+
+00:06:05.370 --> 00:06:06.799
+Now the second question.
+
+00:06:07.150 --> 00:06:13.673
+With the other sharing, the 32 threads at any moment hold j = 8t + c, spread across
+
+00:06:13.673 --> 00:06:17.838
+the whole 0 to 255 range instead of being neighbours.
+
+00:06:18.190 --> 00:06:23.225
+Counted the same way, 35.9 percent of the thread-repetitions are useful.
+
+00:06:23.580 --> 00:06:24.348
+Pause.
+
+00:06:24.690 --> 00:06:26.269
+What speedup does that predict?
+
+00:06:26.620 --> 00:06:31.035
+Then name the second thing the lab's line decides, and say why both point to the
+
+00:06:31.035 --> 00:06:31.697
+same choice.
+
+00:06:38.050 --> 00:06:42.999
+The other sharing predicts 11.49, against 22.06.
+
+00:06:43.350 --> 00:06:48.705
+The line also decides which 32 places wait for each other inside one while loop.
+
+00:06:49.050 --> 00:06:52.847
+With the lab's line, the 32 places at any moment are neighbours.
+
+00:06:53.200 --> 00:06:59.685
+Their bytes sit side by side, in 4 blocks instead of 32, and their iters are
+
+00:06:59.685 --> 00:07:03.525
+similar, 68.9 percent useful instead of 35.9.
+
+00:07:03.880 --> 00:07:07.976
+Both come from the same fact: neighbouring threads hold neighbouring places.
+
+00:07:08.320 --> 00:07:13.073
+The tempting answer, "the line is about combining memory accesses", misses that the
+
+00:07:13.073 --> 00:07:17.024
+other choice would halve the predicted speedup through waiting alone.
+
+00:07:19.180 --> 00:07:24.255
+On a GPU, the decision about which thread handles which piece of data is the most
+
+00:07:24.255 --> 00:07:26.135
+important line in the program.
+
+00:07:26.480 --> 00:07:31.602
+Here a single line decided both how much memory traffic there is and how much of the
+
+00:07:31.602 --> 00:07:33.371
+arithmetic is wasted waiting.
+
+00:07:33.720 --> 00:07:38.392
+Getting it wrong produces no error; it produces a correct picture, more slowly.
+
+00:07:38.740 --> 00:07:43.839
+For a manager: a GPU program can be correct and still leave most of the card idle.
+
+00:07:44.190 --> 00:07:47.049
+Only measurements like these profiler counts show which.
+
+00:07:49.200 --> 00:07:53.424
+The measured speedup is 22.75 times, not 32.
+
+00:07:53.770 --> 00:07:54.815
+Mark your tally.
+
+00:07:59.700 --> 00:08:04.878
+With all 14 SMs available, how would you choose the number of blocks and the threads
+
+00:08:04.878 --> 00:08:08.639
+per block, and what new limit appears once every SM has work?
+
+00:08:08.990 --> 00:08:09.758
+Pause.
+
+00:08:16.110 --> 00:08:21.228
+Use many blocks, each a multiple of 32 threads, with enough per SM that waiting
+
+00:08:21.228 --> 00:08:23.171
+threads are covered by others.
+
+00:08:23.520 --> 00:08:28.210
+The new limit is that blocks covering the middle of the picture cost far more than
+
+00:08:28.210 --> 00:08:31.584
+blocks at its edges, so some SMs finish early and sit idle.
+
+00:08:31.930 --> 00:08:34.362
+Many small blocks spread that unevenness out.
+

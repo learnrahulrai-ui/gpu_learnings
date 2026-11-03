@@ -1,0 +1,266 @@
+WEBVTT
+
+00:00:01.800 --> 00:00:07.752
+Take two arrays of 16.7 million numbers and add them on a GTX 1650.
+
+00:00:08.100 --> 00:00:13.266
+Is the time set by the arithmetic, or by moving the numbers to and from memory, and
+
+00:00:13.266 --> 00:00:14.884
+by roughly how many times?
+
+00:00:15.240 --> 00:00:16.371
+Pause and write it.
+
+00:00:24.520 --> 00:00:29.669
+Almost every GPU tutorial begins with this program: take two lists of numbers, add
+
+00:00:29.669 --> 00:00:33.373
+them place by place, and store the answers in a third list.
+
+00:00:33.720 --> 00:00:35.597
+It teaches the launch syntax well.
+
+00:00:35.950 --> 00:00:39.790
+What it rarely teaches is the thing that decides how fast it goes.
+
+00:00:40.140 --> 00:00:42.828
+The common belief, and mine too, goes like this.
+
+00:00:43.180 --> 00:00:51.995
+The GTX 1650 has 896 FP32 units, circuits that each do a 32-bit add or multiply-add
+
+00:00:51.995 --> 00:00:53.057
+per cycle.
+
+00:00:53.400 --> 00:00:58.051
+Adding 16.7 million pairs is exactly the work they were built for.
+
+00:00:58.400 --> 00:01:03.008
+Before believing that, ask what each addition needs besides the addition itself.
+
+00:01:03.360 --> 00:01:07.410
+Where do the two numbers come from, where does the answer go, and how long does
+
+00:01:07.410 --> 00:01:09.717
+carrying them take compared with adding them?
+
+00:01:16.870 --> 00:01:21.869
+The first line is a function that executes on the GPU; __global__ marks it, and such
+
+00:01:21.869 --> 00:01:23.654
+a function is called a kernel.
+
+00:01:24.000 --> 00:01:29.113
+It receives the addresses of three arrays of fractions in the graphics card's
+
+00:01:29.113 --> 00:01:34.027
+memory, a, b and c, and their length n. const means a and b are only read.
+
+00:01:34.380 --> 00:01:38.956
+Each thread computes its own number k: its block's number times the threads per
+
+00:01:38.956 --> 00:01:41.505
+block, plus its own number inside the block.
+
+00:01:41.850 --> 00:01:47.230
+If k is inside the arrays, read a at place k and b at place k, add them, and store
+
+00:01:47.230 --> 00:01:48.805
+the sum in c at place k.
+
+00:01:49.160 --> 00:01:51.677
+The last line executes on the CPU.
+
+00:01:52.030 --> 00:01:57.464
+It starts the kernel in blocks of 256 threads, with enough blocks to cover all n
+
+00:01:57.464 --> 00:01:57.939
+places.
+
+00:02:03.290 --> 00:02:07.429
+Each k reads two 4-byte floats, writes one, and does a single add.
+
+00:02:07.770 --> 00:02:08.538
+Pause.
+
+00:02:08.890 --> 00:02:10.149
+Fill the three blanks.
+
+00:02:16.500 --> 00:02:27.956
+The program moves 201,326,592 bytes for 16,777,216 adds.
+
+00:02:28.310 --> 00:02:32.150
+That is a twelfth of an add per byte: 0.083.
+
+00:02:32.500 --> 00:02:40.308
+The laptop GTX 1650 has a 128-bit memory bus, which means 16 bytes per transfer.
+
+00:02:40.660 --> 00:02:47.886
+With GDDR5 memory it makes 8 billion transfers a second per pin; with GDDR6, 12
+
+00:02:47.886 --> 00:02:48.617
+billion.
+
+00:02:48.960 --> 00:02:53.675
+My hardware table listed both, so check yours with nvidia-smi -q.
+
+00:02:54.030 --> 00:02:54.798
+Pause.
+
+00:02:55.150 --> 00:03:00.035
+Work out the bytes per second for each, then the time for our 201 million bytes.
+
+00:03:06.380 --> 00:03:14.467
+The GDDR5 version moves 128 billion bytes a second and the GDDR6 version 192
+
+00:03:14.467 --> 00:03:15.319
+billion.
+
+00:03:15.670 --> 00:03:22.817
+Moving the bytes takes 1.573 milliseconds on the first and 1.049 on the second.
+
+00:03:23.170 --> 00:03:29.997
+Each FP32 unit can begin an add every cycle; a cycle is one tick of the GPU's clock.
+
+00:03:30.340 --> 00:03:34.884
+Laptop clocks vary, so I assume 1.5 billion cycles a second.
+
+00:03:35.240 --> 00:03:40.445
+Read yours with nvidia-smi -q -d CLOCK and redo the line.
+
+00:03:40.790 --> 00:03:41.558
+Pause.
+
+00:03:47.910 --> 00:03:54.556
+The units can do 1.344 trillion adds a second, so the adding takes 0.0125
+
+00:03:54.556 --> 00:03:55.739
+milliseconds.
+
+00:03:56.090 --> 00:03:59.077
+Moving the bytes takes 126 times longer.
+
+00:03:59.430 --> 00:04:04.414
+These two times come from published specifications and an assumed clock, not from a
+
+00:04:04.414 --> 00:04:05.915
+measurement on my laptop.
+
+00:04:06.260 --> 00:04:13.236
+Time the kernel alone on yours, for example with nsys profile --stats=true ./add.
+
+00:04:13.590 --> 00:04:21.057
+If memory is the limit, expect between 1.05 and 1.57 milliseconds, plus a little.
+
+00:04:21.400 --> 00:04:24.813
+The adding alone would take 0.0125.
+
+00:04:26.970 --> 00:04:28.143
+Pause and divide.
+
+00:04:34.490 --> 00:04:38.991
+The card can do 10.5 adds for every byte its memory delivers.
+
+00:04:39.340 --> 00:04:44.609
+This program does 0.083, about 126 times too few.
+
+00:04:44.960 --> 00:04:49.989
+Now a colleague proposes to make it faster with 8-at-once instructions inside each
+
+00:04:49.989 --> 00:04:52.320
+thread, or with twice as many threads.
+
+00:04:52.670 --> 00:04:53.438
+Pause.
+
+00:04:53.790 --> 00:04:57.246
+Write what that changes in the time, and what would actually help.
+
+00:05:03.600 --> 00:05:05.328
+Nothing measurable changes.
+
+00:05:05.670 --> 00:05:11.153
+The time is set by the 201 million bytes, and neither proposal moves fewer bytes.
+
+00:05:11.510 --> 00:05:16.828
+What helps is fewer bytes: 16-bit numbers instead of 32-bit halve them, and halve
+
+00:05:16.828 --> 00:05:17.419
+the time.
+
+00:05:17.770 --> 00:05:22.557
+Or more arithmetic per byte: doing several operations on each number while it is
+
+00:05:22.557 --> 00:05:22.975
+loaded.
+
+00:05:23.320 --> 00:05:29.808
+The tempting answer, "more parallel arithmetic, more speed", fails because the
+
+00:05:29.808 --> 00:05:34.051
+arithmetic is 0.0125 milliseconds out of about 1.5.
+
+00:05:36.200 --> 00:05:41.899
+A GPU's arithmetic is so fast that, for simple jobs, the arithmetic is almost free,
+
+00:05:41.899 --> 00:05:45.949
+and the real cost is carrying numbers in and out of memory.
+
+00:05:46.300 --> 00:05:51.985
+Adding two lists is such a job: the GPU spends over 99 percent of the time waiting
+
+00:05:51.985 --> 00:05:53.511
+for numbers to arrive.
+
+00:05:53.860 --> 00:05:57.935
+For a manager: "the GPU has N cores" says little about speed.
+
+00:05:58.290 --> 00:06:02.959
+Ask how many bytes the job moves per calculation, and compare that with what the
+
+00:06:02.959 --> 00:06:04.477
+card's memory can deliver.
+
+00:06:06.620 --> 00:06:12.961
+Moving the numbers sets the time: it takes about 126 times longer than the adding,
+
+00:06:12.961 --> 00:06:15.281
+at 128 billion bytes a second.
+
+00:06:15.630 --> 00:06:19.577
+That comes from published specs, so your own measurement has the final word.
+
+00:06:19.930 --> 00:06:20.975
+Mark your tally.
+
+00:06:23.130 --> 00:06:28.869
+You must compute d = (a + b + c) × e for arrays of n numbers.
+
+00:06:29.210 --> 00:06:34.160
+Should it be three small kernels (add, add, multiply), or a single kernel that does
+
+00:06:34.160 --> 00:06:34.757
+all of it?
+
+00:06:35.110 --> 00:06:39.718
+Give the bytes moved per place for each choice, and the expected ratio of times.
+
+00:06:40.070 --> 00:06:40.838
+Pause.
+
+00:06:47.190 --> 00:06:54.331
+With three kernels, a + b into t moves 12 bytes, t + c into u another 12, and u × e
+
+00:06:54.331 --> 00:06:57.601
+into d another 12: 36 bytes per place.
+
+00:06:57.950 --> 00:07:03.091
+With a single kernel, you read a, b, c and e and write d: 20 bytes per place.
+
+00:07:03.440 --> 00:07:09.908
+Memory sets the time, so the single kernel takes about 20/36 of the time, which
+
+00:07:09.908 --> 00:07:12.037
+makes it 1.8 times faster.
+

@@ -1,0 +1,278 @@
+WEBVTT
+
+00:00:01.800 --> 00:00:07.146
+My laptop computed the same picture four ways: a CPU core with plain code, a CPU
+
+00:00:07.146 --> 00:00:12.359
+core with instructions that handle 8 numbers at once, the graphics card with a
+
+00:00:12.359 --> 00:00:15.901
+single thread, and the graphics card with 32 threads.
+
+00:00:16.250 --> 00:00:17.018
+Pause.
+
+00:00:17.370 --> 00:00:20.314
+Write down which finished first, and by how many times.
+
+00:00:20.660 --> 00:00:22.089
+A number, not a feeling.
+
+00:00:30.240 --> 00:00:35.609
+A processor executes instructions: add these two numbers, multiply those, compare,
+
+00:00:35.609 --> 00:00:35.936
+jump.
+
+00:00:36.290 --> 00:00:41.873
+The CPU, the central processor, is built to finish a single sequence of instructions
+
+00:00:41.873 --> 00:00:43.202
+as fast as possible.
+
+00:00:43.550 --> 00:00:48.883
+The GPU, the graphics processor, has far more arithmetic circuits, each one simpler,
+
+00:00:48.883 --> 00:00:54.089
+and it is fast only when many of them get the same instruction at the same moment.
+
+00:00:54.440 --> 00:00:59.439
+That difference is why GPUs now carry most of the world's AI arithmetic, and why
+
+00:00:59.439 --> 00:01:00.627
+they are expensive.
+
+00:01:00.980 --> 00:01:05.460
+A GPU that is not kept busy is money spent on circuits doing nothing.
+
+00:01:05.810 --> 00:01:10.577
+Underneath every detail, this series measures how much of the hardware did useful
+
+00:01:10.577 --> 00:01:12.402
+work, and why the rest did not.
+
+00:01:19.550 --> 00:01:22.963
+The CPU is a Ryzen 5 4600H.
+
+00:01:23.310 --> 00:01:28.457
+It has 6 cores; a core is a part of the CPU that executes its own sequence of
+
+00:01:28.457 --> 00:01:29.326
+instructions.
+
+00:01:29.680 --> 00:01:35.227
+Each core has AVX2 instructions, which act on a 256-bit register.
+
+00:01:35.570 --> 00:01:39.858
+A float, a fraction stored in 32 bits, takes 32 of those bits.
+
+00:01:40.210 --> 00:01:40.978
+Pause.
+
+00:01:41.330 --> 00:01:46.717
+Calculate how many floats one AVX2 instruction handles, and how many the 6 cores
+
+00:01:46.717 --> 00:01:47.794
+handle together.
+
+00:01:54.140 --> 00:01:58.769
+Dividing 256 by 32 gives 8 floats per instruction.
+
+00:01:59.120 --> 00:02:03.195
+Across the 6 cores that makes 48 float operations at once.
+
+00:02:03.550 --> 00:02:06.345
+The GPU is a GTX 1650.
+
+00:02:06.690 --> 00:02:12.188
+NVIDIA builds the chip from identical blocks of hardware called SMs, and this one
+
+00:02:12.188 --> 00:02:12.663
+has 14.
+
+00:02:13.020 --> 00:02:16.199
+Each SM has 64 FP32 units.
+
+00:02:16.540 --> 00:02:22.705
+An FP32 unit is a circuit that does a 32-bit multiply-add for a single thread.
+
+00:02:23.060 --> 00:02:23.828
+Pause.
+
+00:02:24.180 --> 00:02:27.849
+Calculate the total, and compare it with the CPU's 48.
+
+00:02:34.200 --> 00:02:44.419
+The chip has 14 × 64 = 896 FP32 units, and NVIDIA's own listing says 896 CUDA cores.
+
+00:02:44.770 --> 00:02:49.655
+On paper that is 18.7 times more float circuits than the CPU.
+
+00:02:50.000 --> 00:02:56.486
+These are measured times from Lab 1 of MIT course 6.S894, Accelerated Computing, on
+
+00:02:56.486 --> 00:02:57.424
+this laptop.
+
+00:02:57.780 --> 00:02:58.548
+Pause.
+
+00:02:58.890 --> 00:03:02.218
+Divide the plain CPU time by each of the other three.
+
+00:03:08.570 --> 00:03:12.175
+AVX2 is 7.07 times faster.
+
+00:03:12.530 --> 00:03:20.517
+The single GPU thread gives 0.153, which means it is 6.55 times slower than a plain
+
+00:03:20.517 --> 00:03:21.383
+CPU core.
+
+00:03:21.730 --> 00:03:26.082
+The 32 GPU threads are 3.47 times faster.
+
+00:03:26.430 --> 00:03:32.105
+The fastest of the four is the CPU with AVX2, at 8.71 milliseconds.
+
+00:03:32.460 --> 00:03:35.745
+The AVX2 time used a single core out of 6.
+
+00:03:36.090 --> 00:03:44.444
+The 32-thread GPU time used 32 threads, so at most 32 of the 896 FP32 units at any
+
+00:03:44.444 --> 00:03:45.157
+moment.
+
+00:03:45.510 --> 00:03:46.278
+Pause.
+
+00:03:46.630 --> 00:03:47.953
+Calculate both shares.
+
+00:03:54.300 --> 00:03:58.268
+The CPU result used 16.7 percent of its cores.
+
+00:03:58.620 --> 00:04:03.505
+The GPU result used 3.6 percent of its FP32 units.
+
+00:04:05.650 --> 00:04:07.250
+Put the numbers side by side.
+
+00:04:07.600 --> 00:04:14.235
+The CPU beat the GPU, 8.71 against 17.732 milliseconds.
+
+00:04:14.590 --> 00:04:18.835
+Someone concludes that the GPU is slower than the CPU at this job.
+
+00:04:19.180 --> 00:04:19.948
+Pause.
+
+00:04:20.300 --> 00:04:24.268
+Which single number on the screen says the comparison does not support that?
+
+00:04:30.620 --> 00:04:32.711
+The answer is 3.6 percent.
+
+00:04:33.060 --> 00:04:38.680
+The GPU result used about a twenty-eighth of its arithmetic circuits; the CPU result
+
+00:04:38.680 --> 00:04:40.420
+used a sixth of its cores.
+
+00:04:40.770 --> 00:04:51.132
+If every FP32 unit had done as much as each of the 32 did, the time would be 17.732
+
+00:04:51.132 --> 00:04:55.127
+× 32 / 896 = 0.633 milliseconds.
+
+00:04:55.480 --> 00:05:00.155
+That is a straight-line estimate that ignores everything except the count of units,
+
+00:05:00.155 --> 00:05:01.112
+not a prediction.
+
+00:05:01.460 --> 00:05:07.540
+Its only job is to show how much hardware the 17.732 left unused.
+
+00:05:07.890 --> 00:05:13.915
+The tempting answer, "GPUs are slower than CPUs for this job", fails on the 3.6
+
+00:05:13.915 --> 00:05:14.525
+percent.
+
+00:05:16.670 --> 00:05:18.825
+A GPU is not fast by itself.
+
+00:05:19.180 --> 00:05:23.636
+It is fast when a program gives most of its circuits the same instruction at the
+
+00:05:23.636 --> 00:05:24.193
+same time.
+
+00:05:24.540 --> 00:05:30.252
+The first GPU version here used a single thread and lost to a CPU core by more than
+
+00:05:30.252 --> 00:05:30.940
+six times.
+
+00:05:31.290 --> 00:05:37.178
+The second used 32 threads and still left over 96 percent of the arithmetic circuits
+
+00:05:37.178 --> 00:05:37.669
+unused.
+
+00:05:38.020 --> 00:05:42.520
+For a manager: the hardware you buy and the hardware your software uses are two
+
+00:05:42.520 --> 00:05:43.545
+different numbers.
+
+00:05:43.900 --> 00:05:45.095
+Ask for the second.
+
+00:05:47.240 --> 00:05:56.953
+The CPU with AVX2 finished first, about 2.04 times sooner than the 32 GPU threads:
+
+00:05:56.953 --> 00:05:59.677
+17.732 divided by 8.71.
+
+00:06:00.030 --> 00:06:02.782
+Count your guess as close if it was within a fifth of that.
+
+00:06:03.130 --> 00:06:05.626
+Keep a tally on paper, a line per video.
+
+00:06:07.780 --> 00:06:09.871
+Suppose you could change only the launch.
+
+00:06:10.220 --> 00:06:15.388
+How would you find out whether this GPU can beat 8.71 milliseconds, and which two
+
+00:06:15.388 --> 00:06:16.919
+numbers would you watch?
+
+00:06:17.260 --> 00:06:18.028
+Pause.
+
+00:06:24.380 --> 00:06:30.037
+Launch enough blocks to give all 14 SMs work, each block a multiple of 32 threads,
+
+00:06:30.037 --> 00:06:30.865
+and time it.
+
+00:06:31.220 --> 00:06:32.244
+Watch the time.
+
+00:06:32.590 --> 00:06:41.044
+Also watch the total of all 65,536 results, which my program prints as 16,274,722
+
+00:06:41.044 --> 00:06:48.142
+when the picture is right; if that total changes, the speed is fake.
+
+00:06:48.490 --> 00:06:53.610
+And do not divide 17.732 by 28 to predict the answer.
+
+00:06:53.960 --> 00:06:58.419
+The places of this picture need very different amounts of arithmetic, so measure it.
+

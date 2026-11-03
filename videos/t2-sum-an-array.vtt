@@ -1,0 +1,269 @@
+WEBVTT
+
+00:00:01.800 --> 00:00:07.987
+Add 20 million copies of the number 1.0, one after another, in 32-bit fractions.
+
+00:00:08.340 --> 00:00:09.663
+What total comes out?
+
+00:00:10.010 --> 00:00:11.482
+Pause and write a number.
+
+00:00:19.630 --> 00:00:23.726
+Adding two arrays gives every thread its own independent piece of work.
+
+00:00:24.080 --> 00:00:29.115
+Adding up all the numbers of a single array does not: every partial total depends on
+
+00:00:29.115 --> 00:00:30.373
+the totals before it.
+
+00:00:30.720 --> 00:00:32.533
+This job is called a reduction.
+
+00:00:32.880 --> 00:00:37.924
+It is the second program in every GPU course, and the place where "just put it in
+
+00:00:37.924 --> 00:00:39.792
+parallel" first stops working.
+
+00:00:40.150 --> 00:00:45.192
+The plain loop keeps one total and adds each number to it in turn, so each addition
+
+00:00:45.192 --> 00:00:47.318
+needs the result of the one before.
+
+00:00:47.660 --> 00:00:50.241
+I wrote that part down myself, and it is true.
+
+00:00:50.600 --> 00:00:52.605
+The question is what to do about it.
+
+00:00:52.950 --> 00:00:55.617
+And there is a quieter question most tutorials skip.
+
+00:00:55.970 --> 00:01:00.343
+If a parallel version adds the numbers in a different order, does it give the same
+
+00:01:00.343 --> 00:01:00.663
+total?
+
+00:01:01.010 --> 00:01:02.866
+And if not, which total is right?
+
+00:01:10.020 --> 00:01:11.151
+Line by line.
+
+00:01:11.500 --> 00:01:15.020
+Make a fraction s holding 0; it is the total so far.
+
+00:01:15.370 --> 00:01:19.189
+Repeat the next line for k from 0 up to n minus 1.
+
+00:01:19.540 --> 00:01:23.721
+Add the number at place k to the total, and keep the result as the new total.
+
+00:01:24.070 --> 00:01:29.187
+Each add reads s, which the add before it wrote, so the adds form a chain: none can
+
+00:01:29.187 --> 00:01:31.899
+begin before the previous one has its value.
+
+00:01:32.250 --> 00:01:35.045
+A cycle is one tick of the GPU's clock.
+
+00:01:35.390 --> 00:01:41.327
+On my GTX 1650 I measured that a multiply-add which waits for the previous one costs
+
+00:01:41.327 --> 00:01:45.993
+4 cycles, and a plain add on this chip is published at the same 4.
+
+00:01:46.340 --> 00:01:49.028
+Assume 1.5 billion cycles a second.
+
+00:01:49.380 --> 00:01:50.148
+Pause.
+
+00:01:50.500 --> 00:01:52.676
+Fill the blanks for 20 million numbers.
+
+00:01:59.030 --> 00:02:05.752
+The chain is 20,000,000 adds long: 80,000,000 cycles, or 53.3 milliseconds, however
+
+00:02:05.752 --> 00:02:07.777
+many threads the GPU has.
+
+00:02:08.120 --> 00:02:09.485
+The tree works like this.
+
+00:02:09.840 --> 00:02:14.801
+Add neighbouring pairs, giving half as many partial totals; when the count is odd,
+
+00:02:14.801 --> 00:02:16.859
+the leftover joins the next level.
+
+00:02:17.210 --> 00:02:20.901
+Repeat on the partial totals until a single total is left.
+
+00:02:21.250 --> 00:02:25.218
+Every pair at a level is independent of every other pair at that level.
+
+00:02:25.570 --> 00:02:30.760
+Each add turns two totals into one, so the number of totals goes down by exactly 1
+
+00:02:30.760 --> 00:02:31.266
+per add.
+
+00:02:31.610 --> 00:02:32.378
+Pause.
+
+00:02:32.730 --> 00:02:36.890
+How many adds take 20 million totals down to 1, and how many levels?
+
+00:02:37.240 --> 00:02:50.189
+Use 2 to the 24 = 16,777,216 and 2 to the 25 = 33,554,432.
+
+00:02:56.540 --> 00:03:04.113
+The tree needs 19,999,999 adds, the same work as the plain loop.
+
+00:03:04.460 --> 00:03:11.224
+The levels go 20 million, 10 million, 5 million, 2.5 million, and so on down to 5,
+
+00:03:11.224 --> 00:03:11.884
+3, 2, 1.
+
+00:03:12.240 --> 00:03:18.683
+That makes 25 levels, because 20 million lies between 2 to the 24 and 2 to the 25.
+
+00:03:19.030 --> 00:03:21.462
+A float holds 24 significant bits.
+
+00:03:21.810 --> 00:03:30.801
+Between 2 to the 24 and 2 to the 25, the values a float can hold are spaced 2 apart,
+
+00:03:30.801 --> 00:03:34.119
+so 16,777,217 cannot be stored.
+
+00:03:34.470 --> 00:03:47.377
+After 16,777,216 adds of 1.0, the plain loop's total is exactly 16,777,216.
+
+00:03:47.730 --> 00:04:02.138
+The next add gives 16,777,217, which must be rounded to a neighbour, 16,777,216 or
+
+00:04:02.138 --> 00:04:04.071
+16,777,218.
+
+00:04:04.420 --> 00:04:05.913
+It is exactly halfway.
+
+00:04:06.260 --> 00:04:09.652
+On a tie, the rule picks the neighbour whose last bit is 0.
+
+00:04:10.000 --> 00:04:10.768
+Pause.
+
+00:04:11.120 --> 00:04:12.315
+Which neighbour is it?
+
+00:04:12.670 --> 00:04:15.806
+And what happens to every add of 1.0 after that?
+
+00:04:22.150 --> 00:04:30.662
+It rounds to 16,777,216, which is 2 to the 24 and ends in a 0 bit.
+
+00:04:31.010 --> 00:04:36.045
+Every later add of 1.0 rounds straight back to it, so the total stops growing.
+
+00:04:42.400 --> 00:04:50.229
+The error is 3,222,784, which is 16.1 percent of the true total.
+
+00:04:52.380 --> 00:04:56.860
+Collect the chain lengths, the counts of adds, the spacing of 2, and the two totals.
+
+00:04:57.210 --> 00:04:57.978
+Pause.
+
+00:04:58.330 --> 00:05:02.992
+Write a sentence on everything the tree changes, and why both changes come from the
+
+00:05:02.992 --> 00:05:04.453
+same property of the tree.
+
+00:05:10.800 --> 00:05:15.620
+The tree keeps the work but cuts the longest chain from 20 million to 25, so the
+
+00:05:15.620 --> 00:05:18.693
+adds of each level can be spread over many threads.
+
+00:05:19.040 --> 00:05:24.490
+It also adds totals of similar size, so no partial total ever gets large next to
+
+00:05:24.490 --> 00:05:28.917
+what is added to it, and the rounding never swallows a whole 1.0.
+
+00:05:29.270 --> 00:05:34.124
+Both come from pairing equals instead of adding each new number to one ever-growing
+
+00:05:34.124 --> 00:05:34.475
+total.
+
+00:05:34.820 --> 00:05:39.877
+The tempting answer is "reordering for parallelism costs accuracy; the plain loop is
+
+00:05:39.877 --> 00:05:40.900
+the correct one".
+
+00:05:41.250 --> 00:05:44.877
+It fails, because the plain loop was 16.1 percent wrong.
+
+00:05:47.030 --> 00:05:51.702
+You can add up a long list step after step, or in pairs, then pairs of pairs.
+
+00:05:52.050 --> 00:05:57.369
+The pairs version has the same amount of work but finishes in 25 rounds instead of
+
+00:05:57.369 --> 00:06:00.093
+20 million, which is what lets a GPU help.
+
+00:06:00.450 --> 00:06:05.604
+With computer fractions it is also more accurate, because the step-after-step total
+
+00:06:05.604 --> 00:06:09.517
+grows so large that small numbers added to it are rounded away.
+
+00:06:09.860 --> 00:06:14.703
+For a manager: two correct programs can give different totals from the same data.
+
+00:06:15.060 --> 00:06:20.052
+Ask which order of operations produced a number before trusting it to many digits.
+
+00:06:22.200 --> 00:06:28.237
+The total is 16,777,216, not 20,000,000.
+
+00:06:28.580 --> 00:06:29.625
+Mark your tally.
+
+00:06:32.700 --> 00:06:38.375
+On real data, your GPU tree sum and your CPU loop sum disagree in the fifth digit.
+
+00:06:38.720 --> 00:06:40.981
+Which do you trust, and how do you settle it?
+
+00:06:41.330 --> 00:06:42.098
+Pause.
+
+00:06:48.450 --> 00:06:49.773
+Neither, by default.
+
+00:06:50.120 --> 00:06:55.905
+Compute a reference in 64-bit fractions, which have 53 significant bits instead of
+
+00:06:55.905 --> 00:06:58.163
+24, and compare both against it.
+
+00:06:58.520 --> 00:07:03.000
+The tree is usually closer, because its partial totals stay similar in size.
+
+00:07:03.350 --> 00:07:06.763
+That is a tendency, not a guarantee; the reference settles it.
+

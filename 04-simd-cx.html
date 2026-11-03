@@ -11,6 +11,14 @@
 <h1>04. SIMD: eight cx values from one number</h1>
 <p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
 
+<div class="video">
+<p class="label">The video</p>
+<video controls preload="metadata" playsinline src="videos/04-simd-cx.mp4">
+<track kind="captions" srclang="en" label="English" src="videos/04-simd-cx.vtt">
+</video>
+<p class="vnote">This page as a narrated video, 9:01 long. Every number is worked on screen. Before each answer the video waits 6 seconds: fill the blanks on paper then, or stop the video.</p>
+</div>
+
 <p class="label">The story</p>
 <div class="story">
 <p>A processor core normally does one arithmetic operation on one number per instruction. The Ryzen in this laptop also has AVX2 instructions, which do the same operation on 8 numbers at once, held side by side in one 256-bit register. Lab 1 asks for the picture to be computed with these instructions. The idea is easy to say: handle 8 neighbouring places of the picture together. Saying it is not the hard part.</p>

@@ -11,6 +11,14 @@
 <h1>T2. Summing an array: the chain, the tree, and the wrong answer</h1>
 <p class="sub">GPU basics track. Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
 
+<div class="video">
+<p class="label">The video</p>
+<video controls preload="metadata" playsinline src="videos/t2-sum-an-array.mp4">
+<track kind="captions" srclang="en" label="English" src="videos/t2-sum-an-array.vtt">
+</video>
+<p class="vnote">This page as a narrated video, 7:09 long. Every number is worked on screen. Before each answer the video waits 6 seconds: fill the blanks on paper then, or stop the video.</p>
+</div>
+
 <p class="label">The story</p>
 <div class="story">
 <p>Adding two arrays gives every thread its own independent piece of work. Adding up all the numbers of one array does not: every partial total depends on the totals before it. This job, called a reduction, is the second program in every GPU course, and it is where "just put it in parallel" first stops working.</p>

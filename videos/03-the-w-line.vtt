@@ -1,0 +1,257 @@
+WEBVTT
+
+00:00:01.800 --> 00:00:06.877
+The lab's loop avoids writing 2 times x times y, and saves multiplications.
+
+00:00:07.230 --> 00:00:11.817
+Does it do fewer arithmetic operations per repetition than the textbook version?
+
+00:00:12.160 --> 00:00:13.099
+Yes or no.
+
+00:00:13.450 --> 00:00:14.581
+Pause and write it.
+
+00:00:22.730 --> 00:00:28.481
+The textbook squares a pair (a, b) into (a times a minus b times b, 2 times a times
+
+00:00:28.481 --> 00:00:31.391
+b), then adds the middleman pair (cx, cy).
+
+00:00:31.740 --> 00:00:34.471
+The lab code never writes 2 times a times b.
+
+00:00:34.830 --> 00:00:38.926
+Instead it keeps an extra number called w and subtracts things from it.
+
+00:00:39.270 --> 00:00:43.622
+I read it and objected: the lab says "square", and then the code subtracts.
+
+00:00:43.970 --> 00:00:47.213
+The objection was right; the code does not match the words.
+
+00:00:47.570 --> 00:00:49.490
+Where did 2 times a times b go?
+
+00:00:49.840 --> 00:00:55.512
+The tools needed are multiplying out one square by hand, and something I already
+
+00:00:55.512 --> 00:00:57.072
+knew: i times i is −1.
+
+00:00:57.420 --> 00:01:01.879
+Then comes the question a reviewer should ask about any clever rewrite: what did it
+
+00:01:01.879 --> 00:01:03.329
+save, and what did it cost?
+
+00:01:03.680 --> 00:01:07.264
+Is counting multiplications even the right way to answer that?
+
+00:01:14.410 --> 00:01:20.696
+Lines C, D and F of one repetition write x2, y2 and w; lines A and B of the next
+
+00:01:20.696 --> 00:01:22.346
+repetition read them.
+
+00:01:22.700 --> 00:01:25.943
+Call the x and y of the earlier repetition a and b.
+
+00:01:26.290 --> 00:01:36.423
+Then x2 = a·a, y2 = b·b, z = a + b, and w = (a + b) × (a + b).
+
+00:01:36.770 --> 00:01:37.538
+Pause.
+
+00:01:37.890 --> 00:01:41.367
+Multiply it out term by term, then put it into line B.
+
+00:01:47.720 --> 00:01:54.739
+(a + b)(a + b) = a·a + 2·a·b + b·b.
+
+00:01:55.090 --> 00:02:00.935
+In line B the a·a and b·b cancel, leaving 2·a·b + cy.
+
+00:02:01.280 --> 00:02:04.800
+Line A is a·a − b·b + cx.
+
+00:02:05.150 --> 00:02:07.902
+The textbook formula is all there, rearranged.
+
+00:02:08.250 --> 00:02:16.237
+The i in "i times i is −1" is not the loop counter i, so I write it as capital I: I
+
+00:02:16.237 --> 00:02:17.103
+× I = −1.
+
+00:02:17.460 --> 00:02:20.873
+Write the pair (a, b) as a single number, a + b·I.
+
+00:02:21.220 --> 00:02:21.988
+Pause.
+
+00:02:22.340 --> 00:02:30.212
+Multiply (a + b·I) by (a + b·I) and replace I × I by −1.
+
+00:02:36.560 --> 00:02:41.893
+The result is a·a − b·b + 2·a·b·I.
+
+00:02:42.240 --> 00:02:47.872
+Line A is the part without I, plus cx; line B is the part with I, plus cy.
+
+00:02:48.230 --> 00:02:54.289
+A repetition is therefore: square a + b·I, then add cx + cy·I.
+
+00:02:54.640 --> 00:02:55.408
+Pause.
+
+00:03:01.750 --> 00:03:19.406
+Repetition 1 gives x = −0.75, y = −1.25, x2 = 0.5625, y2 = 1.5625, z = −2.0, w =
+
+00:03:19.406 --> 00:03:20.289
+4.0.
+
+00:03:20.640 --> 00:03:29.152
+In repetition 2, line B and the textbook both give 0.625, and x = −1.75.
+
+00:03:29.500 --> 00:03:33.767
+In repetition 3 both give −3.4375.
+
+00:03:34.120 --> 00:03:46.045
+Before repetition 4 the check is 3.693604 + 11.816406 = 15.51, so iters = 3.
+
+00:03:46.400 --> 00:03:48.747
+Here is the loop written straight from the textbook.
+
+00:03:49.090 --> 00:03:52.141
+The check multiplies x by x and y by y.
+
+00:03:52.490 --> 00:03:57.541
+The new first number goes into a temporary, xt, because the next line still needs
+
+00:03:57.541 --> 00:03:58.165
+the old x.
+
+00:03:58.520 --> 00:04:02.829
+The new second number uses the old x and y, and then x is replaced.
+
+00:04:04.980 --> 00:04:10.267
+Count each multiply and each add or subtract in one repetition, including the check,
+
+00:04:10.267 --> 00:04:15.428
+and the longest chain from the values at the top of a repetition to the values the
+
+00:04:15.428 --> 00:04:16.372
+next one needs.
+
+00:04:16.720 --> 00:04:22.941
+On my GTX 1650 each of these operations delivers its value 4 cycles after it begins;
+
+00:04:22.941 --> 00:04:28.496
+that is the published microbenchmark figure, and my own measurement agrees.
+
+00:04:28.850 --> 00:04:29.618
+Pause.
+
+00:04:29.960 --> 00:04:30.984
+Fill the table.
+
+00:04:37.340 --> 00:04:44.332
+The straight version does 6 multiplies and 4 adds, 10 in total, with a longest chain
+
+00:04:44.332 --> 00:04:48.327
+of 3: x, then x·x, then minus y·y, then plus cx.
+
+00:04:48.670 --> 00:04:56.357
+The lab version does 3 multiplies and 7 adds or subtracts, also 10, with a longest
+
+00:04:56.357 --> 00:05:01.513
+chain of 5: w, minus x2, minus y2, plus cy, x + y, z·z.
+
+00:05:01.870 --> 00:05:05.390
+Along the chain that is 12 cycles of waiting against 20.
+
+00:05:05.740 --> 00:05:06.508
+Pause.
+
+00:05:06.850 --> 00:05:10.711
+Write a sentence on when the lab's rewrite is a win and when it is not.
+
+00:05:17.070 --> 00:05:22.232
+The rewrite moves work from multiplications to additions without lowering the total,
+
+00:05:22.232 --> 00:05:26.350
+so it wins only where a multiplication costs more than an addition.
+
+00:05:26.700 --> 00:05:32.033
+Where every operation costs the same 4 cycles, it lengthens the chain from 3 to 5.
+
+00:05:32.380 --> 00:05:37.155
+Which version is faster on this GPU is a measurement question, not a counting
+
+00:05:37.155 --> 00:05:37.713
+question.
+
+00:05:38.060 --> 00:05:42.958
+The tempting answer, "fewer multiplications means faster", fails because the total
+
+00:05:42.958 --> 00:05:43.735
+stayed at 10.
+
+00:05:45.890 --> 00:05:50.007
+Code that has been tuned often stops looking like the formula it computes.
+
+00:05:50.350 --> 00:05:55.172
+The tuning was done for a reason, on some machine, at some time, and the reason may
+
+00:05:55.172 --> 00:05:56.857
+not hold on the next machine.
+
+00:05:57.210 --> 00:06:01.982
+Reading such code means recovering the formula first, then asking which cost the
+
+00:06:01.982 --> 00:06:03.653
+rewrite was trading against.
+
+00:06:04.000 --> 00:06:08.757
+For a manager: "we optimized it" is a claim about one cost on one machine.
+
+00:06:09.110 --> 00:06:11.137
+Ask which cost, and on which machine.
+
+00:06:13.290 --> 00:06:14.463
+The answer is no.
+
+00:06:14.810 --> 00:06:20.834
+Both versions do 10 operations per repetition: the textbook does 6 multiplications
+
+00:06:20.834 --> 00:06:23.258
+and 4 additions, the lab 3 and 7.
+
+00:06:23.610 --> 00:06:24.655
+Mark your tally.
+
+00:06:26.800 --> 00:06:31.626
+How would you decide, by measurement and not by counting, which of the two loop
+
+00:06:31.626 --> 00:06:33.520
+versions is faster on this GPU?
+
+00:06:33.870 --> 00:06:34.638
+Pause.
+
+00:06:40.990 --> 00:06:43.891
+Write both as GPU kernels of the same shape.
+
+00:06:44.240 --> 00:06:49.036
+Time each at two loop lengths, with clock reads tied to the values, and subtract
+
+00:06:49.036 --> 00:06:50.235
+within each version.
+
+00:06:50.590 --> 00:06:55.630
+Then read both machine listings to see what the compiler fused into multiply-adds,
+
+00:06:55.630 --> 00:06:57.843
+because that changes the real chain.
+

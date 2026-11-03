@@ -11,6 +11,14 @@
 <h1>06. GPU: one changed line, and the proof of "nearby"</h1>
 <p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
 
+<div class="video">
+<p class="label">The video</p>
+<video controls preload="metadata" playsinline src="videos/06-gpu-threads.mp4">
+<track kind="captions" srclang="en" label="English" src="videos/06-gpu-threads.vtt">
+</video>
+<p class="vnote">This page as a narrated video, 8:36 long. Every number is worked on screen. Before each answer the video waits 6 seconds: fill the blanks on paper then, or stop the video.</p>
+</div>
+
 <p class="label">The story</p>
 <div class="story">
 <p>The graphics card in this laptop, a GTX 1650, has 896 small arithmetic units arranged in 14 SMs. Lab 1 first computes the whole picture with one GPU thread, which takes 403 milliseconds, more than six times slower than one CPU core. Then it changes one line so that 32 threads share the work, and the time falls to 17.7 milliseconds.</p>

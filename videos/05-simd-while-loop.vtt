@@ -1,0 +1,308 @@
+WEBVTT
+
+00:00:01.800 --> 00:00:06.237
+The Ryzen's 8-at-once instructions handle 8 places per instruction.
+
+00:00:06.590 --> 00:00:09.705
+What speedup over plain code did my laptop measure?
+
+00:00:10.050 --> 00:00:11.522
+Pause and write a number.
+
+00:00:19.670 --> 00:00:26.064
+Each place of the 256 by 256 picture needs its own number of repetitions of the
+
+00:00:26.064 --> 00:00:32.458
+Mandelbrot loop, anywhere from 1 to 1000, and that count, iters, is the place's
+
+00:00:32.458 --> 00:00:33.025
+result.
+
+00:00:33.380 --> 00:00:38.769
+AVX2 instructions handle 8 places at once, but an instruction cannot do something to
+
+00:00:38.769 --> 00:00:42.297
+some of its 8 numbers and something else to the others.
+
+00:00:42.650 --> 00:00:45.765
+So how can one loop give 8 places 8 different counts?
+
+00:00:46.110 --> 00:00:47.838
+I attacked this from every side.
+
+00:00:48.190 --> 00:00:50.323
+SIMD does not understand while loops.
+
+00:00:50.670 --> 00:00:54.190
+SIMD cannot be told to update some numbers and not others.
+
+00:00:54.540 --> 00:00:58.060
+There is no way to know in advance which of the 8 finishes first.
+
+00:00:58.410 --> 00:01:00.031
+All three statements are true.
+
+00:01:00.380 --> 00:01:04.956
+Any solution has to respect all of them and still give every place its correct
+
+00:01:04.956 --> 00:01:05.308
+count.
+
+00:01:05.660 --> 00:01:09.713
+Before reading the code, write down what such a solution would have to waste.
+
+00:01:16.860 --> 00:01:22.744
+In English: four holds 4.0 at all 8 indexes. iters_vec holds 8 whole-number
+
+00:01:22.744 --> 00:01:28.785
+counters, all 0, one per place. iter is a single counter for the loop itself.
+
+00:01:29.140 --> 00:01:32.297
+The loop repeats while iter is below max_iters.
+
+00:01:32.650 --> 00:01:39.129
+At each index, add x2 and y2 and compare the sum with 4: at most 4 gives 32 bits all
+
+00:01:39.129 --> 00:01:44.682
+set to 1, anything else gives 32 bits all 0, and the 8 answers are mask.
+
+00:01:45.030 --> 00:01:48.849
+If all 256 bits of mask are 0, leave the loop.
+
+00:01:49.200 --> 00:01:54.771
+Read mask's bits as 8 whole numbers and subtract them from the 8 counters, index by
+
+00:01:54.771 --> 00:01:55.173
+index.
+
+00:01:55.520 --> 00:01:59.595
+Then do lines A to F at all 8 indexes, and add 1 to iter.
+
+00:01:59.950 --> 00:02:00.718
+Pause.
+
+00:02:01.060 --> 00:02:02.084
+Fill the table.
+
+00:02:08.440 --> 00:02:12.365
+Before repetition 6: T T T T T T F F.
+
+00:02:12.710 --> 00:02:15.931
+Before 7: T T T F F F F F.
+
+00:02:16.280 --> 00:02:18.712
+Before 9: T followed by seven F.
+
+00:02:19.070 --> 00:02:23.358
+Before 13: all F, so the test sees all zeros and the loop breaks.
+
+00:02:23.700 --> 00:02:28.052
+Take 32 bits all set to 1 as a whole number, and add 1 in binary.
+
+00:02:28.410 --> 00:02:34.768
+Each 1 + 1 gives 0 and carries 1, all the way up, and the final carry does not fit
+
+00:02:34.768 --> 00:02:35.621
+in 32 bits.
+
+00:02:35.970 --> 00:02:36.738
+Pause.
+
+00:02:37.090 --> 00:02:39.458
+What is left, and so what number is all-ones?
+
+00:02:45.800 --> 00:02:48.381
+All 32 bits are 0, which is 0.
+
+00:02:48.730 --> 00:02:52.271
+The number that becomes 0 when 1 is added is −1.
+
+00:02:52.630 --> 00:02:57.704
+The cast changes no bit; it only lets the next instruction read the 8 values as
+
+00:02:57.704 --> 00:02:58.603
+whole numbers.
+
+00:02:58.950 --> 00:03:03.430
+So where the mask is T, count − (−1) = count + 1.
+
+00:03:03.780 --> 00:03:06.511
+Where it is F, count − 0 = count.
+
+00:03:06.860 --> 00:03:07.628
+Pause.
+
+00:03:13.980 --> 00:03:15.665
+After 5: all fives.
+
+00:03:16.010 --> 00:03:19.210
+After 6: 6 6 6 6 6 6 5 5.
+
+00:03:19.560 --> 00:03:23.272
+After 7: 7 7 7 6 6 6 5 5.
+
+00:03:23.630 --> 00:03:28.921
+After 12: 12 8 7 6 6 6 5 5, exactly the plain counts.
+
+00:03:29.270 --> 00:03:34.303
+No index was ever asked whether it had finished: its own mask value stopped its own
+
+00:03:34.303 --> 00:03:34.667
+count.
+
+00:03:35.010 --> 00:03:40.251
+After index 6 gets F, lines A to F still compute at index 6, because every
+
+00:03:40.251 --> 00:03:42.093
+instruction acts on all 8.
+
+00:03:42.450 --> 00:03:43.645
+Can it get T again?
+
+00:03:43.990 --> 00:03:58.231
+Use the place (i = 128, j = 255): cx = 0.490234, cy = 0, and after repetition 5, x2
+
+00:03:58.231 --> 00:04:00.118
+= 8.167644.
+
+00:04:00.470 --> 00:04:01.238
+Pause.
+
+00:04:01.590 --> 00:04:03.382
+Do one more repetition anyway.
+
+00:04:09.730 --> 00:04:25.133
+x = 8.167644 + 0.490234 = 8.657878, and x2 = 74.958850, still above 4.
+
+00:04:25.480 --> 00:04:30.707
+Once the moving pair is farther than 2 from (0, 0), squaring makes it farther again.
+
+00:04:31.060 --> 00:04:36.183
+Far enough out, the float becomes infinity, then NaN, and the compare gives F for
+
+00:04:36.183 --> 00:04:36.436
+NaN.
+
+00:04:36.780 --> 00:04:37.996
+So F stays F.
+
+00:04:38.350 --> 00:04:39.118
+Pause.
+
+00:04:45.470 --> 00:04:53.069
+The i = 40 block does 12 repetitions, which is 96 index-repetitions: 55 useful and
+
+00:04:53.069 --> 00:04:54.089
+41 useless.
+
+00:04:54.440 --> 00:05:02.732
+In the i = 22 block, index 5 is T forever, so iter < 1000 ends the loop: 1000
+
+00:05:02.732 --> 00:05:08.008
+repetitions, 8000 index-repetitions, 1217 useful.
+
+00:05:08.350 --> 00:05:10.142
+That is 15.2 percent.
+
+00:05:16.500 --> 00:05:24.457
+The prediction is 8 × 0.8883 = 7.11, against 7.07 measured.
+
+00:05:24.800 --> 00:05:30.837
+The useless index-repetitions alone explain why 8 at once gave about 7 times, not 8.
+
+00:05:32.990 --> 00:05:39.902
+Now shuffle the 65,536 places randomly, and cut them into blocks of 8 that are no
+
+00:05:39.902 --> 00:05:41.438
+longer neighbours.
+
+00:05:41.790 --> 00:05:45.886
+Counted the same way, 27.9 percent of the work is useful.
+
+00:05:46.240 --> 00:05:47.008
+Pause.
+
+00:05:47.350 --> 00:05:48.929
+What speedup does that predict?
+
+00:05:49.280 --> 00:05:55.324
+Then explain, in a single sentence, both of these at once: single blocks get as low
+
+00:05:55.324 --> 00:06:00.203
+as 15.2 percent useful, yet the whole picture reaches 88.8 percent.
+
+00:06:06.550 --> 00:06:11.521
+Random blocks predict 2.23, with the same instructions on the same machine.
+
+00:06:11.880 --> 00:06:16.808
+Neighbouring places usually need similar numbers of repetitions, so most blocks of 8
+
+00:06:16.808 --> 00:06:19.389
+neighbours finish together and waste little.
+
+00:06:19.730 --> 00:06:23.975
+Only the few blocks on the edge of the set mix 1000 with small counts.
+
+00:06:24.330 --> 00:06:28.767
+The 7 times comes from that property of the picture, not from the instructions.
+
+00:06:29.120 --> 00:06:34.188
+The tempting answer, "SIMD is 8 times faster minus some overhead", fails: shuffled
+
+00:06:34.188 --> 00:06:38.144
+places keep the instructions and lose two thirds of the speedup.
+
+00:06:40.290 --> 00:06:45.160
+Doing 8 things with one instruction pays only when the 8 things need the same amount
+
+00:06:45.160 --> 00:06:45.623
+of work.
+
+00:06:45.970 --> 00:06:50.645
+Here the vector code is about 7 times faster because neighbouring parts of this
+
+00:06:50.645 --> 00:06:52.775
+picture happen to need similar work.
+
+00:06:53.130 --> 00:06:56.522
+Pick the 8 badly and the same hardware gives barely 2.
+
+00:06:56.870 --> 00:07:02.033
+For a manager: speedups quoted as "8 times" or "32 times" are maximums.
+
+00:07:02.380 --> 00:07:07.064
+The real number depends on how similar the units of work are, and that is a property
+
+00:07:07.064 --> 00:07:08.737
+of your data, not of the chip.
+
+00:07:10.890 --> 00:07:18.549
+The measured speedup is 7.07 times: 61.6 milliseconds down to 8.71.
+
+00:07:18.900 --> 00:07:19.945
+Mark your tally.
+
+00:07:22.100 --> 00:07:27.583
+Suppose a picture where neighbouring places have unrelated costs: the 2.23 case.
+
+00:07:27.930 --> 00:07:30.917
+What would you change so the 8-at-once code wins again?
+
+00:07:31.270 --> 00:07:32.038
+Pause.
+
+00:07:38.380 --> 00:07:41.537
+Put places of similar cost into the same register.
+
+00:07:41.890 --> 00:07:47.257
+Compute a coarse, low-resolution picture first and use its counts to sort places by
+
+00:07:47.257 --> 00:07:48.162
+expected cost.
+
+00:07:48.510 --> 00:07:53.384
+Then fill each register with places from the same cost class, and write each result
+
+00:07:53.384 --> 00:07:54.675
+back to its own place.
+
