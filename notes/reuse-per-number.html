@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A BM by BN tile fetches 1/BN + 1/BM numbers per multiply-add; for L2 not to set the time its side must reach 4 * 26.7 / 2.4 = 44.5 on the course GPU, whatever the size of the matrices.">
+<meta name="keywords" content="Lab 4, memory">
+<title>Reuse per number fetched, and the side of a tile</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="site">
+<a class="brand" href="MIT-6.S894.html">6.S894 self-study</a>
+<nav><a href="MIT-6.S894.html#syllabus">Lessons</a><a href="index.html">Notes</a><a href="../index.html">Lab pages</a><a href="../words.html">Words</a></nav>
+</header>
+<main>
+<p class="crumbs"><a href="../index.html">GPU Learnings</a> / <a href="index.html">notes</a> / <a href="MIT-6.S894.html">MIT 6.S894</a></p>
+<h1>Reuse per number fetched, and the side of a tile</h1>
+<p class="sub">Topics: Lab 4, memory. A single idea, with a few lines to calculate. Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+
+<p class="label">The idea</p>
+<div class="story">
+<p>A block that computes a square tile of a matrix product copies pieces of the inputs into on-chip memory and uses every copied number several times. Named numbers such as BM = 64 fix the side of that tile, and a number kept out of habit cannot be changed safely.</p>
+<p>The question here: what decides the smallest useful side of the tile, and what stops it from growing?</p>
+</div>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The Lab 4 handout's numbers for the course GPU: 26.7 TFLOP/s of multiply-adds, 2 FLOP each; the L2 cache 2.4 TB/s; the L1 memory of all 48 SMs, the identical blocks of hardware the chip is built from, 13.4 TB/s; the second kernel must finish the 3072 by 3072 by 3072 test in under 8 ms. From the formula of the product: a block computing a BM by BN tile of C fetches, at one value of k, BM + BN numbers for BM * BN multiply-adds. <span class="from">from: the Lab 4 handout; the starter's CPU reference</span></p>
+<p class="ln do"><b>L02</b> <b class="x">DO</b> Numbers fetched from L2 per multiply-add for 32 by 32 tiles ____ , for 64 by 64 ____ . L2 time over the 3072 test: ____ ms and ____ ms, against ____ ms of multiply-adds. <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>1/16 and 1/32
+3.02 ms and 1.51 ms, against 57,982,058,496 FLOP / 26.7 TFLOP/s = 2.17 ms
+only 64 by 64 leaves the multiply-adds to set the time</pre>
+</details>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> Solve for the side T of a square tile at which L2 time equals multiply-add time: ____ . Does 3,072 appear in the answer? ____ . <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>8 / (T * 2.4) = 2 / 26.7, so T = 4 * 26.7 / 2.4 = 44.5
+no: the number of multiply-adds cancels; the side depends only on the chip's two rates,
+and 64 is the first power of 2 above it</pre>
+</details>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> Each thread computing a 4 by 4 patch of C in registers reads ____ numbers from shared memory per ____ multiply-adds; time at 13.4 TB/s: ____ ms, against 8. With one number of C per thread: ____ ms. <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>8 reads per 16 multiply-adds, 1/2 each: 58.0 GB, 4.33 ms, under 8 ms
+one number per thread: 2 reads per multiply-add, 231.9 GB, 17.3 ms</pre>
+</details>
+
+<p class="label">Worked out in full</p>
+<ul class="related">
+<li><a href="../32-why-64.html">32. Lab 4: why the tile side is 64, reuse per number fetched</a></li>
+</ul>
+
+<p class="label">Related notes</p>
+<ul class="related">
+<li><a href="tiles.html">Tiles in shared memory</a>: how much reuse a matrix multiply needs on the laptop, and whether a tile that size fits</li>
+<li><a href="indices-to-threads.html">From the formula to threads and a loop</a>: why the loop over k is walked in pieces at all</li>
+<li><a href="split-k.html">Split-k: pieces of one sum in different blocks</a>: what to do when the tiles leave SMs without work</li>
+</ul>
+
+<div class="backlinks">
+<p class="label">Lessons and notes that point here</p>
+<!-- backlinks:begin -->
+<ul class="related">
+<li><a href="indices-to-threads.html">From the formula to threads and a loop</a></li>
+<li><a href="MIT-6.S894.html">MIT 6.S894 Accelerated Computing, Labs 1 and 2, on your own computer</a></li>
+<li><a href="split-k.html">Split-k: pieces of one sum in different blocks</a></li>
+</ul>
+<!-- backlinks:end -->
+</div>
+
+<nav><a href="index.html">all notes</a><a href="MIT-6.S894.html">MIT 6.S894 course page</a></nav>
+</main>
+<footer class="site">
+<p>Independent self-study material for MIT 6.S894 Accelerated Computing, written from one learner's work, and not affiliated with or endorsed by MIT or the course staff. The course pages are at <a href="https://accelerated-computing.academy/fall25/">accelerated-computing.academy/fall25</a> and the starter code at <a href="https://github.com/accelerated-computing-class">github.com/accelerated-computing-class</a>. Every measured number comes from one laptop, a Ryzen 5 4600H with a GTX 1650, unless a sentence says otherwise.</p>
+</footer>
+</body>
+</html>

@@ -49,7 +49,11 @@
 <li>"I cannot tell from my index line whether one instruction reads side by side", or "each of my threads reads its floats in order, so why is it slow?" <a href="27-which-threads-are-neighbours.html">page 27</a>.</li>
 <li>"My two versions copy the same array correctly; do their threads read the same floats?", or "why does the base of my index change with the loop variable?" <a href="28-the-shared-base.html">page 28</a>.</li>
 <li>"My wave kernel overwrites the array other threads are reading; is that a race?", or "where does the bounds check go, and may I return early?" <a href="29-the-naive-wave-step.html">page 29</a>.</li>
-<li>"My result looks fine but I am not sure it measures what I think." <a href="failures.html">the failure list</a>, 56 ways a clean-looking number goes wrong.</li>
+<li>"Taking the first index of my matrix from y feels backwards", or "why does the thread ID use the block's size in x but never its size in y?" <a href="30-which-index-gets-x.html">page 30</a>.</li>
+<li>"I read C = A times B as A, then B, then C, and cannot see why the kernel begins from C", or "what is bk &lt; size_k for, and why are the shared arrays square?" <a href="31-from-the-formula-to-the-kernel.html">page 31</a>.</li>
+<li>"I wrote BM = 64 but cannot say why 64", or "my tiled kernel is correct but nowhere near 8 ms." <a href="32-why-64.html">page 32</a>.</li>
+<li>"My matrix multiply with a small C and a long k leaves most of the GPU idle", or "my split version decides differently on the course GPU than on my laptop." <a href="33-split-k.html">page 33</a>.</li>
+<li>"My result looks fine but I am not sure it measures what I think." <a href="failures.html">the failure list</a>, 64 ways a clean-looking number goes wrong.</li>
 <li>"A table printed by a course file looks wrong on my GPU." <a href="12-the-48-trap.html">page 12</a>.</li>
 </ol>
 

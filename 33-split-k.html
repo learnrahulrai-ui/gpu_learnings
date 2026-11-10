@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Split-K</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>33. Lab 5: split-k, when C has fewer tiles than the GPU has SMs</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>Lab 5 of MIT 6.S894 times the matrix multiplication of Lab 4 on twelve shapes instead of one. Among them is a shape that stands apart: C is only 128 by 128 numbers, but each of them is a sum of 32,768 products. With the 64 by 64 tiles of Lab 4, that C is four tiles, so the launch has four blocks of threads, on a chip with 48 identical blocks of hardware that each execute blocks of threads.</p>
+<p>The handout's answer is called split-k: cut the sum over k into pieces, give each piece to a block of its own, and add the pieces afterwards. The learner had written partial sums for days, inside every loop of every kernel, and could not see what was new; a for loop always finishes, so what could be unfinished about its result? And the learner's version decided when to split with a test written against the number 14.</p>
+<p>What changes when the pieces of one sum belong to different blocks, and where should the decision to split come from?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>On the course GPU, which has 48 identical blocks of hardware (SMs), the 128 by 128 by 32768 product is computed with 64 by 64 tiles of C, one block of threads per tile, and a block executes on one SM. How many of the 48 SMs have any work? Write a number.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "I did partial sums for days: what is new?" / "Unfinished results: a for loop always finishes." / "Always 64 by 64" / "One thread handles one C element."</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The Lab 5 handout, Part 2: twelve sizes of size_i by size_j by size_k, among them 3072 by 3072 by 3072, 256 by 256 by 8192 and 128 by 128 by 32768, each with a target given as a percent of the fastest possible: 25% for 256 by 256 by 8192 and 40% for 128 by 128 by 32768. For a C too small to give every SM a tile, the handout suggests splitting the iteration over k, which it calls split-k, with two kernels: a main kernel that computes partial sums without adding them together, and a reduction kernel that adds them. <span class="from">from: the Lab 5 handout</span></p>
+<p class="ln"><b>L02</b> The Lab 4 handout's numbers for the course GPU, an RTX 4000 Ada: it is built from 48 identical blocks of hardware, which NVIDIA calls SMs; they do 26.7 TFLOP/s of multiply-adds together, a multiply-add counting as 2 FLOP; its main memory, DRAM, delivers 360 GB/s. NVIDIA's CUDA programming guide: all threads of a block reside on one SM; blocks are required to execute independently, in any order, in parallel or in series; a thread's registers are its own, and a block's shared memory is visible only to the threads of that block. <span class="from">from: the Lab 4 handout; the CUDA programming guide</span></p>
+<p class="ln"><b>L03</b> Your Lab 5 main kernel is your Lab 4 kernel: blocks of 16 by 16 threads, each block computing a 64 by 64 tile of C; each thread computes a 4 by 4 patch of the tile, whose 16 sums stay in its registers, and walks k in steps of BK = 16 through tiles of A and B copied into shared memory, where each number it reads serves 4 of its multiply-adds. The launch has one block per tile of C. <span class="from">from: your code</span></p>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> With these 64 by 64 tiles, one block per tile: blocks for 128 by 128 by 32768 ____ ; SMs with work ____ of 48. Each block computes ____ numbers of C, each a sum of ____ products: multiply-adds per block ____ . At one SM's share of 26.7 TFLOP/s, ____ TFLOP/s, a block needs at least ____ µs. <span class="from">from: L01, L02, L03</span></p>
+<details><summary>CHECK</summary>
+<pre>2 * 2 = 4 blocks: at most 4 SMs work, at least 44 have nothing
+64 * 64 = 4,096 numbers, each a sum of 32,768 products: 134,217,728 multiply-adds per block
+26.7 / 48 = 0.556 TFLOP/s per SM; 2 * 134,217,728 FLOP / 0.556 TFLOP/s = 483 µs</pre>
+</details>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> The fastest possible for this size: FLOP ____ , at 26.7 TFLOP/s ____ µs; bytes of A, B and C ____ , at 360 GB/s ____ µs. The larger of the two is the bound: ____ µs. What fraction of the possible can 4 busy SMs reach at most? ____ . Against the 40% target: ____ . <span class="from">from: L01, L02, L04</span></p>
+<details><summary>CHECK</summary>
+<pre>2 * 128 * 128 * 32,768 = 1,073,741,824 FLOP: 40.2 µs
+A: 128 * 32,768 * 4 = 16,777,216 bytes; B the same; C: 128 * 128 * 4 = 65,536 bytes;
+together 33,619,968 bytes: 93.4 µs
+the bound is 93.4 µs, set by memory; 93.4 / 483 = 19% at most
+below the 40% target, however well each block is written</pre>
+</details>
+<p class="ln"><b>L06</b> The sum over k can be cut: the sum over k = 0 to 32,767 equals the sum over 0 to 2,047, plus the sum over 2,048 to 4,095, and so on, for any pieces that cover every k exactly once. Your launch makes the pieces the third number of the grid, (2, 2, split_k), and a block computes, for its tile, the sum over its own piece of k: <span class="from">from: the starter's CPU reference; your code</span></p>
+<pre>int split_idx = blockIdx.z;
+int split_k = gridDim.z;
+int k_tiles = (size_k + BK - 1) / BK;
+int tiles_per_split = (k_tiles + split_k - 1) / split_k;
+int bk_start = split_idx * tiles_per_split * BK;
+int bk_end = min((split_idx + 1) * tiles_per_split * BK, size_k);
+for (int bk = bk_start; bk &lt; bk_end; bk += BK) {</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>int split_idx = blockIdx.z;</code><span>This block's piece number: its z number in the launch.</span></li>
+<li><code>int split_k = gridDim.z;</code><span>The number of pieces: the launch's size in z.</span></li>
+<li><code>int k_tiles = (size_k + BK - 1) / BK;</code><span>The number of steps of BK = 16 values of k that cover size_k, rounded up.</span></li>
+<li><code>int tiles_per_split = (k_tiles + split_k - 1) / split_k;</code><span>Steps per piece: that number divided by the number of pieces, rounded up.</span></li>
+<li><code>int bk_start = split_idx * tiles_per_split * BK;</code><span>The first k of this block's piece.</span></li>
+<li><code>int bk_end = min((split_idx + 1) * tiles_per_split * BK, size_k);</code><span>One past the last k of the piece, never beyond size_k.</span></li>
+<li><code>for (int bk = bk_start; bk &lt; bk_end; bk += BK) {</code><span>Walk this block's piece of k in steps of 16, the way the Lab 4 kernel walks all of k.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L07</b> <b class="x">DO</b> With split_k = 16 for 128 by 128 by 32768: k_tiles ____ ; tiles_per_split ____ ; values of k per piece ____ ; the piece of the blocks with blockIdx.z = 5: k from ____ to ____ . Blocks in the launch ____ , against 48 SMs; multiply-adds per block ____ . <span class="from">from: L04, L06</span></p>
+<details><summary>CHECK</summary>
+<pre>k_tiles = 32,768 / 16 = 2,048; tiles_per_split = 2,048 / 16 = 128 steps;
+128 * 16 = 2,048 values of k per piece
+blockIdx.z = 5: k = 5 * 2,048 = 10,240 to 12,287
+2 * 2 * 16 = 64 blocks, more than the 48 SMs: every SM can get work
+4,096 * 2,048 = 8,388,608 multiply-adds per block, 1/16 of L04's</pre>
+</details>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> Every block's loop finishes. What does a block hold when it ends? ____ . If all 16 blocks of a tile stored their results straight into C: ____ . If they added into C with <code>c[...] += sum</code>, two blocks could both read the old value before either stores: ____ . <span class="from">from: L06, L07</span></p>
+<details><summary>CHECK</summary>
+<pre>the sum over its own 2,048 values of k: a finished loop, an unfinished sum, one of 16
+pieces of each number of its tile
+each store replaces the one before: C keeps whichever piece was stored last, one of the 16
+pieces of the sum, and which piece that is can change from launch to launch
+an addition is lost: both read the old value, both add their piece, and the later store
+overwrites the earlier</pre>
+</details>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> Lab 4's kernel also made partial sums. Who held the pieces of one number of C there, and who holds them here? ____ . Why can no thread of the main kernel add the 16 pieces of a number? ____ . <span class="from">from: L02, L03, L08</span></p>
+<details><summary>CHECK</summary>
+<pre>Lab 4: one thread held the whole sum of each of its numbers in one register and added every
+piece itself, in order; nothing crossed between threads
+here: 16 blocks hold the 16 pieces in their own registers, possibly on 16 different SMs at
+the same moment
+no thread can read another block's registers or shared memory, and blocks execute in any
+order, so one block cannot even assume that another has begun (L02): inside the launch
+there is no moment at which all 16 pieces are known to exist</pre>
+</details>
+<p class="ln"><b>L10</b> Your code stores each block's results into its own slice of a workspace, GPU memory that the starter allocates with <code>cudaMalloc</code>, fills with 0 and hands to your launch function, of the size your <code>get_workspace_size</code> returns. A second kernel, with one thread per number of C, adds the slices. The Lab 3 handout: kernel launches issued one after another execute one after another, each finishing before the next begins. <span class="from">from: your code; the Lab 5 starter; the Lab 3 handout</span></p>
+<pre>float *out = (split_k &gt; 1)
+    ? (reinterpret_cast&lt;float *&gt;(workspace) + (size_t)split_idx * size_i * size_j)
+    : c;</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>float *out = (split_k &gt; 1)</code><span>Where this block stores its results: if k is split,</span></li>
+<li><code>    ? (reinterpret_cast&lt;float *&gt;(workspace) + (size_t)split_idx * size_i * size_j)</code><span>its own slice of the workspace, slice number split_idx, each slice size_i * size_j numbers long;</span></li>
+<li><code>    : c;</code><span>otherwise C itself.</span></li>
+</ol>
+</div>
+<pre>int idx = blockIdx.x * blockDim.x + threadIdx.x;
+if (idx &lt; total_elements) {
+    float sum = 0.0f;
+    for (int s = 0; s &lt; split_k; ++s) {
+        sum += workspace[s * (size_t)total_elements + idx];
+    }
+    c[idx] = sum;
+}</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>int idx = blockIdx.x * blockDim.x + threadIdx.x;</code><span>This thread's number in the whole launch of the second kernel: one number of C.</span></li>
+<li><code>if (idx &lt; total_elements) {</code><span>If C has a number there,</span></li>
+<li><code>    float sum = 0.0f;</code><span>begin a sum at 0,</span></li>
+<li><code>    for (int s = 0; s &lt; split_k; ++s) {</code><span>and for every slice s = 0 to split_k - 1</span></li>
+<li><code>        sum += workspace[s * (size_t)total_elements + idx];</code><span>add the number at place idx of slice s;</span></li>
+<li><code>    }</code><span>end of the loop over slices;</span></li>
+<li><code>    c[idx] = sum;</code><span>store the sum into C at place idx.</span></li>
+<li><code>}</code><span>End of the check.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> Workspace bytes for 128 by 128 by 32768 with 16 slices: ____ . The place of C at (12, 20) is 12 * 128 + 20 = ____ ; in slice 5 it is at ____ . Bytes the two kernels add to the traffic by writing the workspace and reading it back: ____ , against the ____ bytes of A, B and C of L05. <span class="from">from: L05, L10</span></p>
+<details><summary>CHECK</summary>
+<pre>16 * 128 * 128 * 4 = 1,048,576 bytes
+C at (12, 20): place 1,556; in slice 5: 5 * 16,384 + 1,556 = 83,476
+1,048,576 written + 1,048,576 read = 2,097,152 bytes, about 6% of the 33,619,968 of L05</pre>
+</details>
+<p class="ln do"><b>L12</b> <b class="x">DO</b> Why does the second kernel give each thread one number of C, while the main kernel gives each thread 4 by 4? ____ . Threads of the second kernel for 128 by 128: ____ , in blocks of 256: ____ blocks. <span class="from">from: L03, L10</span></p>
+<details><summary>CHECK</summary>
+<pre>in the main kernel a 4 by 4 patch lets each number read from shared memory serve 4
+multiply-adds; in the second kernel each workspace number is read once and used once, so a
+larger patch per thread reuses nothing
+128 * 128 = 16,384 threads, in 64 blocks of 256</pre>
+</details>
+<p class="ln do"><b>L13</b> <b class="x">DO</b> Lab 4's kernel added the 32,768 products of a number in one order; split, each piece is added in order and the 16 pieces are added at the end. Is the result the same to the last bit? ____ . What does the starter accept? ____ . <span class="from">from: L03, L08, L10</span></p>
+<details><summary>CHECK</summary>
+<pre>not in general: a float addition rounds after every step, so a different order of the same
+additions can change the last bits
+the starter compares C with the reference C stored with its test data, by relative RMSE
+(the square root of the mean squared difference, divided by the square root of the mean
+square of the reference numbers), and calls the result incorrect only above 1e-5</pre>
+</details>
+<p class="ln"><b>L14</b> Your decision of when to split: <span class="from">from: your code</span></p>
+<pre>int determine_split_k(int32_t size_i, int32_t size_j, int32_t size_k) {
+    int blocks_m = (size_i + 63) / 64;
+    int blocks_n = (size_j + 63) / 64;
+    int total_blocks = blocks_m * blocks_n;
+    if (size_k &gt;= 16384 &amp;&amp; total_blocks &lt; 14) return 16;
+    if (size_k &gt;= 8192 &amp;&amp; total_blocks &lt; 14) return 8;
+    return 1;
+}</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>int determine_split_k(int32_t size_i, int32_t size_j, int32_t size_k) {</code><span>A function that takes the three sizes and returns the number of pieces of k.</span></li>
+<li><code>    int blocks_m = (size_i + 63) / 64;</code><span>Tiles of 64 needed to cover size_i, rounded up.</span></li>
+<li><code>    int blocks_n = (size_j + 63) / 64;</code><span>The same for size_j.</span></li>
+<li><code>    int total_blocks = blocks_m * blocks_n;</code><span>Blocks without a split: one per tile of C.</span></li>
+<li><code>    if (size_k &gt;= 16384 &amp;&amp; total_blocks &lt; 14) return 16;</code><span>If k is at least 16,384 long and there are fewer than 14 blocks, cut k into 16 pieces.</span></li>
+<li><code>    if (size_k &gt;= 8192 &amp;&amp; total_blocks &lt; 14) return 8;</code><span>Else, if k is at least 8,192 long and there are fewer than 14 blocks, cut it into 8.</span></li>
+<li><code>    return 1;</code><span>Otherwise do not cut k.</span></li>
+<li><code>}</code><span>End of the function.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L15</b> <b class="x">DO</b> Which sizes does the decision need, and why? The number of blocks without a split needs ____ ; the time a split saves grows with ____ ; the cost of the workspace grows with ____ and not with ____ . <span class="from">from: L04, L11, L14</span></p>
+<details><summary>CHECK</summary>
+<pre>size_i and size_j: they fix how many blocks exist without a split
+size_k: a block's work is 4,096 * size_k multiply-adds on one SM
+the workspace costs split_k * size_i * size_j numbers written and read back, which does
+not grow with size_k
+so all three sizes enter: size_i and size_j to know whether SMs sit idle, size_k to know
+whether a split pays for its workspace</pre>
+</details>
+<p class="ln do"><b>L16</b> <b class="x">DO</b> Where does 14 come from? Your laptop's GTX 1650 has 14 SMs; the course GPU has 48 (L02). total_blocks for 128 by 128 by 32768: ____ ; for 256 by 256 by 8192: ____ . Which of the two split with 14 in the test? ____ . With 48 in its place? ____ . How can the program learn the number of SMs of the GPU it executes on? ____ . <span class="from">from: L01, L02, L14</span></p>
+<details><summary>CHECK</summary>
+<pre>128 by 128: 2 * 2 = 4; 256 by 256: 4 * 4 = 16
+with 14: only 128 by 128 by 32768 (4 &lt; 14 and 32,768 &gt;= 16,384: 16 pieces); 256 by 256
+by 8192 has 16 blocks, not fewer than 14, and is not split
+with 48: both (16 &lt; 48 and 8,192 &gt;= 8,192: 8 pieces, 128 blocks); without a split 32 of
+the 48 SMs have nothing to do
+from CUDA itself: cudaDeviceGetAttribute(&amp;n, cudaDevAttrMultiProcessorCount, 0)
+puts the number of SMs of GPU 0 into n</pre>
+</details>
+<p class="ln do"><b>L17</b> <b class="x">DO</b> Without a split, can 256 by 256 by 8192 still reach its 25% target on the course GPU? Bound: FLOP at 26.7 TFLOP/s ____ µs, bytes at 360 GB/s ____ µs. Each of its 16 blocks needs at least ____ µs on one SM; the most the 16 busy SMs reach: ____ . So ____ . <span class="from">from: L01, L02, L04, L05, L16</span></p>
+<details><summary>CHECK</summary>
+<pre>2 * 256 * 256 * 8,192 = 1,073,741,824 FLOP: 40.2 µs; A and B 8,388,608 bytes each, C
+262,144: 17,039,360 bytes, 47.3 µs; the bound is 47.3 µs
+one block: 4,096 * 8,192 * 2 FLOP / 0.556 TFLOP/s = 120.6 µs; 47.3 / 120.6 = 39% at most
+this count does not rule the 25% target out, as it ruled out 40% for 128 by 128 (L05);
+not recorded in the chats: measure it on the course GPU, split and not split</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L18</b> <b class="x">DO</b> Collect L04 (4 blocks: 44 of 48 SMs idle, 483 µs per block), L05 (the bound is 93.4 µs, so 4 SMs reach at most 19%, against a 40% target), L07 (16 pieces: 64 blocks, every SM can work), L08 (a finished loop holds an unfinished sum; stores into C keep one piece of 16), L09 (no thread of the launch can wait for the other blocks), L10 (the workspace and the boundary between launches), L11 (the workspace adds about 6% to the traffic), L13 (a new order of additions changes the last bits) and L16 (the 14 is the laptop's number of SMs). Write one sentence on what split-k changes, and one on what the decision to split must read. <span class="from">from: L04, L05, L07, L08, L09, L10, L11, L13, L16</span></p>
+<details><summary>CHECK</summary>
+<pre>Split-k changes who holds the pieces of one sum: in Lab 4 one thread added every product of
+its numbers in one register, while here the pieces sit in different blocks that can neither
+see each other's registers nor wait for each other inside a launch, so each piece goes to
+its own slice of memory and a second kernel adds them, after the boundary between launches
+guarantees that every piece exists.
+The decision must read the shape, size_i and size_j for how many blocks exist and size_k for
+whether a block's work is long enough to pay for the workspace, and the GPU, its number of
+SMs, which the literal 14 takes from the laptop and not from the course GPU.
+
+Tempting answer that fails: "partial sums are nothing new; the loop finishes, so the result
+is finished". Each block's loop does finish, over its own 2,048 values of k only: stored
+straight into C, the 16 pieces overwrite each other and C keeps one piece of each sum (L08).</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>When the result is small but each of its numbers is a very long sum, there are too few independent results to keep every part of the chip busy. Cutting each long sum into pieces gives more independent work, but the pieces must be written down separately and added in a second step, because parts of the chip working at the same time cannot wait for each other in the middle of one step. Adding the pieces in a new order can change the last digits, so the result is checked against a tolerance, not digit for digit.</p>
+<p>For a manager: parallel hardware is only as busy as the number of independent pieces of work; when a job has fewer pieces than the hardware has units, ask whether its pieces can be cut further, and what adding them back together costs.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>4 at most. Four tiles of 64 by 64 cover the 128 by 128 C, one block each, and a block stays
+on one SM: at least 44 of the 48 SMs have nothing to do for the whole launch (L04).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>Why not have every block add its piece into a C filled with 0, with <code>atomicAdd</code>, which makes each read-add-store of one place indivisible, instead of a workspace and a second kernel?</p>
+<details><summary>CHECK</summary>
+<pre>No addition is lost then, and the workspace and the second kernel go away, but C must be
+filled with 0 before every launch. The 16 pieces of each number now arrive in whatever order
+the blocks finish, so the last bits of C can change from launch to launch (L13), and every
+place of C receives 16 indivisible additions from different SMs. The two kernels add the
+pieces of every number in one fixed order, slice 0 to slice 15, so they give the same bits
+every launch.</pre>
+</details>
+</div>
+
+<nav><a href="32-why-64.html">prev: 32 why the tile side is 64</a><a href="failures.html">next: the failure list</a></nav>
+</main>
+</body>
+</html>

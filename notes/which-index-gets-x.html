@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A thread ID counts the threads before it, x first, and 32 consecutive IDs execute one instruction; so the index of C that steps through memory one number at a time must take x.">
+<meta name="keywords" content="Lab 4, GPU chip">
+<title>Which index of C gets x</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="site">
+<a class="brand" href="MIT-6.S894.html">6.S894 self-study</a>
+<nav><a href="MIT-6.S894.html#syllabus">Lessons</a><a href="index.html">Notes</a><a href="../index.html">Lab pages</a><a href="../words.html">Words</a></nav>
+</header>
+<main>
+<p class="crumbs"><a href="../index.html">GPU Learnings</a> / <a href="index.html">notes</a> / <a href="MIT-6.S894.html">MIT 6.S894</a></p>
+<h1>Which index of C gets x</h1>
+<p class="sub">Topics: Lab 4, GPU chip. A single idea, with a few lines to calculate. Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+
+<p class="label">The idea</p>
+<div class="story">
+<p>A kernel that computes a matrix gives each thread two numbers, x and y, and the code decides which index of the matrix each one becomes. Both choices give a correct result, so no check of the output tells them apart.</p>
+<p>The question here: what in the numbering of threads and the layout of the matrix decides which index must take x?</p>
+</div>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> NVIDIA's CUDA programming guide: in a block of sizes (Dx, Dy), the thread with numbers (x, y) has thread ID x + y * Dx; the hardware executes 32 threads of consecutive thread IDs with one common instruction, each thread with its own registers; the memory system serves the addresses of one instruction in pieces of 32 bytes, each beginning at a multiple of 32. The Lab 4 starter stores C(i, j) at <code>c[i * size_j + j]</code>, with size_j = 3072 in its large test. <span class="from">from: the CUDA programming guide; the Lab 4 starter</span></p>
+<p class="ln do"><b>L02</b> <b class="x">DO</b> In a block of <code>dim3(32, 8)</code>, the thread (5, 2) has ID ____ . Which of 32 and 8 never appears, and why? ____ . The 32 threads with IDs 64 to 95 have y = ____ and x = ____ . <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>5 + 2 * 32 = 69
+8 never appears: the ID counts the threads before this one, and the lines after it do not
+change that count
+IDs 64 to 95: y = 2 for all of them, x = 0 to 31</pre>
+</details>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> Those 32 threads store one number each into C. With j from x: pieces of 32 bytes ____ . With i from x: ____ . Which is correct? ____ . <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>j from x: one i, 32 neighbouring numbers, 128 bytes: 4 pieces if they begin at a multiple of
+32, 5 if not
+i from x: 32 numbers 3,072 * 4 = 12,288 bytes apart: 32 pieces
+both are correct: every place of C gets one thread either way; only the cost differs</pre>
+</details>
+
+<p class="label">Worked out in full</p>
+<ul class="related">
+<li><a href="../30-which-index-gets-x.html">30. Lab 4: which index of C gets x, read off the thread numbering</a></li>
+</ul>
+
+<p class="label">Related notes</p>
+<ul class="related">
+<li><a href="neighbours-in-memory.html">Which threads are neighbours in memory</a>: how the index line alone shows whether one instruction's floats sit side by side</li>
+<li><a href="nearby.html">Nearby: 32 stores in 4 blocks of 32 bytes</a>: how the 32 addresses of one instruction become pieces of 32 bytes</li>
+<li><a href="indices-to-threads.html">From the formula to threads and a loop</a>: which indices of the formula become threads at all</li>
+</ul>
+
+<div class="backlinks">
+<p class="label">Lessons and notes that point here</p>
+<!-- backlinks:begin -->
+<ul class="related">
+<li><a href="indices-to-threads.html">From the formula to threads and a loop</a></li>
+<li><a href="MIT-6.S894.html">MIT 6.S894 Accelerated Computing, Labs 1 and 2, on your own computer</a></li>
+</ul>
+<!-- backlinks:end -->
+</div>
+
+<nav><a href="index.html">all notes</a><a href="MIT-6.S894.html">MIT 6.S894 course page</a></nav>
+</main>
+<footer class="site">
+<p>Independent self-study material for MIT 6.S894 Accelerated Computing, written from one learner's work, and not affiliated with or endorsed by MIT or the course staff. The course pages are at <a href="https://accelerated-computing.academy/fall25/">accelerated-computing.academy/fall25</a> and the starter code at <a href="https://github.com/accelerated-computing-class">github.com/accelerated-computing-class</a>. Every measured number comes from one laptop, a Ryzen 5 4600H with a GTX 1650, unless a sentence says otherwise.</p>
+</footer>
+</body>
+</html>

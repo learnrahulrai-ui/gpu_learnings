@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Why 64</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>32. Lab 4: why the tile side is 64, reuse per number fetched</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>Lab 4's second kernel, <code>matmul_l1_reg</code>, must finish the 3072 test in under 8 milliseconds. The learner's version begins with a handful of named numbers: each block computes a 64 by 64 tile of C and walks k in pieces of 16, and each thread computes a 4 by 4 patch of C in its own registers. Declaring a named number was easy. Where the 64 came from was not.</p>
+<p>It is a power of two, and every tutorial uses one, so it was easy to accept out of habit. But a number kept out of habit cannot be changed safely, and the handout asks which numbers were tuned and how their values were chosen.</p>
+<p>What decides the side of the tile a block computes, and what stops it from growing without limit?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>Suppose each block computed a 32 by 32 tile of C instead of 64 by 64, using every number it brings from the L2 cache for its whole tile. Would the L2 cache's 2.4 TB/s, rather than the multiply-adds, set the time of the 3072 test? Yes or no.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "I have typed this const as per int bm64." / "Anyone can say that 64 is normal round number. Two raised to the power whatever it is, I think it is 6. That is not the issue." / "How can a person high IQ person just see this problem and come up with the reason that he has to write constants for int bm is equal to 64?" / "Why do I need to have a variable which is supposed to be 64?"</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The Lab 4 handout's numbers for the course GPU, an RTX 4000 Ada, built from 48 identical blocks of hardware that NVIDIA calls SMs: multiply-adds 26.7 TFLOP/s in all, a multiply-add counting as 2 FLOP; the L2 cache 2.4 TB/s; the L1 memory of all 48 SMs together 13.4 TB/s, of which at most 100 KB per SM can serve as shared memory, memory that all threads of one block can read and write; targets on the large test of the starter, size_i = size_j = size_k = 3072 (the 3072 test), under 45 ms for <code>matmul_l1</code> and under 8 ms for <code>matmul_l1_reg</code>. NVIDIA's CUDA programming guide: a thread may hold at most 255 registers of 32 bits, one number each, and a block at most 1024 threads. <span class="from">from: the Lab 4 handout; the CUDA programming guide</span></p>
+<p class="ln do"><b>L02</b> <b class="x">DO</b> Multiply-adds in the 3072 test, 3,072 * 3,072 * 3,072: ____ ; FLOP: ____ ; time if the multiply-add units were the only limit: ____ ms. <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>28,991,029,248 multiply-adds; 57,982,058,496 FLOP
+57,982,058,496 / (26.7 * 10^12) = 2.17 ms</pre>
+</details>
+<p class="ln"><b>L03</b> From the formula of C, the sum over k of A at (i, k) times B at (k, j): a block that computes a tile of BM by BN numbers of C needs, at one value of k, BM numbers of A (one for each i of its tile) and BN numbers of B (one for each j), and does BM * BN multiply-adds with them; each number of A is used BN times and each number of B BM times. Brought from L2 once each, that is BM + BN numbers per BM * BN multiply-adds. <span class="from">from: the starter's CPU reference</span></p>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> Numbers fetched from L2 per multiply-add, (BM + BN) / (BM * BN) = 1/BN + 1/BM: for 32 by 32 tiles ____ , for 64 by 64 ____ . Bytes from L2 over the whole test: ____ GB and ____ GB. Time at 2.4 TB/s: ____ ms and ____ ms. Which is below the 2.17 ms of L02? ____ . <span class="from">from: L01, L02, L03</span></p>
+<details><summary>CHECK</summary>
+<pre>32 by 32: 1/32 + 1/32 = 1/16; 64 by 64: 1/64 + 1/64 = 1/32
+28,991,029,248 / 16 * 4 bytes = 7.25 GB: 3.02 ms
+28,991,029,248 / 32 * 4 bytes = 3.62 GB: 1.51 ms
+only 64 by 64: with 32 by 32 tiles L2 would set the time, 3.02 ms against 2.17 ms; with
+64 by 64 the multiply-adds do</pre>
+</details>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> For square tiles of side T: L2 time = multiply-adds * (2 / T) * 4 bytes / 2.4 TB/s, and multiply-add time = multiply-adds * 2 FLOP / 26.7 TFLOP/s. Set them equal and solve for T: ____ . Does the size of the matrices appear in the answer? ____ . The smallest power of 2 above it: ____ ; does it divide 3,072? ____ . <span class="from">from: L01, L04</span></p>
+<details><summary>CHECK</summary>
+<pre>8 / (T * 2.4) = 2 / 26.7, so T = 4 * 26.7 / 2.4 = 44.5
+the number of multiply-adds is on both sides and cancels: T depends only on the chip's two
+rates, not on 3,072
+64 = 2^6 is the first power of 2 above 44.5; 3,072 = 48 * 64, so 48 * 48 = 2,304 tiles
+cover C with none partial</pre>
+</details>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> The tiles sit in shared memory. If each thread computed one number of C, each multiply-add would read its 2 numbers from shared memory: bytes over the test ____ GB; time at 13.4 TB/s ____ ms; against the 8 ms target ____ . <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>28,991,029,248 * 2 * 4 = 231.9 GB; 231.9 GB / 13.4 TB/s = 17.3 ms
+more than twice 8 ms, whatever the side of the tile</pre>
+</details>
+<p class="ln"><b>L07</b> Your named numbers, from your <code>matmul_l1_reg</code>: <span class="from">from: your code</span></p>
+<pre>constexpr int BM = 64;
+constexpr int BN = 64;
+constexpr int BK = 16;
+constexpr int TM = 4;
+constexpr int TN = 4;</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>constexpr int BM = 64;</code><span>BM = 64: the number of values of i in one block's tile of C, fixed when the program is compiled.</span></li>
+<li><code>constexpr int BN = 64;</code><span>BN = 64: the number of values of j in that tile.</span></li>
+<li><code>constexpr int BK = 16;</code><span>BK = 16: the number of values of k in one piece of the loop over k.</span></li>
+<li><code>constexpr int TM = 4;</code><span>TM = 4: the number of values of i that one thread computes.</span></li>
+<li><code>constexpr int TN = 4;</code><span>TN = 4: the number of values of j that one thread computes.</span></li>
+</ol>
+</div>
+<p class="ln"><b>L08</b> And the product at the heart of its loop, with its <code>#pragma unroll</code> lines and declarations left out; a_frag, b_frag and c_reg are arrays in the thread's own registers, and thread_row and thread_col are its threadIdx.y and threadIdx.x: <span class="from">from: your code</span></p>
+<pre>for (int dot_k = 0; dot_k &lt; BK; ++dot_k) {
+    for (int m = 0; m &lt; TM; ++m)
+        a_frag[m] = s_a[thread_row * TM + m][dot_k];
+    for (int n = 0; n &lt; TN; ++n)
+        b_frag[n] = s_b[dot_k][thread_col * TN + n];
+    for (int m = 0; m &lt; TM; ++m)
+        for (int n = 0; n &lt; TN; ++n)
+            c_reg[m][n] += a_frag[m] * b_frag[n];
+}</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>for (int dot_k = 0; dot_k &lt; BK; ++dot_k) {</code><span>Repeat for each of the BK = 16 values of k in the piece now held in shared memory:</span></li>
+<li><code>    for (int m = 0; m &lt; TM; ++m)</code><span>for m = 0 to 3,</span></li>
+<li><code>        a_frag[m] = s_a[thread_row * TM + m][dot_k];</code><span>copy the number of s_a at this thread's m-th value of i and the present k into the register a_frag[m];</span></li>
+<li><code>    for (int n = 0; n &lt; TN; ++n)</code><span>for n = 0 to 3,</span></li>
+<li><code>        b_frag[n] = s_b[dot_k][thread_col * TN + n];</code><span>copy the number of s_b at the present k and this thread's n-th value of j into the register b_frag[n];</span></li>
+<li><code>    for (int m = 0; m &lt; TM; ++m)</code><span>then for m = 0 to 3</span></li>
+<li><code>        for (int n = 0; n &lt; TN; ++n)</code><span>and n = 0 to 3,</span></li>
+<li><code>            c_reg[m][n] += a_frag[m] * b_frag[n];</code><span>add a_frag[m] times b_frag[n] to the sum c_reg[m][n], kept in a register.</span></li>
+<li><code>}</code><span>End of the loop over the piece.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> Per value of dot_k, one thread reads ____ numbers from shared memory and does ____ multiply-adds: reads per multiply-add ____ , against 2 in L06. Bytes from shared memory over the test: ____ GB; time at 13.4 TB/s: ____ ms; against 8 ms: ____ . <span class="from">from: L02, L06, L08</span></p>
+<details><summary>CHECK</summary>
+<pre>4 + 4 = 8 reads for 4 * 4 = 16 multiply-adds: 1/2 per multiply-add
+each number read from s_a serves 4 multiply-adds, and each read from s_b 4
+28,991,029,248 * 0.5 * 4 = 58.0 GB; 58.0 GB / 13.4 TB/s = 4.33 ms, under 8 ms</pre>
+</details>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> From the named numbers of L07: threads per block, (BM / TM) * (BN / TN) = ____ ; numbers in shared memory, s_a of BM by BK and s_b of BK by BN: ____ , ____ bytes; sums each thread keeps in registers: ____ ; blocks for the 3072 test: ____ , for 48 SMs. <span class="from">from: L01, L05, L07, L08</span></p>
+<details><summary>CHECK</summary>
+<pre>16 * 16 = 256 threads
+64 * 16 + 16 * 64 = 2,048 numbers = 8,192 bytes, far under 100 KB
+16 sums in c_reg, plus 8 numbers in a_frag and b_frag
+48 * 48 = 2,304 blocks, 48 for each SM</pre>
+</details>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> Where must the number of values of i per block, 64, agree for the kernel to be correct? Name the places: ____ . If the launch made size_i / 128 blocks in y while each block computed 64 values of i, which part of C would be computed? ____ . So why is 64 written once, with a name? ____ . <span class="from">from: L07, L10</span></p>
+<details><summary>CHECK</summary>
+<pre>the block's first i (blockIdx.y * BM), the number of blocks in y in the launch, the first
+size of s_a, the copies each thread makes per piece (BM * BK / 256 = 4), and the threads in
+y (BM / TM = 16)
+24 blocks of 64 values each: i = 0 to 1,535 only; the other half of C is never written,
+and the starter's check reports the result as incorrect
+one name keeps every place in agreement, and makes the tile side a single number to tune,
+which is what the handout's Question 4 asks about</pre>
+</details>
+<p class="ln do"><b>L12</b> <b class="x">DO</b> Make the tile larger with the same 256 threads. BM = BN = 128 needs TM = TN = ____ , so sums per thread ____ . Numbers from L2 per multiply-add: ____ . Shared memory with BK = 16: ____ bytes. Blocks for the 3072 test: ____ . For the Lab 5 handout's size 128 by 128 by 32768: blocks with 64 by 64 tiles ____ , with 128 by 128 ____ , against 48 SMs. <span class="from">from: L01, L03, L04, L10</span></p>
+<details><summary>CHECK</summary>
+<pre>TM = TN = 8: 64 sums per thread, plus 16 numbers in the two fragments
+1/128 + 1/128 = 1/64 per multiply-add: the L2 traffic halves again, but L2 already stopped
+being the limit at 64 (L04)
+128 * 16 * 4 * 2 = 16,384 bytes; 24 * 24 = 576 blocks, 12 for each SM
+128 by 128 C: 4 blocks with 64 by 64 tiles, 1 with 128 by 128: 44 or 47 of the 48 SMs
+with nothing to do
+a larger tile buys reuse that is no longer needed, and costs registers and blocks</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L13</b> <b class="x">DO</b> Collect L02 (2.17 ms of multiply-adds), L04 (32 by 32 tiles: 3.02 ms of L2 traffic; 64 by 64: 1.51 ms), L05 (the side needed is 44.5, set by the chip's two rates, not by 3,072), L06 (one number of C per thread: 17.3 ms of shared memory reads), L09 (4 by 4 per thread: 4.33 ms), L10 (256 threads, 8,192 bytes, 2,304 blocks), L11 (the same 64 in five places) and L12 (128 by 128 halves L2 traffic that no longer limits, and leaves SMs idle on a small C). Write one sentence on what the 64 is, and one on what limits it. <span class="from">from: L02, L04, L05, L06, L09, L10, L11, L12</span></p>
+<details><summary>CHECK</summary>
+<pre>BM = 64 is the number of times the block uses each number of B it brings from L2 (BN = 64
+the same for A), and it must be at least 4 * 26.7 / 2.4 = 44.5 for L2 not to set the time,
+a value fixed by the chip and not by the matrix; 64 is the first power of 2 above it, and
+it divides 3,072.
+It is limited from above by what a larger tile costs: more sums per thread in registers,
+more shared memory per block, and fewer blocks for the 48 SMs, which matters most when C is
+small.
+
+Tempting answer that fails: "64 is a round power of 2 that GPUs like". 32 is a power of 2
+too, and with 32 by 32 tiles L2 sets the time, 3.02 ms against 2.17 ms (L04); the side
+comes from the ratio of the chip's two rates (L05).</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>A block of threads copies a square piece of each input into fast memory on the chip and uses every copied number as many times as the side of the square. The chip multiplies faster than its L2 cache can deliver numbers, so each delivered number must be used at least about 45 times for the cache not to hold the work back, and 64 is the first convenient size above that. A larger square needs more fast memory per block and leaves fewer blocks to keep every part of the chip busy.</p>
+<p>For a manager: a tuning number should come with the quantity it controls and the limits it sits between; ask for them, because a number kept only out of habit cannot be changed safely.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>Yes. With 32 by 32 tiles each multiply-add fetches 1/16 of a number from L2: 7.25 GB,
+3.02 ms at 2.4 TB/s, more than the 2.17 ms the multiply-adds need (L02, L04).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>Why not make each thread's patch 16 by 16 instead of 4 by 4, which cuts the reads from shared memory to 1/8 per multiply-add?</p>
+<details><summary>CHECK</summary>
+<pre>A 16 by 16 patch needs 256 sums in registers, plus 32 numbers for the fragments, while a
+thread may hold at most 255 registers (L01). The compiler then keeps some of them in local
+memory, which the Lab 4 handout says is cached in L1 and L2 but backed by DRAM, so updating
+such a sum becomes a memory access. The 4 by 4 patch already brings the shared memory time
+to 4.33 ms, under the 8 ms target (L09); an 8 by 8 patch, 64 sums and 1/4 read per
+multiply-add, is the larger size that still fits.</pre>
+</details>
+</div>
+
+<nav><a href="31-from-the-formula-to-the-kernel.html">prev: 31 from the formula to the kernel</a><a href="33-split-k.html">next: 33 split-k</a></nav>
+</main>
+</body>
+</html>

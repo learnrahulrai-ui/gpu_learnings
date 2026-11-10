@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>From the Formula to the Kernel</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>31. Lab 4: from the formula of C to the kernel, threads, loop and tiles</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>Lab 4 of MIT 6.S894 asks for a matrix multiplication on the GPU that finishes its large test, three square matrices of 3072 by 3072 numbers, in under 45 milliseconds. The formula is short: each number of C is a sum, over k, of a number of A times a number of B. Years of school mathematics had taught the learner to read it in order: go through A, go through B, and make C.</p>
+<p>The kernels of the course read it the other way round. They begin from C: each thread owns one number of C, and A and B appear only inside a loop over k. Then that loop is cut into pieces, and small square pieces of A and B are copied into on-chip memory as little matrices, although the learner had just accepted that matrices live in memory as flat arrays. The loop condition <code>bk &lt; size_k</code> looked like a bounds check, and the size of the small arrays, BLOCK_SIZE by BLOCK_SIZE, looked arbitrary.</p>
+<p>Where in the formula does each part of the kernel come from: the threads, the loop, the small square arrays and the comparison <code>bk &lt; size_k</code>?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>In the 3072 test, if every multiply-add read both of its numbers from the L2 cache, the GPU's last cache before its main memory, could the kernel finish in under the handout's 45 milliseconds? Yes or no.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "i used to think that we go into a then b and then we make c this is odd a low iq brain cannot understand that for loop comes first for c and we are leaving a and b" / "what the hell is size underscore I? Why do I need that?" / "Why am I doing this less than comparison?" / "Now here you are taking the matrices back and again representing parts of that flat array again into matrix, small small matrix." / "now s_a is of block size block size why" / "When did a block become two by two threads? I thought a block contains 256 threads, 128 threads."</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The CPU reference in the Lab 4 starter <code>matmul.cu</code>, commented out there because it is too slow to execute; the starter tests size_i = size_j = size_k = 256 and 3072, and times the 3072 test: <span class="from">from: the Lab 4 starter code</span></p>
+<pre>for (int32_t i = 0; i &lt; size_i; ++i) {
+    for (int32_t j = 0; j &lt; size_j; ++j) {
+        float sum = 0.0;
+        for (int32_t k = 0; k &lt; size_k; ++k) {
+            sum += a[i * size_k + k] * b[k * size_j + j];
+        }
+        c[i * size_j + j] = sum;
+    }
+}</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>for (int32_t i = 0; i &lt; size_i; ++i) {</code><span>Repeat for every i from 0 to size_i - 1.</span></li>
+<li><code>    for (int32_t j = 0; j &lt; size_j; ++j) {</code><span>Inside that, repeat for every j from 0 to size_j - 1.</span></li>
+<li><code>        float sum = 0.0;</code><span>Begin a sum at 0.</span></li>
+<li><code>        for (int32_t k = 0; k &lt; size_k; ++k) {</code><span>Repeat for every k from 0 to size_k - 1:</span></li>
+<li><code>            sum += a[i * size_k + k] * b[k * size_j + j];</code><span>add the number of A at (i, k) times the number of B at (k, j) to the sum.</span></li>
+<li><code>        }</code><span>End of the k loop.</span></li>
+<li><code>        c[i * size_j + j] = sum;</code><span>Store the sum as the number of C at (i, j).</span></li>
+<li><code>    }</code><span>End of the j loop.</span></li>
+<li><code>}</code><span>End of the i loop.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L02</b> <b class="x">DO</b> Which indices name the place that is written, <code>c[i * size_j + j]</code>? ____ . Which index appears only on the right, inside the sum? ____ . Does computing C(i, j) need any other number of C? ____ . So the 3072 test splits into how many independent pieces? ____ , each a loop of ____ multiply-adds over ____ . <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>i and j name the written place; k appears only inside the sum
+C(i, j) needs no other number of C: only line i of A and line j of B, size_k numbers each
+3,072 * 3,072 = 9,437,184 independent pieces, one per number of C, each a loop of 3,072
+multiply-adds over k</pre>
+</details>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> A kernel can give each thread one pair (i, j) and leave k as the thread's own loop. Why not give the threads k as well? ____ . <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>the products for the different values of k of one C(i, j) all add into one sum; spread over
+threads, they would need a separate step to add the pieces together; kept in one thread's
+loop, they add into one register as they are made</pre>
+</details>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> Where does each size appear in L01? size_k: ____ . size_j: ____ . size_i: ____ . When threads replace the loops over i and j, what is left of size_i? ____ . <span class="from">from: L01, L03</span></p>
+<details><summary>CHECK</summary>
+<pre>size_k: the limit of the k loop, and the step of i in a[i * size_k + k], the length of a
+line of A
+size_j: the limit of the j loop, and the step of i in c and of k in b, the length of a line
+of C and of B
+size_i: only the limit of the i loop; no address uses it, because a place counts what comes
+before it, never how many lines come after
+with threads in place of the i loop, size_i is left only in the check i &lt; size_i, which
+turns away threads beyond the last line of C</pre>
+</details>
+<p class="ln"><b>L05</b> The Lab 4 handout's numbers for the course GPU, an RTX 4000 Ada: the chip is built from 48 identical blocks of hardware, which NVIDIA calls SMs; its multiply-add units together do 26.7 TFLOP/s, a multiply-add counting as 2 FLOP; its main memory, DRAM, delivers 360 GB/s and its L2 cache 2.4 TB/s; each SM has 128 KB of L1 memory, of which at most 100 KB can serve as shared memory, memory that all threads of one block can read and write. The target for the first kernel, <code>matmul_l1</code>: under 45 ms on the 3072 test. <span class="from">from: the Lab 4 handout</span></p>
+<p class="ln"><b>L06</b> NVIDIA's CUDA programming guide: in a block of sizes (Dx, Dy) the thread with numbers (x, y) has thread ID x + y * Dx, and the hardware executes 32 threads of consecutive thread IDs with one instruction; a block holds at most 1024 threads; the memory system serves the addresses of one instruction in pieces of 32 bytes, each beginning at a multiple of 32, and <code>cudaMalloc</code> returns multiples of 256. <span class="from">from: the CUDA programming guide</span></p>
+<p class="ln do"><b>L07</b> <b class="x">DO</b> Multiply-adds in the 3072 test: ____ . If each reads both of its numbers from L2: bytes ____ ; time at 2.4 TB/s ____ ms. From DRAM instead: ____ ms. Bytes of A, B and C themselves: ____ . Against the 45 ms target: ____ . <span class="from">from: L01, L05</span></p>
+<details><summary>CHECK</summary>
+<pre>3,072^3 = 28,991,029,248 multiply-adds
+2 numbers * 4 bytes each: 231,928,233,984 bytes, 231.9 GB
+from L2: 231.9 GB / 2.4 TB/s = 96.6 ms; from DRAM: 231.9 GB / 360 GB/s = 644 ms
+A, B and C: 3 * 3,072^2 * 4 = 113,246,208 bytes, 113 MB: each number of A and B is read
+3,072 times
+96.6 ms &gt; 45 ms: the target is impossible unless most reads come from memory nearer than L2</pre>
+</details>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> Which threads read the same number of A, <code>a[i * size_k + k]</code>? ____ . The same number of B, <code>b[k * size_j + j]</code>? ____ . A block of 32 by 32 threads covers 32 values of i and 32 of j. At one k it needs ____ numbers of A and ____ of B for ____ multiply-adds. Brought from L2 once each and read by its threads from shared memory: numbers from L2 per multiply-add ____ ; bytes ____ GB; time at 2.4 TB/s ____ ms. <span class="from">from: L01, L05, L07</span></p>
+<details><summary>CHECK</summary>
+<pre>the same number of A: every thread with the same i, whatever its j; of B: every thread with
+the same j
+32 of A and 32 of B for 32 * 32 = 1,024 multiply-adds
+64 / 1,024 = 1/16 per multiply-add, against 2: 32 times fewer
+231.9 GB / 32 = 7.25 GB; 7.25 GB / 2.4 TB/s = 3.02 ms, under 45 ms</pre>
+</details>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> Can the block hold in shared memory all of A it needs for the whole loop over k, 32 lines of 3,072 numbers? Bytes ____ , against 100 KB: ____ . So the loop over k is cut into pieces of BLOCK_SIZE = 32 values; the 32 by 32 piece of A or B held for one of them is what the course calls a tile. Per piece the block holds ____ numbers of A and ____ of B, ____ bytes together; pieces in the 3072 test: ____ . <span class="from">from: L05, L08</span></p>
+<details><summary>CHECK</summary>
+<pre>32 * 3,072 * 4 = 393,216 bytes, almost 4 times the 102,400 bytes of 100 KB: no
+32 * 32 = 1,024 numbers of A and 1,024 of B: 8,192 bytes together
+3,072 / 32 = 96 pieces</pre>
+</details>
+<p class="ln"><b>L10</b> Your code, the beginning of the loop over pieces, with BLOCK_SIZE = 32 and blocks of 32 by 32 threads (your code gives the thread's i a name of its own; this page writes it as the reference's i): <span class="from">from: your code</span></p>
+<pre>__shared__ float s_a[BLOCK_SIZE][BLOCK_SIZE];
+__shared__ float s_b[BLOCK_SIZE][BLOCK_SIZE];
+float sum = 0.0f;
+for (int bk = 0; bk &lt; size_k; bk += BLOCK_SIZE) {
+    if (i &lt; size_i &amp;&amp; (bk + threadIdx.x) &lt; size_k) {
+        s_a[threadIdx.y][threadIdx.x] = a[i * size_k + bk + threadIdx.x];
+    } else {
+        s_a[threadIdx.y][threadIdx.x] = 0.0f;
+    }</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>__shared__ float s_a[BLOCK_SIZE][BLOCK_SIZE];</code><span>Reserve in shared memory a square array s_a of BLOCK_SIZE by BLOCK_SIZE numbers, one array for the whole block.</span></li>
+<li><code>__shared__ float s_b[BLOCK_SIZE][BLOCK_SIZE];</code><span>The same for s_b.</span></li>
+<li><code>float sum = 0.0f;</code><span>This thread's sum begins at 0.</span></li>
+<li><code>for (int bk = 0; bk &lt; size_k; bk += BLOCK_SIZE) {</code><span>Repeat with bk = 0, BLOCK_SIZE, 2 * BLOCK_SIZE, and so on, while bk is less than size_k:</span></li>
+<li><code>    if (i &lt; size_i &amp;&amp; (bk + threadIdx.x) &lt; size_k) {</code><span>if this thread's i is a line of A, and k = bk + threadIdx.x lies inside that line,</span></li>
+<li><code>        s_a[threadIdx.y][threadIdx.x] = a[i * size_k + bk + threadIdx.x];</code><span>copy the number of A at (i, bk + threadIdx.x) into s_a at (threadIdx.y, threadIdx.x);</span></li>
+<li><code>    } else {</code><span>otherwise,</span></li>
+<li><code>        s_a[threadIdx.y][threadIdx.x] = 0.0f;</code><span>put 0 there.</span></li>
+<li><code>    }</code><span>End of the check.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> Read <code>bk &lt; size_k</code> against the k loop of L01. bk is ____ ; the comparison asks ____ ; after a piece, bk grows by ____ . Is the comparison the check that keeps reads inside A? ____ . <span class="from">from: L01, L09, L10</span></p>
+<details><summary>CHECK</summary>
+<pre>bk is the first k of the piece: the number of values of k that the earlier pieces used up
+the comparison asks whether any k is left: it is the reference's k &lt; size_k, taken one piece
+at a time
+bk grows by BLOCK_SIZE = 32, the values of k that one piece uses
+no: inside a piece, (bk + threadIdx.x) &lt; size_k keeps each read inside A; bk &lt; size_k only
+ends the walk over k, after 96 pieces in the 3072 test</pre>
+</details>
+<p class="ln do"><b>L12</b> <b class="x">DO</b> Why is s_a BLOCK_SIZE by BLOCK_SIZE? Its first side is the number of values of ____ the block covers, fixed by the block; its second side is the number of values of ____ in one piece, a choice. With the second side equal to the first, the block has ____ threads and s_a has ____ places, so each thread copies ____ number(s) into s_a per piece. A block of 64 by 64 threads, one per number of C: threads ____ ; allowed by L06? ____ . <span class="from">from: L06, L08, L09, L10</span></p>
+<details><summary>CHECK</summary>
+<pre>first side: the 32 values of i of the block; second side: the 32 values of k of one piece
+1,024 threads and 1,024 places: each thread copies exactly 1 number into s_a and 1 into s_b
+per piece, no thread idle and none copying twice
+64 * 64 = 4,096 threads: more than the 1,024 a block may hold</pre>
+</details>
+<p class="ln do"><b>L13</b> <b class="x">DO</b> Which number does the thread with (threadIdx.x, threadIdx.y) copy? Into <code>s_a[threadIdx.y][threadIdx.x]</code> goes A at line i = ____ and k = ____ . Into <code>s_b[threadIdx.y][threadIdx.x]</code>, with the two roles swapped, B at k = ____ and j = ____ . The 32 threads of one instruction share threadIdx.y and have threadIdx.x = 0 to 31 (L06). Why must threadIdx.x pick k in A and j in B? ____ . <span class="from">from: L01, L06, L10</span></p>
+<details><summary>CHECK</summary>
+<pre>s_a: line i = blockIdx.y * 32 + threadIdx.y, and k = bk + threadIdx.x
+s_b: k = bk + threadIdx.y, and j = blockIdx.x * 32 + threadIdx.x
+in a[i * size_k + k] the index that steps one number at a time is k, and in
+b[k * size_j + j] it is j; with threadIdx.x on them, each copy instruction of 32 threads reads
+32 neighbouring numbers, 128 bytes; bk and blockIdx.x * 32 are multiples of 32 numbers, a
+line is 12,288 bytes and cudaMalloc gives a multiple of 256 (L06), so the 128 bytes begin
+at a multiple of 128: 4 pieces of 32 bytes
+swapped, the 32 threads would read 32 different lines of A: 32 pieces</pre>
+</details>
+<p class="ln do"><b>L14</b> <b class="x">DO</b> Flat or square? In shared memory, <code>s_a[threadIdx.y][threadIdx.x]</code> is place ____ of one unbroken stretch of 1,024 numbers. The numbers of A it holds for blockIdx.y = 0 and bk = 0 sit at the flat places of a: ____ . So what does the copy of L10 do to A? ____ . <span class="from">from: L08, L10, L13</span></p>
+<details><summary>CHECK</summary>
+<pre>place threadIdx.y * 32 + threadIdx.x: s_a is a flat array too, written with two numbers
+from a: places 0 to 31, 3,072 to 3,103, and so on up to 95,232 to 95,263: 32 separate
+stretches of 32 numbers, one line of A apart
+the copy gathers 32 separate stretches of A into one unbroken stretch of shared memory,
+where the block's threads read each number 32 times</pre>
+</details>
+<p class="ln"><b>L15</b> What the loop must do next for the sum of L01 to come out: every thread needs numbers that other threads of its block copied, so the block waits at <code>__syncthreads()</code>, where every thread of a block waits until all have arrived; then each thread adds <code>s_a[threadIdx.y][kk] * s_b[kk][threadIdx.x]</code> to sum for kk = 0 to 31, and the block waits again before the next piece overwrites the arrays. After the last piece, each thread stores sum into C at (i, j). <span class="from">from: L01, L13</span></p>
+<p class="ln do"><b>L16</b> <b class="x">DO</b> Per piece, for one thread: numbers copied from L2 or DRAM ____ ; multiply-adds ____ ; reads from shared memory ____ . Numbers from L2 per multiply-add: ____ , against 2 in L07. <span class="from">from: L07, L08, L12, L15</span></p>
+<details><summary>CHECK</summary>
+<pre>2 numbers copied (1 into s_a, 1 into s_b), 32 multiply-adds, 64 reads from shared memory
+2 / 32 = 1/16 per multiply-add, the 1/16 of L08; the reads from shared memory are still 2
+per multiply-add</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L17</b> <b class="x">DO</b> Collect L02 (the indices of C name independent pieces; k appears only inside the sum), L03 (k stays a loop because its products meet in one sum), L04 (size_i survives only as a check), L07 (from L2 the 3072 test needs 96.6 ms, against 45), L08 (a block of 32 by 32 threads uses each number brought from L2 32 times: 3.02 ms), L09 (a block's whole lines of A do not fit, 393,216 bytes against 100 KB), L11 (bk &lt; size_k is the reference's k loop taken in pieces), L12 (one side of s_a is fixed by the block, the other chosen so places equal threads) and L14 (s_a is flat too). Write one sentence that derives the shape of the kernel from the formula and the two limits. <span class="from">from: L02, L03, L04, L07, L08, L09, L11, L12, L14</span></p>
+<details><summary>CHECK</summary>
+<pre>The written indices i and j become threads because the pieces they name are independent,
+and k stays each thread's loop because its products add into one sum; reading every number
+from L2 would take 96.6 ms against a 45 ms target, so a block of threads that share lines of
+A and B brings each number on chip once and uses it 32 times from shared memory; and because
+a block's whole lines do not fit there, the loop over k is walked in pieces of 32, which is
+all that bk &lt; size_k and the BLOCK_SIZE by BLOCK_SIZE arrays are.
+
+Tempting answer that fails: "first go through A, then through B, then make C". No number of C
+can be finished from part of A without the matching part of B: every multiply-add needs a
+number of A and a number of B at the same k (L02), which is why each piece of the loop
+copies both tiles before any product is made.</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>Each number of the result is a sum of products, and different numbers of the result do not depend on each other, so each thread gets one result number and walks its sum itself. Threads that need the same input numbers form one block, which copies each input number once into a small fast memory on the chip and reads it many times from there. The small memory cannot hold everything the block needs, so the block walks the sum in pieces.</p>
+<p>For a manager: a computation that reads its inputs from far memory every time can be impossible to make fast, however many processors it has; ask how many times each number fetched is used before it is fetched again.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>No. Every multiply-add reading both numbers from L2 moves 231.9 GB, which takes 96.6 ms at
+2.4 TB/s (L07), more than twice the 45 ms target.</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>Each thread of this kernel reads 2 numbers from shared memory per multiply-add (L16). The Lab 4 handout gives the L1 memory of all 48 SMs together 13.4 TB/s, and sets a second target of 8 ms. Can this kernel reach it?</p>
+<details><summary>CHECK</summary>
+<pre>No. 28,991,029,248 multiply-adds * 2 numbers * 4 bytes = 231.9 GB from shared memory, and
+231.9 GB / 13.4 TB/s = 17.3 ms, more than twice 8 ms. Shared memory is now what the 3072 test
+waits on, as L2 was before tiles. Each thread has to keep numbers in its own registers and
+use each of them several times, by computing several numbers of C instead of one.</pre>
+</details>
+</div>
+
+<nav><a href="30-which-index-gets-x.html">prev: 30 which index of C gets x</a><a href="32-why-64.html">next: 32 why the tile side is 64</a></nav>
+</main>
+</body>
+</html>

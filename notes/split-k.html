@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A 128 by 128 C in 64 by 64 tiles is 4 blocks for 48 SMs; cutting k into 16 pieces gives 64 blocks, and the pieces must go through a workspace and a second kernel.">
+<meta name="keywords" content="Lab 5, splitting work">
+<title>Split-k: pieces of one sum in different blocks</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="site">
+<a class="brand" href="MIT-6.S894.html">6.S894 self-study</a>
+<nav><a href="MIT-6.S894.html#syllabus">Lessons</a><a href="index.html">Notes</a><a href="../index.html">Lab pages</a><a href="../words.html">Words</a></nav>
+</header>
+<main>
+<p class="crumbs"><a href="../index.html">GPU Learnings</a> / <a href="index.html">notes</a> / <a href="MIT-6.S894.html">MIT 6.S894</a></p>
+<h1>Split-k: pieces of one sum in different blocks</h1>
+<p class="sub">Topics: Lab 5, splitting work. A single idea, with a few lines to calculate. Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+
+<p class="label">The idea</p>
+<div class="story">
+<p>When the result of a matrix product is small and each of its numbers is a very long sum, one block per tile of the result leaves most of the GPU without work. The sum can be cut into pieces and the pieces given to more blocks, but then the pieces of one number belong to different blocks.</p>
+<p>The question here: why must those pieces travel through memory and a second kernel, and what must the decision to split read?</p>
+</div>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The Lab 5 handout: the size 128 by 128 by 32768, with a target of 40% of the fastest possible. The Lab 4 handout: the course GPU has 48 SMs, the identical blocks of hardware the chip is built from, doing 26.7 TFLOP/s of multiply-adds together, and its memory delivers 360 GB/s. The CUDA programming guide: a block of threads resides on one SM, and blocks execute independently, in any order. The Lab 3 handout: launches issued one after another finish one before the next begins. <span class="from">from: the Lab 5, Lab 4 and Lab 3 handouts; the CUDA programming guide</span></p>
+<p class="ln do"><b>L02</b> <b class="x">DO</b> Blocks with 64 by 64 tiles: ____ ; multiply-adds per block ____ ; at one SM's 26.7 / 48 = 0.556 TFLOP/s, at least ____ µs. The bound for the size, from its 33,619,968 bytes at 360 GB/s: ____ µs; so at most ____ of the possible. <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>2 * 2 = 4 blocks; 64 * 64 = 4,096 numbers of C each, 32,768 products per number:
+134,217,728 multiply-adds per block, 2 FLOP each: 483 µs
+33,619,968 / 360 GB/s = 93.4 µs; 93.4 / 483 = 19%, under the 40% target</pre>
+</details>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> With k cut into 16 pieces: blocks ____ . If every block stored its result straight into C, C would keep ____ . Why can no block wait for the others inside the launch? ____ . <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>2 * 2 * 16 = 64 blocks, more than 48 SMs
+one of the 16 pieces of each sum, whichever was stored last
+blocks execute in any order, so no block can know that the others have even begun; each
+piece goes to its own slice of a workspace, 16 * 128 * 128 * 4 = 1,048,576 bytes, and a
+second launch adds the slices once the first has finished</pre>
+</details>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> A decision written as <code>total_blocks &lt; 14</code> reads the laptop's 14 SMs. On the course GPU's 48, which of 128 by 128 by 32768 (4 blocks) and 256 by 256 by 8192 (16 blocks) would split? With 14: ____ . With 48: ____ . <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>with 14: only 128 by 128 by 32768; with 48: both
+cudaDeviceGetAttribute with cudaDevAttrMultiProcessorCount reads the number of SMs from
+the GPU itself</pre>
+</details>
+
+<p class="label">Worked out in full</p>
+<ul class="related">
+<li><a href="../33-split-k.html">33. Lab 5: split-k, when C has fewer tiles than the GPU has SMs</a></li>
+</ul>
+
+<p class="label">Related notes</p>
+<ul class="related">
+<li><a href="reuse-per-number.html">Reuse per number fetched, and the side of a tile</a>: what decides the side of the tile that leaves so few blocks</li>
+<li><a href="reduction.html">Adding up an array: chain or tree</a>: what the order of the adds changes in a sum</li>
+<li><a href="two-buffers.html">Separate buffers and a launch per step</a>: what the end of a launch guarantees</li>
+</ul>
+
+<div class="backlinks">
+<p class="label">Lessons and notes that point here</p>
+<!-- backlinks:begin -->
+<ul class="related">
+<li><a href="MIT-6.S894.html">MIT 6.S894 Accelerated Computing, Labs 1 and 2, on your own computer</a></li>
+<li><a href="reuse-per-number.html">Reuse per number fetched, and the side of a tile</a></li>
+</ul>
+<!-- backlinks:end -->
+</div>
+
+<nav><a href="index.html">all notes</a><a href="MIT-6.S894.html">MIT 6.S894 course page</a></nav>
+</main>
+<footer class="site">
+<p>Independent self-study material for MIT 6.S894 Accelerated Computing, written from one learner's work, and not affiliated with or endorsed by MIT or the course staff. The course pages are at <a href="https://accelerated-computing.academy/fall25/">accelerated-computing.academy/fall25</a> and the starter code at <a href="https://github.com/accelerated-computing-class">github.com/accelerated-computing-class</a>. Every measured number comes from one laptop, a Ryzen 5 4600H with a GTX 1650, unless a sentence says otherwise.</p>
+</footer>
+</body>
+</html>
