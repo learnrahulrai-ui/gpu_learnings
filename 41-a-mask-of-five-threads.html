@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A Mask of Five Threads</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>41. CUTLASS 1094: a shuffle mask that named 5 of the 32 threads executing it</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>NVIDIA's CUTLASS library is a collection of fast matrix multiplication kernels. In September 2023 a user reported that one of its examples, which worked on an A100 GPU, failed on the newer H100 with an illegal instruction. The cause was a single number in a single line: the mask 0x1f in a warp shuffle, an instruction that copies a value from one thread's registers to other threads of the same set of 32. NVIDIA's fix replaced 0x1f with 0xffffffff, four days after the report.</p>
+<p>The learner could not accept it. The documentation had not changed, the code had worked for years, and the shuffle only sends a value from one thread to the others, so why should any mask, let alone two of them, matter? If the rule says one thing and the hardware does another, one of them must be wrong.</p>
+<p>What does the mask of a shuffle say, and how could wrong code give right answers on one GPU and crash on the next?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>The mask 0x1f names how many of a warp's 32 threads? Write a number.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "This makes no sense. Why would a lane call a shuffle, a function calls a function, right" / "I mean all the CUDA documentation was fine, right? This used to work for many decades, right" / "If the rule says something and the hardware produces some other results, that means one of them has to be wrong, right" / "If all the threads are running the same code, then why do I need two different masks"</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> NVIDIA's CUDA programming guide: the hardware executes threads in units of 32 that NVIDIA calls warps. __shfl_sync(mask, var, srcLane) returns the value of var held by the thread of the same warp whose number in the warp is srcLane. The mask has one bit for each of the 32 threads; "Each calling thread must have its own bit set in the mask and all non-exited threads named in mask must execute the same intrinsic with the same mask, or the result is undefined." <span class="from">from: the CUDA programming guide, warp shuffle functions</span></p>
+<p class="ln"><b>L02</b> CUTLASS issue 1094, opened 14 September 2023: in examples/45_dual_gemm/kernel/dual_gemm.h, every thread of a block executes, with no if around it: <span class="from">from: CUTLASS issue 1094</span></p>
+<pre>int warp_idx = __shfl_sync(0x1f, threadIdx.x / 32, 0);</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>int warp_idx = __shfl_sync(0x1f, threadIdx.x / 32, 0);</code><span>Each thread computes threadIdx.x / 32, and the shuffle gives every thread named in the mask the value computed by thread 0 of its warp; the mask 0x1f names the threads that take part.</span></li>
+</ol>
+</div>
+<p class="ln"><b>L03</b> The same issue: the code works correctly on an A100; on an H100 the kernel fails with cudaErrorIllegalInstruction, and the debugger cuda-gdb reports Warp Illegal Instruction with all 32 threads of warp 0 active. Pull request 1097, merged on 18 September 2023, replaced 0x1f with 0xffffffff. The maintainer's explanation: 0x1f "has five 1s", 0xffffffff "has 32 1s", and a warp "has 32 threads, so we need 32 1s." <span class="from">from: CUTLASS issue 1094 and pull request 1097</span></p>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> Write 0x1f in binary: 0x1f = 1 * 16 + 15 = ____ = ____ in binary. Its bits set: ____ . Threads named: ____ . And 0xffffffff: ____ hexadecimal digits of 4 ones each = ____ ones. <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>0x1f = 31 = 11111 in binary: bits 0, 1, 2, 3 and 4 set
+threads 0 to 4 of the warp are named, 5 of 32
+0xffffffff: 8 digits of 4 ones = 32 ones, all 32 threads named</pre>
+</details>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> All 32 threads of a warp execute the line. Is bit 17 of 0x1f set? ____ . So does thread 17 keep the rule of L01? ____ . How many of the 32 executing threads break it? ____ . <span class="from">from: L01, L02, L04</span></p>
+<details><summary>CHECK</summary>
+<pre>bit 17 of 0x1f is 0: thread 17 executes the call without its own bit set
+the rule is broken by threads 5 to 31: 27 of the 32; the guide calls the result undefined</pre>
+</details>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> What value does the line give the threads with threadIdx.x from 96 to 127? Each computes threadIdx.x / 32 = ____ ; thread 0 of their warp (threadIdx.x = 96) computes ____ . So the shuffle changes ____ value(s). <span class="from">from: L02</span></p>
+<details><summary>CHECK</summary>
+<pre>each computes 96 / 32 = 3 to 127 / 32 = 3: 3
+thread 96 computes 3, the value handed to all of them
+the shuffle changes no value at all: every thread already had the number it receives</pre>
+</details>
+<p class="ln"><b>L07</b> The CUTLASS source as it is today carries the comment that this line broadcasts the warp number computed by thread 0 of the warp so that the code depending on it is compiled as the same for the whole warp. The CUDA guide's own example computes a thread's number in its warp as threadIdx.x &amp; 0x1f. <span class="from">from: the CUTLASS source, gemm_universal_streamk.h; the CUDA programming guide</span></p>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> threadIdx.x = 113: 113 &amp; 0x1f = ____ , because 113 = 3 * 32 + ____ . As a shuffle mask, 0x1f names threads ____ . What is the difference between the two uses of the same number? ____ . <span class="from">from: L01, L04, L07</span></p>
+<details><summary>CHECK</summary>
+<pre>113 = 3 * 32 + 17: 113 &amp; 0x1f = 17, the thread's number in its warp
+as a shuffle mask, 0x1f names threads 0 to 4
+as an AND on a number, 0x1f keeps its lowest 5 bits, which can be any of 32 values; as a mask
+of a shuffle, each bit names one thread, so 0x1f names only 5 threads</pre>
+</details>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> Why did the A100 give the right result? ____ . Was the documentation wrong, or the A100, or the H100? ____ . <span class="from">from: L01, L03, L05, L06</span></p>
+<details><summary>CHECK</summary>
+<pre>by L06 the shuffle changes no value, so whatever the A100 did with the 27 unnamed threads, each
+kept a correct 3; undefined means the guide promises nothing, and the A100 happened to give the
+right numbers
+none of them: the guide already called the call undefined; the code broke its rule, and only
+the H100 reported it</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> Collect L04 (0x1f names threads 0 to 4), L05 (27 executing threads are not named), L06 (the shuffle changes no value), L08 (0x1f also means the lowest 5 bits of a number) and L09 (undefined behaviour happened to give right numbers on the A100). Write one sentence on what the mask says and why the bug stayed hidden. <span class="from">from: L04, L05, L06, L08, L09</span></p>
+<details><summary>CHECK</summary>
+<pre>The mask says, one bit per thread, which threads take part, and every thread that executes the
+shuffle must be among them; 0x1f, the familiar constant for the lowest 5 bits of a number,
+names only 5 of the 32 executing threads, and because the shuffle copies a value every thread
+already had, the undefined call left every result correct on the A100 until the H100 refused it.
+
+Tempting answer that fails: "the code worked for years, so the new GPU or the documentation is
+wrong". The guide's rule already made the call undefined (L01), and the A100's correct output
+came from a shuffle that changed no value (L06).</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>A warp shuffle copies a value between the 32 threads that execute together, and its mask lists which of them take part. The code listed only 5 while all 32 took part, which the documentation calls undefined. Because the value copied was one every thread already had, the old GPU gave right answers anyway, and the mistake surfaced only when a newer GPU refused the instruction.</p>
+<p>For a manager: code that works only because the hardware tolerates a broken rule is a delayed failure; ask whether a result is correct by rule or by luck before a hardware upgrade answers it.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>5: 0x1f = 31 = binary 11111, bits 0 to 4, threads 0 to 4 (L04).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>Inside if (threadIdx.x % 32 < 16), only threads 0 to 15 of each warp execute a shuffle. Which mask keeps the rule of L01, and why would 0xffffffff now be wrong?</p>
+<details><summary>CHECK</summary>
+<pre>0x0000ffff: 16 ones, naming exactly threads 0 to 15, each of which executes the call with its
+own bit set. 0xffffffff would name threads 16 to 31 as well; they are not exited, yet they do
+not execute this shuffle, which breaks the second half of the rule.</pre>
+</details>
+</div>
+
+<nav><a href="40-a-cast-that-stops-early-copies.html">prev: 40 a cast that stops the early copies</a><a href="42-a-byte-distance-divided.html">next: 42 a byte distance divided by the size of an element</a></nav>
+</main>
+</body>
+</html>

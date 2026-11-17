@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A register is named in the instruction text and owned by one thread; with no crossbar and no computed names, an array read at a computed element number leaves the registers.">
+<meta name="keywords" content="Lecture 5, GPU chip">
+<title>Registers have names, not addresses</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="site">
+<a class="brand" href="MIT-6.S894.html">6.S894 self-study</a>
+<nav><a href="MIT-6.S894.html#syllabus">Lessons</a><a href="index.html">Notes</a><a href="../index.html">Lab pages</a><a href="../words.html">Words</a></nav>
+</header>
+<main>
+<p class="crumbs"><a href="../index.html">GPU Learnings</a> / <a href="index.html">notes</a> / <a href="MIT-6.S894.html">MIT 6.S894</a></p>
+<h1>Registers have names, not addresses</h1>
+<p class="sub">Topics: Lecture 5, GPU chip. A single idea, with a few lines to calculate. Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+
+<p class="label">The idea</p>
+<div class="story">
+<p>Registers are the fastest storage on the GPU, and every thread has its own. Yet a program cannot pick one of them by a number it computes, the way it picks an element of an array in memory.</p>
+<p>The question here: why can no computed number choose a register, and what happens to an array that is read that way?</p>
+</div>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The Lecture 5 slides of MIT 6.S894 (2 October 2025): the register file is built from parallel banks, one for each of the 32 threads that execute together, and "no r[3] (or r[i]), only r3"; shared memory has 32 banks and a 32 by 32 crossbar, and moving data between threads' registers takes an explicit shuffle instruction. The Lab 4 handout: an array read at a computed element number is moved to local memory, backed by DRAM. <span class="from">from: the Lecture 5 slides; the Lab 4 handout</span></p>
+<p class="ln do"><b>L02</b> <b class="x">DO</b> An instruction names R7 and 32 threads execute it together. How many registers called R7 take part, and do they hold the same value? ____ . <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>32 registers called R7, one per thread, each with its own thread's value</pre>
+</details>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> float x[4]; x[i] = v; with i computed while executing: where does x live, and why? ____ . <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>in local memory: the store's text must name one register, and no name can depend on i</pre>
+</details>
+
+<p class="label">Worked out in full</p>
+<ul class="related">
+<li><a href="../38-registers-have-names.html">38. Lecture 5: registers have names, not places, one set per thread</a></li>
+</ul>
+
+<p class="label">Related notes</p>
+<ul class="related">
+<li><a href="register-budget.html">The register budget</a>: how many registers a thread may use before fewer threads fit</li>
+<li><a href="asm-operands.html">%0 and %1: binding variables to an instruction</a>: how named registers reach an instruction written as text</li>
+<li><a href="tensor-core-placement.html">Which thread holds which number for a tensor core</a>: why the tensor core's operands must be fixed registers</li>
+</ul>
+
+<div class="backlinks">
+<p class="label">Lessons and notes that point here</p>
+<!-- backlinks:begin -->
+<ul class="related">
+<li><a href="asm-operands.html">%0 and %1: binding variables to an instruction</a></li>
+<li><a href="MIT-6.S894.html">MIT 6.S894 Accelerated Computing, Labs 1 and 2, on your own computer</a></li>
+<li><a href="tensor-core-placement.html">Which thread holds which number for a tensor core</a></li>
+</ul>
+<!-- backlinks:end -->
+</div>
+
+<nav><a href="index.html">all notes</a><a href="MIT-6.S894.html">MIT 6.S894 course page</a></nav>
+</main>
+<footer class="site">
+<p>Independent self-study material for MIT 6.S894 Accelerated Computing, written from one learner's work, and not affiliated with or endorsed by MIT or the course staff. The course pages are at <a href="https://accelerated-computing.academy/fall25/">accelerated-computing.academy/fall25</a> and the starter code at <a href="https://github.com/accelerated-computing-class">github.com/accelerated-computing-class</a>. Every measured number comes from one laptop, a Ryzen 5 4600H with a GTX 1650, unless a sentence says otherwise.</p>
+</footer>
+</body>
+</html>

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Places in a, b and c</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>36. Lab 6: the places 8g + t, 8t + g and 8g + 2t, and who decides each factor</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>After computing its number n and the two smaller numbers g and t, each thread of the Lab 6 prelab reads 4 floats of a, 2 of b and 4 of c from GPU memory. The learner wrote the reads one at a time, and each one looked different: a multiplies g by 8, b multiplies t by 8, and c doubles t.</p>
+<p>The learner's picture of an address was the usual one: the length of a line of the matrix times the line, plus the place in the line. Here the line came from the thread, not from the matrix, and the learner did not control the matrix at all, since it arrived as a plain address from the caller.</p>
+<p>Where does each factor of these places come from, and what in them would change if the caller stored the matrices differently?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>Thread 13 must load A(3, 1) from a matrix stored line after line with 8 numbers per line, counted from place 0. At which place of a does it sit? Write a number.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "So, tell me why did I choose the number 8? Why did I choose the number 8?" / "but a need not be 16 times 8 at all i have no control over a" / "so tell again why 8 * g g comes from thread not from matrix" / "why add g g was for the left matrix right" / "Something doesn't add up. It was all about four and now you are doing two. Why?"</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The Lab 6 prelab starter hands the kernel three addresses of floats in GPU memory: a with 16 by 8 numbers, b with 8 by 8 and c with 16 by 8, each stored one line of 8 numbers after another; its CPU check reads A(i, k) at place i * 8 + k. It gives each array 8 times the room it needs and fills the rest with NaN, to make reads outside the matrices visible. <span class="from">from: the Lab 6 starter exercise_mma.cu; the Lab 6 handout</span></p>
+<p class="ln"><b>L02</b> NVIDIA's PTX manual: the thread numbered n in its warp, with g = n / 4 rounded down and t = n % 4, holds A(g, t), A(g + 8, t), A(g, t + 4), A(g + 8, t + 4); B(t, g) and B(t + 4, g); and C at (g, 2t), (g, 2t + 1), (g + 8, 2t), (g + 8, 2t + 1). The first number in the brackets counts down a matrix, the second across. <span class="from">from: NVIDIA's PTX manual</span></p>
+<p class="ln"><b>L03</b> Your reads, four of them: <span class="from">from: your code</span></p>
+<pre>float a0 = a[8 * g + t];
+float a1 = a[8 * (g + 8) + t];
+float b0 = b[8 * t + g];
+float c0 = c[8 * g + 2 * t];</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>float a0 = a[8 * g + t];</code><span>Read the float of a at place 8 * g + t into a0.</span></li>
+<li><code>float a1 = a[8 * (g + 8) + t];</code><span>Read the float of a at place 8 * (g + 8) + t into a1.</span></li>
+<li><code>float b0 = b[8 * t + g];</code><span>Read the float of b at place 8 * t + g into b0: t and g have swapped roles.</span></li>
+<li><code>float c0 = c[8 * g + 2 * t];</code><span>Read the float of c at place 8 * g + 2 * t into c0: here t is doubled.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> In a matrix stored with 8 numbers per line, the number at (r, c) sits at place ____ . For thread 13 (g = 3, t = 1): A(g, t) at ____ ; A(g + 8, t) at ____ ; B(t, g) at ____ ; C(g, 2t) at ____ . <span class="from">from: L01, L02, L03</span></p>
+<details><summary>CHECK</summary>
+<pre>8 * r + c: r whole lines of 8 come before it, then c more
+A(3, 1) at 8 * 3 + 1 = 25; A(11, 1) at 89; B(1, 3) at 8 * 1 + 3 = 11; C(3, 2) at 8 * 3 + 2 = 26</pre>
+</details>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> In 8 * g + t, which factor comes from the data and which from the hardware? The 8: ____ . The g and the t: ____ . <span class="from">from: L01, L02, L04</span></p>
+<details><summary>CHECK</summary>
+<pre>the 8 is the caller's: a line of a holds 8 numbers (L01)
+g and t are the instruction's: its placement says this thread needs A(g, t) (L02)
+the place multiplies a line number chosen by the hardware by a line size chosen by the caller</pre>
+</details>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> Why does b use 8 * t + g, with t and g in the opposite roles? ____ . <span class="from">from: L02, L04</span></p>
+<details><summary>CHECK</summary>
+<pre>the placement gives this thread B(t, g): t counts down B and g across, so the line is t and the
+place in the line is g; the letters are the same, their roles are set separately for each matrix</pre>
+</details>
+<p class="ln do"><b>L07</b> <b class="x">DO</b> Why 2 * t for c, when a used t and t + 4? C has 8 numbers across each line; the threads with the same g are ____ in number, so each takes ____ of them, and the placement makes them neighbours: ____ and ____ . <span class="from">from: L02</span></p>
+<details><summary>CHECK</summary>
+<pre>4 threads share each g (t = 0 to 3), so each takes 8 / 4 = 2 numbers across: 2t and 2t + 1
+A splits its 8 numbers across the other way: t and t + 4, two halves of 4</pre>
+</details>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> The habit of earlier labs: thread n reads place n. Thread 13 would read a[13], which is A( ____ , ____ ) by L04. The placement needs ____ . <span class="from">from: L02, L04</span></p>
+<details><summary>CHECK</summary>
+<pre>13 = 8 * 1 + 5: a[13] is A(1, 5)
+the placement needs A(3, 1), at place 25: the place of a number is computed, never the thread's
+own number</pre>
+</details>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> Suppose a caller stored A with 9 numbers per line instead of 8. Where would A(g, t) sit? ____ . Would g or t change? ____ . Would the 8 in the read of c change? ____ . <span class="from">from: L01, L02, L05</span></p>
+<details><summary>CHECK</summary>
+<pre>at 9 * g + t: only the caller's factor changes
+g and t do not change: they come from the instruction
+the 8 in c's read changes only if c's lines change; each array keeps its own line size
+the starter's caller gives 8 numbers per line, so the kernel is correct for exactly that
+arrangement</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> Collect L04 (thread 13 reads places 25, 89, 11 and 26), L05 (8 from the caller, g and t from the instruction), L06 (b swaps the roles of t and g), L07 (c pairs 2t and 2t + 1), L08 (place n is A(1, 5), not A(3, 1)) and L09 (9 numbers per line change the 8 and nothing else). Write one sentence on what each read combines. <span class="from">from: L04, L05, L06, L07, L08, L09</span></p>
+<details><summary>CHECK</summary>
+<pre>Each read combines two independent rules: the instruction's placement says which number of the
+matrix this thread must hold (g, t, t + 4, 2t, set separately for A, B and C), and the caller's
+layout turns that number into a place in memory (8 numbers per line); change the caller and only
+the line size changes, change the instruction and only the placement changes.
+
+Tempting answer that fails: "thread n reads place n, as in every earlier lab". Thread 13 would
+read A(1, 5) where the instruction expects A(3, 1) (L08).</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>Each thread must fetch the particular numbers that the hardware expects it to hold. Which numbers those are is fixed by the hardware; where they sit in memory is fixed by how the program stored its matrices. The address of each read is the two rules put together, and confusing them, or falling back on the habit of one thread per memory place, fetches the wrong numbers without any error.</p>
+<p>For a manager: an address in this kind of code answers two separate questions, what the hardware wants and how the data is stored; ask which part of each formula answers which, so that a change to one does not break the other.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>25: A(3, 1) has 3 whole lines of 8 before it, then 1 more: 8 * 3 + 1 = 25 (L04).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>After the instruction, each thread writes its 4 numbers of D back into c. Which 4 places does thread 31 write, and why do they come out as the last places of some lines?</p>
+<details><summary>CHECK</summary>
+<pre>Thread 31: g = 7, t = 3. D follows C's placement: (7, 6), (7, 7), (15, 6), (15, 7), at places
+8 * 7 + 6 = 62, 63, 8 * 15 + 6 = 126 and 127. With t = 3, 2t + 1 = 7 is the last number
+across, so thread 31 holds the last two numbers of lines 7 and 15, and 127 is the last place of c.</pre>
+</details>
+</div>
+
+<nav><a href="35-four-numbers-one-product.html">prev: 35 four numbers of A, one whole product</a><a href="37-from-variables-to-operands.html">next: 37 from your variables to the instruction's operands</a></nav>
+</main>
+</body>
+</html>

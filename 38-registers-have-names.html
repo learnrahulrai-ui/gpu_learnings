@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Registers Have Names</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>38. Lecture 5: registers have names, not places, one set per thread</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>Lecture 5 of MIT 6.S894 builds the GPU's fastest storage from the inside. The registers are not separate cells in hardware but one large memory cut into banks, and the lecturer added a rule that sounded strange: a program can name a register, but it can never compute which register it wants.</p>
+<p>The learner had been told that a warp holds 32 copies of the register set. That sentence contradicted everything else: if every thread has its own registers with its own values, what would a copy be? And if a thread may hold hundreds of variables, why could it not pick one of them by a computed number, the way it picks an element of an array in memory?</p>
+<p>What is a register, whose is it, and why can no program choose one by a number computed while it executes?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>A kernel declares float x[4] and stores into x[i], where i is computed from threadIdx.x while the kernel executes. Can x stay in registers? Yes or no.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "One warp has thirty-two copies of the register set. This is the problem. If a register set is personal to each thread then how can a warp have a copy?" / "warp doesn't create new registers, right? Threads already have those registers. A warp is just a photograph of these thirty-two things together, right?" / "But there can be the case that a thread can have hundreds of variables, right? Then how will you draw" / "Why there should be only thirty two lanes? Why not more lanes"</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The Lecture 5 slides (2 October 2025, Jonathan Ragan-Kelley): the register file is built from parallel banks, one for each of the 32 threads that execute together, 32 banks of 2 KB; the slide adds "no r[3] (or r[i]), only r3". The lecturer, in the transcript of your chat: "you can't do, like, register file subscript some index, or compute which register you want dynamically ... You just get to name all of the unique registers, like ... R3, R7". <span class="from">from: the Lecture 5 slides; the lecture transcript in your chat</span></p>
+<p class="ln"><b>L02</b> NVIDIA's CUDA programming guide: the hardware executes threads in units of 32 that NVIDIA calls warps; each thread of a warp has its own registers, at most 255 of 32 bits each. The Lab 4 handout: the register file holds 64 KB for each of an SM's 4 warp schedulers. <span class="from">from: the CUDA programming guide; the Lab 4 handout</span></p>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> An instruction names register R7, and a warp executes it. How many registers called R7 take part? ____ . Do they hold the same number? ____ . What, then, is "32 copies of the register set"? ____ . <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>32 registers called R7, one in each thread's own set
+no: each holds its own thread's value
+not copies: 32 separate register sets under the same names, one per thread; the warp creates no
+registers, it is the 32 threads executed together</pre>
+</details>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> Size: 32 banks of 2 KB hold ____ KB, which is ____ registers of 4 bytes. At 255 registers per thread, how many threads fit? ____ . At 32 registers per thread? ____ . <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>32 * 2 KB = 64 KB, the 64 KB per scheduler of L02; 64 * 1,024 / 4 = 16,384 registers
+16,384 / 255 = 64.25: 64 threads, 2 warps
+16,384 / 32 = 512 threads, 16 warps
+a thread may hold hundreds of variables; the price is fewer threads beside it</pre>
+</details>
+<p class="ln"><b>L05</b> Your array, written so that the element number is computed while the kernel executes: <span class="from">from: the lecture's rule applied to your code</span></p>
+<pre>float x[4];
+x[i] = v;</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>float x[4];</code><span>Declare an array of 4 floats in this thread.</span></li>
+<li><code>x[i] = v;</code><span>Store v into element i of x, where i is a number this thread computed while executing.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> The store instruction must name one register in its text, fixed when the program is compiled. Which register could it name for x[i]? ____ . The Lab 4 handout: an array read at a computed element number is moved to local memory, backed by DRAM. So x lives ____ , and each x[i] costs ____ . <span class="from">from: L01, L05; the Lab 4 handout</span></p>
+<details><summary>CHECK</summary>
+<pre>none: i is known only while executing, and the text cannot name a register that depends on it
+x lives in local memory, in DRAM behind the caches, and each x[i] becomes a memory store or load
+with every i fixed when compiling (a loop whose counts are known and is written out in full),
+x[0] to x[3] become four named registers again</pre>
+</details>
+<p class="ln do"><b>L07</b> <b class="x">DO</b> The Lab 6 instruction takes its four A values as %4 to %7. Could they come from an array read at a computed element number? ____ . <span class="from">from: L01, L06</span></p>
+<details><summary>CHECK</summary>
+<pre>no: each operand of the instruction is a register named in its text; an array read at a
+computed element number would sit in local memory, and the instruction takes registers only, so the
+four values are four separate variables, or an array whose element numbers are all fixed when compiling</pre>
+</details>
+<p class="ln"><b>L08</b> The Lecture 5 slides on the L1 memory, which holds shared memory: 32 parallel banks, addresses striped over them 4 bytes at a time (the bank of word w is w mod 32), and a 32 by 32 crossbar that connects any bank to any of the 32 threads. For registers: "explicit shfl instruction": data moves between threads' registers only by a separate instruction. The lecturer: the register banks have "no crossbar or mux". <span class="from">from: the Lecture 5 slides; the lecture transcript in your chat</span></p>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> Shared memory: words 0, 32 and 64 sit in banks ____ ; 32 threads reading words 0 to 31 use ____ banks, served in ____ round(s); reading words 0, 32, 64, ..., 992 uses ____ bank(s), in ____ rounds. <span class="from">from: L08</span></p>
+<details><summary>CHECK</summary>
+<pre>0, 0 and 0
+words 0 to 31: 32 different banks, 1 round
+words 0, 32, ..., 992: all in bank 0, 32 rounds, one word each</pre>
+</details>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> Why can a computed address reach any word of shared memory in one step, while no computed number can choose a register? ____ . <span class="from">from: L01, L06, L08, L09</span></p>
+<details><summary>CHECK</summary>
+<pre>shared memory has the crossbar: a computed address picks a bank, and the crossbar routes that
+bank's word to the thread; each register bank is wired to one thread, with no crossbar, and
+the register's number is part of the instruction text; nothing computed while executing can
+select it, and nothing in one thread's bank reaches another thread without the shuffle
+instruction</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> Collect L03 (32 registers called R7, 32 different values), L04 (64 KB: 64 threads at 255 registers, 512 at 32), L06 (a computed element number sends an array to local memory), L07 (the Lab 6 operands must be named registers) and L09 and L10 (shared memory has a crossbar, registers do not). Write one sentence on what a register is and why it cannot be chosen by a computed number. <span class="from">from: L03, L04, L06, L07, L09, L10</span></p>
+<details><summary>CHECK</summary>
+<pre>A register is a storage cell owned by one thread and named in the instruction text, the 32
+threads of a warp each having their own set under the same names; because the name is fixed
+when the program is compiled and the register banks have no crossbar, no number computed while
+executing can choose one, so arrays read at computed element numbers leave the registers for local
+memory, and moving a value between threads takes an explicit shuffle instruction.
+
+Tempting answer that fails: "a warp holds 32 copies of one register set". The 32 registers
+called R7 hold 32 different values (L03).</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>The fastest storage on the GPU has no addresses, only names written into each instruction, and every thread has its own set of them. That is why it is fast, and also why a program cannot pick one by a number it computes along the way: such data falls back to ordinary memory, which is far slower. Moving a value from one thread's storage to another's takes its own instruction.</p>
+<p>For a manager: the fastest storage comes with rules about how it can be reached; ask whether a design needs computed access before blaming the hardware for slowness.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>No. The store must name a register in its text, and i is known only while executing; the array
+moves to local memory, backed by DRAM (L06).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>The Lecture 5 slide says the registers deliver more than 100 TB/s, with each operation reading 3 values and writing 1. The Lecture 3 slides give the course GPU 13.4 * 10^12 instructions per second. How many bytes per second must the registers deliver, and how does that compare with the L1's 13.4 TB/s?</p>
+<details><summary>CHECK</summary>
+<pre>(3 + 1) * 4 bytes = 16 bytes per instruction; 13.4 * 10^12 * 16 = 214 * 10^12 bytes per
+second, 214 TB/s, 16 times the L1's 13.4 TB/s. Only storage with names fixed in the
+instruction, one bank per thread and no crossbar to cross, keeps up with every unit at once.</pre>
+</details>
+</div>
+
+<nav><a href="37-from-variables-to-operands.html">prev: 37 from your variables to the instruction's operands</a><a href="39-k-equal-pairs.html">next: 39 why only pairs with the same k</a></nav>
+</main>
+</body>
+</html>

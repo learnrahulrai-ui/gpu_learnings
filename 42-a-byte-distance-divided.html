@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A Byte Distance Divided</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>42. NVIDIA Warp 2282: a distance in bytes divided by the size of an element</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>NVIDIA Warp is a Python library that compiles Python functions into kernels for the GPU or the CPU; the name of the library has nothing to do with the 32-thread warp. Its tile functions load pieces of arrays into a block's threads, keeping the piece either in registers or in shared memory. In November 2026 Warp issue 2282 reported that the register path reads the wrong numbers from some arrays of 3-float vectors, with no error at all.</p>
+<p>The arrays in question had padding: each vector of 3 floats was followed by an unused fourth float. The learner had only met padding inside C structures, did not expect it between the elements of an array, and could not believe that a library tested as widely as this one could hand back wrong numbers for years.</p>
+<p>What did the library's arithmetic assume about an array, and why would no ordinary test ever break that assumption?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>In the reported array each 3-float vector starts 16 bytes after the previous one. At which float does vector number 1 start? Write a number.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "This is very weird. I have heard that padding is only happening in a structures, right? You are saying padding also happens in floats and this vectors" / "so the libary is wrong? that sound fishy libraries are tested all the t ime" / "this is so weired a famous lubrary like wrap cannot have such errors that is sounding bad very bad for me to think at all" / "what was he thinking why did he do it he must have thought something"</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> NVIDIA Warp issue 2282, opened on 10 November 2026 and still open: an array of 12 floats, 0 to 11, stored as 3 lines of 4, is viewed as an array of 3 vectors of 3 floats (wp.vec3), each beginning 16 bytes after the previous one. The kernel loads it with wp.tile_load(src, shape=3, storage="register") and stores it back. Expected: [[0, 1, 2], [4, 5, 6], [8, 9, 10]]. Returned: [[0, 1, 2], [3, 4, 5], [6, 7, 8]], six of nine numbers wrong, with no exception. <span class="from">from: NVIDIA Warp issue 2282</span></p>
+<p class="ln"><b>L02</b> The same issue: the register-tile load and store and the indexed tile load and store are wrong, for 3-vectors and 3 by 3 matrices, on CPU and CUDA; the shared-tile load and store return the right numbers; "No application failure has been demonstrated." <span class="from">from: NVIDIA Warp issue 2282</span></p>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> A vec3 is ____ floats = ____ bytes; the distance from one vector to the next is ____ bytes = ____ floats, so ____ bytes of padding follow each vector. Vector c starts at float ____ : for c = 0, 1, 2 at floats ____ . <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>3 floats = 12 bytes; 16 bytes = 4 floats apart; 4 bytes of padding after each vector
+vector c starts at float 4 * c: floats 0, 4, 8, so the vectors are [0,1,2], [4,5,6], [8,9,10]</pre>
+</details>
+<p class="ln"><b>L04</b> Warp's register path, in its source file warp/native/tile.h (as of commit d92753f): the function index() of tile_global_t computes the distance and the count, and load() reads the element; the two steps shown together: <span class="from">from: the NVIDIA Warp source</span></p>
+<pre>byte_index += int64_t(data.strides[i]) * c;
+// array strides are in bytes so we convert to elements
+out = byte_index / sizeof(T);
+return data.data[out];</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>byte_index += int64_t(data.strides[i]) * c;</code><span>Add, for each dimension i, the array's distance in bytes between neighbouring elements times the element's number c along it.</span></li>
+<li><code>// array strides are in bytes so we convert to elements</code><span>The source's own comment: the distances are in bytes, so they are turned into a count of elements.</span></li>
+<li><code>out = byte_index / sizeof(T);</code><span>Divide the distance in bytes by the size of one element T, rounding down, and call the result out.</span></li>
+<li><code>return data.data[out];</code><span>Read element number out of the array, counting whole elements of T from its start.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> For T = vec3, sizeof(T) = ____ bytes. Vector c: byte_index = ____ ; out = byte_index / 12, rounded down, = ____ for c = 0, 1, 2. data.data[out] starts at byte 12 * out = ____ , that is at float ____ . <span class="from">from: L03, L04</span></p>
+<details><summary>CHECK</summary>
+<pre>sizeof(vec3) = 12 bytes; byte_index = 16 * c = 0, 16, 32
+out = 0 / 12 = 0, 16 / 12 = 1, 32 / 12 = 2
+data.data[out] counts whole 12-byte vectors: bytes 0, 12, 24, floats 0, 3, 6
+it reads [0, 1, 2], [3, 4, 5], [6, 7, 8]: exactly the output reported in L01</pre>
+</details>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> The division turns a distance d in bytes into a count of elements of E bytes, and data.data[out] turns the count back into bytes: E * (d / E rounded down) = d - (d mod E). When does that return d? ____ . For d = 16 * c and E = 12, at which c? ____ . <span class="from">from: L05; integer division</span></p>
+<details><summary>CHECK</summary>
+<pre>only when d is a multiple of E, so that d mod E = 0
+16 * c is a multiple of 12 only for c = 0, 3, 6, ...: vectors 1 and 2 are read 4 and 8 bytes
+too early</pre>
+</details>
+<p class="ln do"><b>L07</b> <b class="x">DO</b> An ordinary array of vec3 has its vectors 12 bytes apart, and an ordinary array of 4-float vectors 16 bytes apart. In both, is every distance d a multiple of E? ____ . So which arrays can show the fault, and what does every test with ordinary arrays show? ____ . <span class="from">from: L06</span></p>
+<details><summary>CHECK</summary>
+<pre>yes: with distance = size, d = E * c, and the division is exact
+only arrays whose elements lie further apart than their size, by an amount that is not a
+multiple of it, such as padded vec3; every test with ordinary arrays reads the right numbers,
+so no ordinary test can fail</pre>
+</details>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> By L02 the shared-tile path returns the right numbers from the same array. What must it do differently with the distance in bytes? ____ . <span class="from">from: L02, L06</span></p>
+<details><summary>CHECK</summary>
+<pre>it must keep the distance in bytes and read at (start address + byte_index), without changing
+the distance into a count of elements; two paths to the same element agree whenever distances
+are multiples of the element size, and only the dividing path breaks when they are not</pre>
+</details>
+<p class="ln"><b>L09</b> NVIDIA's pull request 2336 is linked to the issue, still open. A commit titled "Fix padded tile array addressing", from your own fork of the library, is linked to it as well. <span class="from">from: NVIDIA Warp issue 2282</span></p>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> Collect L03 (vectors start at floats 0, 4, 8), L05 (the register path reads from floats 0, 3, 6), L06 (a division of a distance by a size is exact only for multiples of the size), L07 (ordinary arrays always give multiples) and L08 (the shared path keeps bytes and reads correctly). Write one sentence on what the code assumed and why its tests could not see it. <span class="from">from: L03, L05, L06, L07, L08</span></p>
+<details><summary>CHECK</summary>
+<pre>The register path changes a distance from bytes into whole elements by dividing by the element
+size, which silently assumes that every element starts a multiple of its own size from the
+array's start; ordinary arrays always satisfy that, so every test with them reads the right
+numbers, and only a padded array, its vec3 elements 16 bytes apart, exposes reads that start
+at floats 0, 3, 6 instead of 0, 4, 8, with no error.
+
+Tempting answer that fails: "a library this widely used and tested cannot read wrong numbers".
+Tests with ordinary arrays can never reach the fault, because for them the division is exact
+(L07).</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>The library stored where each element of an array begins as a distance in bytes, then turned that distance into a count of elements by dividing by the element's size. That is correct whenever elements sit back to back, which is almost always, so every usual test gave right answers. When elements had unused space between them, the division threw part of each distance away and the library quietly read from the wrong places.</p>
+<p>For a manager: a check that every common case satisfies can still hide a wrong assumption; ask which inputs would break the assumption, and test those on purpose.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>4: the vectors start 16 bytes = 4 floats apart, so vector 1 starts at float 4 (L03). The register
+path read it from float 3 (L05).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>An array of vec3 whose vectors start 24 bytes apart (12 bytes of padding each). Which floats does the register path read for vectors 1 and 2, and is vector 2 right?</p>
+<details><summary>CHECK</summary>
+<pre>byte_index = 24 * c: 24 and 48. out = 24 / 12 = 2 and 48 / 12 = 4. data.data[out] starts at bytes
+24 and 48, floats 6 and 12: both right, because 24 is a multiple of 12. With a distance that is a
+multiple of the element size the division is exact; the fault needs a distance like 16 that is not.</pre>
+</details>
+</div>
+
+<nav><a href="41-a-mask-of-five-threads.html">prev: 41 a mask that named 5 of 32 threads</a><a href="43-shared-memory-counted-too-early.html">next: 43 shared memory counted too early</a></nav>
+</main>
+</body>
+</html>

@@ -53,7 +53,17 @@
 <li>"I read C = A times B as A, then B, then C, and cannot see why the kernel begins from C", or "what is bk &lt; size_k for, and why are the shared arrays square?" <a href="31-from-the-formula-to-the-kernel.html">page 31</a>.</li>
 <li>"I wrote BM = 64 but cannot say why 64", or "my tiled kernel is correct but nowhere near 8 ms." <a href="32-why-64.html">page 32</a>.</li>
 <li>"My matrix multiply with a small C and a long k leaves most of the GPU idle", or "my split version decides differently on the course GPU than on my laptop." <a href="33-split-k.html">page 33</a>.</li>
-<li>"My result looks fine but I am not sure it measures what I think." <a href="failures.html">the failure list</a>, 64 ways a clean-looking number goes wrong.</li>
+<li>"Why must my tensor core kernel begin with the thread's number, and where does the 4 come from?", or "swapping two threads' work broke a result that used to be fine." <a href="34-the-thread-number-decides.html">page 34</a>.</li>
+<li>"Each thread loads only 4 numbers of A and 2 of B, so how can one instruction give whole sums?" <a href="35-four-numbers-one-product.html">page 35</a>.</li>
+<li>"Why 8 * g + t for a, 8 * t + g for b and 8 * g + 2 * t for c?", or "my tensor core result has numbers in the wrong places." <a href="36-places-in-a-b-and-c.html">page 36</a>.</li>
+<li>"What do %0, %1 and the two colons of an asm statement mean?" <a href="37-from-variables-to-operands.html">page 37</a>.</li>
+<li>"My small array went to local memory although it has only 4 floats", or "what does it mean that registers cannot be indexed?" <a href="38-registers-have-names.html">page 38</a>.</li>
+<li>"Why does anyone name the products with equal k, and what does a layout have to do with k?" <a href="39-k-equal-pairs.html">page 39</a>.</li>
+<li>"Converting my data to a smaller type made the matrix multiply slower, not faster." <a href="40-a-cast-that-stops-early-copies.html">page 40</a>.</li>
+<li>"My shuffle between threads works on one GPU and fails with an illegal instruction on a newer one." <a href="41-a-mask-of-five-threads.html">page 41</a>.</li>
+<li>"A library reads the wrong numbers from my padded array of vectors, with no error." <a href="42-a-byte-distance-divided.html">page 42</a>.</li>
+<li>"My kernel reports an illegal memory access although I never index memory by hand", or "it crashes at one size and not at another." <a href="43-shared-memory-counted-too-early.html">page 43</a>.</li>
+<li>"My result looks fine but I am not sure it measures what I think." <a href="failures.html">the failure list</a>, 73 ways a clean-looking number goes wrong.</li>
 <li>"A table printed by a course file looks wrong on my GPU." <a href="12-the-48-trap.html">page 12</a>.</li>
 </ol>
 

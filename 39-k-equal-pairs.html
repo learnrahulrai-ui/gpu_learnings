@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>K-Equal Pairs</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>39. Tensor cores: why only pairs with the same k, and what a layout must guarantee</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>A step-by-step text on tensor cores, which the learner was reading, split the products of two matrices into two kinds: products whose two numbers share the same k, and products whose numbers do not. Then it said that a tensor core instruction never reads k at all, and that its layouts keep k-equal numbers next to each other.</p>
+<p>The learner rejected the whole distinction. Everyone multiplies matching numbers and adds them, so why name the products that are never made? And how could a layout have anything to do with k, when k belongs to the matrices and a register holds whatever numbers the program puts in it?</p>
+<p>Why does a matrix product need the k-equal pairs to be named at all, and what does a register's layout have to do with them?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>A has 8 numbers along k for one result and B has 8 down k for it. Of the 8 * 8 = 64 products of one number from each, how many does the result use? Write a number.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "Why do I even bother dot K unequal and K equal? We have to do the summing anyways, right?" / "Never multiply a row 2 3 by column 5 7, right? That is impossible, right? Why would anyone multiply 2 into 3? We multiply the values at those positions and add them pairwise, right?" / "MMA receives the number, right? The way mental model works is MMA is a dumb operation. It doesn't even care about matrix and pointers and location." / "So for one register, when it contains A zero, zero and A zero, one, the K is zero or K is one or K is zero and one both for this register"</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The matrix product, as every lab starter writes it: C(m, n) = the sum over k of A(m, k) * B(k, n). A product A(m, k) * B(j, n) with j different from k never appears in it. Call A(m, k) and B(j, n) a k-equal pair when j = k, and a k-unequal pair otherwise. <span class="from">from: the lab starters' CPU reference; definition for this page</span></p>
+<p class="ln do"><b>L02</b> <b class="x">DO</b> A has the two numbers A(m, 0) = 2 and A(m, 1) = 3; B has B(0, n) = 5 and B(1, n) = 7. The k-equal products: ____ ; the k-unequal products: ____ . C(m, n) = ____ . <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>k-equal: 2 * 5 = 10 and 3 * 7 = 21
+k-unequal: 2 * 7 = 14 and 3 * 5 = 15, never used
+C(m, n) = 10 + 21 = 31</pre>
+</details>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> For K = 8, of the 8 * 8 = 64 possible products of one number of A(m, .) and one of B(., n), how many are k-equal? ____ . What fraction of the possible pairings must never be multiplied? ____ . <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>8 are k-equal, one for each k; 56 are k-unequal
+56 / 64 = 7/8 of the possible pairings must never meet</pre>
+</details>
+<p class="ln"><b>L04</b> The Lab 6 handout: the tensor core instruction multiplies numbers taken from fixed registers of the 32 threads of a warp, NVIDIA's name for the threads that execute together. NVIDIA's PTX manual, for the TF32 instruction m16n8k8: the thread numbered n in the warp, with g = n / 4 rounded down and t = n % 4, holds A(g, t), A(g + 8, t), A(g, t + 4), A(g + 8, t + 4) and B(t, g), B(t + 4, g). <span class="from">from: the Lab 6 handout; NVIDIA's PTX manual</span></p>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> Read k off each number the thread holds. In A(g, t) and A(g + 8, t), k = ____ ; in A(g, t + 4) and A(g + 8, t + 4), k = ____ ; in B(t, g), k = ____ ; in B(t + 4, g), k = ____ . <span class="from">from: L04</span></p>
+<details><summary>CHECK</summary>
+<pre>A: k = t, and k = t + 4; B: k = t, and k = t + 4
+in every thread the numbers of A and the numbers of B carry the same two values of k</pre>
+</details>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> For one result D(i, j), the partner of A(i, k) is B(k, j). A(i, k) sits in the thread with t = ____ in the set of 4 threads with g = i % 8; B(k, j) sits in the thread with t = ____ in the set with g = j. So k-equal partners always sit in threads with the same ____ . <span class="from">from: L01, L04, L05</span></p>
+<details><summary>CHECK</summary>
+<pre>A(i, k): t = k % 4; B(k, j): t = k % 4
+k-equal partners always sit in threads with the same t, one in each of two sets of 4 threads;
+the placement ties k to t in A and in B alike</pre>
+</details>
+<p class="ln"><b>L07</b> NVIDIA's PTX manual, for the 16-bit instruction m16n8k16: one 32-bit register holds two 16-bit numbers. The first A register of thread n holds A(g, 2t) and A(g, 2t + 1); the first B register holds B(2t, g) and B(2t + 1, g). <span class="from">from: NVIDIA's PTX manual</span></p>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> Which values of k sit in one 16-bit A register? ____ . In the same thread's first B register? ____ . So for one register, is its k one value or two? ____ . <span class="from">from: L07</span></p>
+<details><summary>CHECK</summary>
+<pre>A: k = 2t and 2t + 1; B: k = 2t and 2t + 1, the same two
+two values of k in one register: the two numbers are neighbours along k, in A and in B alike</pre>
+</details>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> The instruction does not read k; it multiplies fixed parts of fixed registers. What must the layout of the numbers guarantee, then, for the product to be correct? ____ . <span class="from">from: L03, L06, L08</span></p>
+<details><summary>CHECK</summary>
+<pre>that every number of A meets exactly its k-equal partners of B, and none of the 7 in 8
+k-unequal ones: the instruction cannot check, so the layout is the only thing that pairs k</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> Collect L02 (2 * 5 + 3 * 7 = 31, while 2 * 7 and 3 * 5 never appear), L03 (8 of 64 pairings are k-equal), L05 (in every thread the A and B numbers carry the same k), L06 (k-equal partners sit in threads with the same t), L08 (a 16-bit register carries two neighbouring k in A and in B) and L09 (the instruction cannot check k). Write one sentence on why k-equal pairs are named. <span class="from">from: L02, L03, L05, L06, L08, L09</span></p>
+<details><summary>CHECK</summary>
+<pre>They are named because the hardware multiplies places, not meanings: of the 64 possible
+pairings of a result's numbers only 8 are k-equal, and the only thing that makes the
+instruction pick those 8 is the layout, which puts the same k in the same place of A's
+registers and of B's, the same t for 32-bit numbers and the same neighbouring pair for 16-bit
+ones.
+
+Tempting answer that fails: "everyone knows to multiply matching numbers, so naming them is
+pointless". The instruction does not know which numbers match: a layout that puts k-unequal
+numbers in paired places computes a wrong product without any error (L09).</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>In a matrix product, each number of the result uses only the pairs whose shared index agrees, a small part of all the pairs one could form. People do this without noticing; the hardware cannot notice anything, so the way the numbers are laid out in its storage must place every matching pair together and no other pair. Naming the matching pairs is naming what the layout has to guarantee.</p>
+<p>For a manager: when hardware does the pairing blindly, correctness lives in the data's arrangement; ask what the arrangement guarantees, not only what the arithmetic does.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>8. Only the products with the same k enter the sum: 8 of the 64, one for each value of k (L03).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>With 8-bit numbers a 32-bit register holds 4 of them. NVIDIA's PTX manual places A of the 8-bit instruction m16n8k32 so that thread n's first register holds A(g, 4t) to A(g, 4t + 3). If those 4 numbers are converted to 16 bits for the instruction m16n8k16, which threads must hold them?</p>
+<details><summary>CHECK</summary>
+<pre>The 16-bit placement puts k = 2t' and 2t' + 1 in thread t' of a set (L07). The 8-bit thread t
+holds k = 4t to 4t + 3: k = 4t and 4t + 1 belong to the 16-bit thread t' = 2t, and k = 4t + 2
+and 4t + 3 to t' = 2t + 1. Half of the numbers must move to another thread, and a conversion
+of each number's format moves nothing between threads.</pre>
+</details>
+</div>
+
+<nav><a href="38-registers-have-names.html">prev: 38 registers have names, not places</a><a href="40-a-cast-that-stops-early-copies.html">next: 40 a cast that stops the early copies</a></nav>
+</main>
+</body>
+</html>

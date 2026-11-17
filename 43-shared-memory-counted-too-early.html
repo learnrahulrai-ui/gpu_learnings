@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shared Memory Counted Too Early</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>43. NVIDIA Warp 2294: shared memory counted before a later line moved the tile</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>NVIDIA Warp, the Python library for GPU kernels, decides by itself how much of an SM's shared memory each kernel needs, and asks for exactly that much when the kernel is launched. In November 2026 Warp issue 2294 reported a kernel that crashes with an illegal memory access although it never touches memory by hand: it calls a small helper that returns a tile, and then uses that tile in a matrix product.</p>
+<p>The reporter found it in MuJoCo Warp, a physics engine built on the library. The learner, reading it as an application developer, could not see how correct operations, each valid on its own, could add up to an illegal access, and why other sizes of the same kernel did not crash.</p>
+<p>How can a kernel that addresses nothing by hand ask for too little memory, and why would the same mistake crash at one size and not at another?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>The kernel asked for 4,224 bytes of shared memory and needed 4,288. How many 4-byte floats were missing? Write a number.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "THAT is not what I am asking I am asking how I an an application developer will gett this bugg" / "i am confused what waa atile tile is nothing but a part of matric" / "why do othe rthreads miss the tile"</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> NVIDIA Warp issue 2294, opened on 11 November 2026 and still open: with K = 16, N = 20 and blocks of 128 threads, the kernel below is launched once (decorators and argument types left out). A tile is a piece of an array that the threads of a block hold together, kept either in their registers or in the block's shared memory. Warp computes the shared memory the kernel needs and requests it at the launch. <span class="from">from: NVIDIA Warp issue 2294</span></p>
+<pre>def double_tile(a):
+    t = wp.tile_load(a, shape=K)
+    return wp.tile_map(wp.add, t, t)
+J_kj = wp.tile_load(J, shape=(K, N), storage="shared")
+d = double_tile(a)
+J_ki = wp.tile_map(wp.mul, wp.tile_transpose(J_kj), wp.tile_broadcast(d, shape=(N, K)))
+wp.tile_store(out, wp.tile_matmul(J_ki, J_kj))</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>def double_tile(a):</code><span>A helper function, compiled for the GPU, that takes an array a.</span></li>
+<li><code>    t = wp.tile_load(a, shape=K)</code><span>Load K numbers of a into a tile t.</span></li>
+<li><code>    return wp.tile_map(wp.add, t, t)</code><span>Return a new tile holding t + t, every number doubled.</span></li>
+<li><code>J_kj = wp.tile_load(J, shape=(K, N), storage="shared")</code><span>In the kernel: load K by N numbers of J into a tile kept in shared memory.</span></li>
+<li><code>d = double_tile(a)</code><span>Call the helper; d receives its returned tile.</span></li>
+<li><code>J_ki = wp.tile_map(wp.mul, wp.tile_transpose(J_kj), wp.tile_broadcast(d, shape=(N, K)))</code><span>Multiply J transposed, number by number, by d repeated over N lines.</span></li>
+<li><code>wp.tile_store(out, wp.tile_matmul(J_ki, J_kj))</code><span>Multiply the two tiles as matrices and store the N by N result into out.</span></li>
+</ol>
+</div>
+<p class="ln"><b>L02</b> The issue's measurements: requested 4,224 bytes, needed 4,288 by its own count of (2 * K * N + K + N * N + K) floats of 4 bytes, and the launch ends with CUDA error 700, an illegal memory access, on an RTX PRO 4500 Blackwell GPU. With K = 13, the request is short by the same 64 bytes, and the launch succeeds. <span class="from">from: NVIDIA Warp issue 2294</span></p>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> Count with K = 16, N = 20: 2 * 16 * 20 + 16 + 20 * 20 + 16 = ____ floats = ____ bytes. The request: 4,224 bytes = ____ floats. Missing: ____ floats = ____ bytes, the size of ____ . <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>640 + 16 + 400 + 16 = 1,072 floats = 4,288 bytes
+4,224 / 4 = 1,056 floats
+missing 16 floats = 64 bytes: K = 16 floats, the size of the tile d returned by double_tile</pre>
+</details>
+<p class="ln"><b>L04</b> The issue's explanation: "The tile returned by a user function shares its type object with the variable that receives it in the caller", and the call is counted when it is compiled, "while the function's tile is still a register tile". The broadcast of d into an N by K shape then moves d's tile to shared storage. The reporter's workaround: "We worked around it by not returning the tile from a function." <span class="from">from: NVIDIA Warp issue 2294</span></p>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> Order of events. When the call d = double_tile(a) is counted, d's tile is kept in ____ and adds ____ bytes of shared memory. The broadcast moves the same tile to ____ , which needs ____ bytes. Is the count of the call updated? ____ . <span class="from">from: L03, L04</span></p>
+<details><summary>CHECK</summary>
+<pre>in registers, adding 0 bytes of shared memory
+the broadcast moves it, through the type object it shares with the call's result, to shared
+memory: 16 floats = 64 bytes
+the count taken at the call is not updated: the request stays 64 bytes short</pre>
+</details>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> What does the launch with K = 13 that succeeds prove about its request? ____ . <span class="from">from: L02</span></p>
+<details><summary>CHECK</summary>
+<pre>nothing: by L02 it is short by the same 64 bytes; whether reads and writes past the request
+fault depends on what lies beyond it on that launch, so a launch that does not crash is no
+evidence that the request was right</pre>
+</details>
+<p class="ln do"><b>L07</b> <b class="x">DO</b> Why does the workaround of L04 remove the fault? ____ . <span class="from">from: L04, L05</span></p>
+<details><summary>CHECK</summary>
+<pre>without a function returning the tile, there is no count taken at a call while the tile is
+still in registers: the tile is created in the kernel's own body, where its final storage is
+counted</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> Collect L03 (64 bytes short, exactly the returned 16-float tile), L05 (the count was taken while the tile was in registers, and a later line moved it to shared memory), L06 (the same shortfall launches fine at K = 13) and L07 (no function, no stale count). Write one sentence on what went wrong. <span class="from">from: L03, L05, L06, L07</span></p>
+<details><summary>CHECK</summary>
+<pre>The library counted the shared memory of the helper's call at a moment when the returned tile
+still lived in registers, and a later line of the caller moved that same tile into shared
+memory without the count being updated, so the kernel asked for exactly that tile's 64 bytes
+too little; whether the shortfall crashes depends on the sizes, so a launch that succeeds says
+nothing about the request.
+
+Tempting answer that fails: "an illegal memory access means my code read outside an array".
+The kernel addresses no memory by hand; the library's own request was 64 bytes short (L03).</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>The library added up how much fast memory a program would need before the program had finished deciding where one of its pieces would live. A later step moved that piece into the fast memory, but the total was never updated, so the program asked for slightly too little. Sometimes the shortfall caused a crash and sometimes it did not, which is why ordinary testing did not catch it.</p>
+<p>For a manager: a total computed before every decision is made can be wrong without any single step being wrong; ask when a budget is computed relative to the choices it depends on.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>16 floats: 4,288 - 4,224 = 64 bytes, and 64 / 4 = 16, the K = 16 floats of the returned tile (L03).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>Without the crash, how could a developer have found that the request was short?</p>
+<details><summary>CHECK</summary>
+<pre>By comparing the library's request with an independent count of every tile's final storage,
+which is what the reporter did: the reproducer prints the kernel's requested shared bytes beside
+(2 * K * N + K + N * N + K) * 4. A request smaller than the independent count is the bug,
+whether or not the launch fails.</pre>
+</details>
+</div>
+
+<nav><a href="42-a-byte-distance-divided.html">prev: 42 a byte distance divided by the size of an element</a><a href="failures.html">next: the failure list</a></nav>
+</main>
+</body>
+</html>

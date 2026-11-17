@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A matrix product uses only the 8 of 64 pairings with equal k; the hardware multiplies places, so the layout must put k-equal numbers in paired places, and a format change can break that.">
+<meta name="keywords" content="Lab 6, memory">
+<title>k-equal pairs and what a layout guarantees</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="site">
+<a class="brand" href="MIT-6.S894.html">6.S894 self-study</a>
+<nav><a href="MIT-6.S894.html#syllabus">Lessons</a><a href="index.html">Notes</a><a href="../index.html">Lab pages</a><a href="../words.html">Words</a></nav>
+</header>
+<main>
+<p class="crumbs"><a href="../index.html">GPU Learnings</a> / <a href="index.html">notes</a> / <a href="MIT-6.S894.html">MIT 6.S894</a></p>
+<h1>k-equal pairs and what a layout guarantees</h1>
+<p class="sub">Topics: Lab 6, memory. A single idea, with a few lines to calculate. Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+
+<p class="label">The idea</p>
+<div class="story">
+<p>Each number of a matrix product is a sum of products whose two numbers share the same k. A tensor core never reads k: it multiplies numbers in fixed places of registers.</p>
+<p>The question here: what must a layout guarantee about k, and what happens when numbers change size between the load and the multiply?</p>
+</div>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> C(m, n) = the sum over k of A(m, k) * B(k, n). NVIDIA's PTX manual: for the TF32 instruction m16n8k8, thread n holds A(g, t), A(g, t + 4) and B(t, g), B(t + 4, g); for the 16-bit m16n8k16, one register holds A(g, 2t) and A(g, 2t + 1); for the 8-bit m16n8k32, A(g, 4t) to A(g, 4t + 3). <span class="from">from: the lab starters; NVIDIA's PTX manual</span></p>
+<p class="ln do"><b>L02</b> <b class="x">DO</b> Of the 64 products of 8 numbers of A(m, .) and 8 of B(., n), how many enter C(m, n)? ____ . In the TF32 layout, which k do a thread's A and B numbers carry? ____ . <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>8, one for each k; 56 never enter
+A(g, t), A(g, t + 4) and B(t, g), B(t + 4, g): both carry k = t and t + 4</pre>
+</details>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> An 8-bit thread with t = 0 holds k = 0 to 3 in one register. After conversion to 16 bits, which threads must hold them? ____ . <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>the 16-bit layout puts k = 0, 1 in t = 0 and k = 2, 3 in t = 1: half must move to another
+thread, which a conversion cannot do</pre>
+</details>
+
+<p class="label">Worked out in full</p>
+<ul class="related">
+<li><a href="../39-k-equal-pairs.html">39. Tensor cores: why only pairs with the same k, and what a layout must guarantee</a></li>
+<li><a href="../40-a-cast-that-stops-early-copies.html">40. Triton 1397: an 8-bit A converted before the multiply, half the bytes and 44% slower</a></li>
+</ul>
+
+<p class="label">Related notes</p>
+<ul class="related">
+<li><a href="tensor-core-placement.html">Which thread holds which number for a tensor core</a>: which thread holds each number of A, B and C</li>
+<li><a href="tiles.html">Tiles in shared memory</a>: how much reuse a matrix multiply needs</li>
+<li><a href="hidden-by-the-common-case.html">Bugs hidden by the common case</a>: why a small change can cost much more than it seems</li>
+</ul>
+
+<div class="backlinks">
+<p class="label">Lessons and notes that point here</p>
+<!-- backlinks:begin -->
+<ul class="related">
+<li><a href="MIT-6.S894.html">MIT 6.S894 Accelerated Computing, Labs 1 and 2, on your own computer</a></li>
+<li><a href="tensor-core-placement.html">Which thread holds which number for a tensor core</a></li>
+</ul>
+<!-- backlinks:end -->
+</div>
+
+<nav><a href="index.html">all notes</a><a href="MIT-6.S894.html">MIT 6.S894 course page</a></nav>
+</main>
+<footer class="site">
+<p>Independent self-study material for MIT 6.S894 Accelerated Computing, written from one learner's work, and not affiliated with or endorsed by MIT or the course staff. The course pages are at <a href="https://accelerated-computing.academy/fall25/">accelerated-computing.academy/fall25</a> and the starter code at <a href="https://github.com/accelerated-computing-class">github.com/accelerated-computing-class</a>. Every measured number comes from one laptop, a Ryzen 5 4600H with a GTX 1650, unless a sentence says otherwise.</p>
+</footer>
+</body>
+</html>

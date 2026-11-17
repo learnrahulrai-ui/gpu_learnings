@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A Cast That Stops the Early Copies</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>40. Triton 1397: an 8-bit A converted before the multiply, half the bytes and 44% slower</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>Triton is a language for writing GPU kernels in Python, and its tutorial includes a matrix multiplication. In March 2023 a user changed one thing in it: matrix A was stored as 8-bit integers instead of 16-bit floats, and converted to 16-bit floats inside the loop just before the multiply. The report, Triton issue 1397, is still open.</p>
+<p>The learner found the result absurd. The 8-bit A moves half as many bytes, and a conversion is one cheap instruction per number, yet the kernel lost almost half its speed. Worse, the explanation offered was that the loads were no longer started ahead of the computation, as if one conversion could change how a kernel loads its data.</p>
+<p>How can converting each number, which costs almost nothing, make a kernel that moves fewer bytes slower?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>The 8-bit version moves half the bytes of A. On the reporter's A100 GPU, was it faster than the 16-bit version? Yes or no.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "A is a 8-bit integer, B is a 16-bit float. Why is A an integer, B is a float? Tell me in one line" / "This sounds stupid. Can you search on the internet a simple cast is going to slow down a computer? I mean, this is just ridiculous" / "But this sounds stupid, right? Pipelining makes things faster, but you are saying that it is slowing things down"</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> Triton issue 1397, opened on 23 March 2023 and still open: in the matrix multiplication tutorial, the reporter sets A's type to 8-bit integers and converts A to 16-bit floats inside the loop, with tiles of 128 by 128 by 64 and 4 warps; NVIDIA calls the 32 threads that execute together a warp. The loop's three steps, with their bounds arguments left out: <span class="from">from: Triton issue 1397</span></p>
+<pre>a = tl.load(a_ptrs)
+a = a.to(tl.float16)
+accumulator += tl.dot(a, b)</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>a = tl.load(a_ptrs)</code><span>Load this step's tile of A from GPU memory; in the report its numbers are 8-bit integers.</span></li>
+<li><code>a = a.to(tl.float16)</code><span>Convert every number of the tile to a 16-bit float.</span></li>
+<li><code>accumulator += tl.dot(a, b)</code><span>Multiply the tile by B's tile on the tensor cores and add the product to the total so far.</span></li>
+</ol>
+</div>
+<p class="ln"><b>L02</b> The issue's measurements on an A100 40GB GPU: 127 TFLOP/s for the 8-bit A against 227 TFLOP/s for the 16-bit A. In the compiled kernel the 8-bit load is not started ahead of the computation, and extra layout conversions appear between the type conversion and the multiply. NVIDIA's profiler showed the stall reason Long Scoreboard rising from almost 0 to more than 3 cycles, and the cycles spent issuing instructions up 77%. <span class="from">from: Triton issue 1397</span></p>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> Bytes of one A tile of 128 by 64 numbers: 8-bit ____ ; 16-bit ____ . Speed of the 8-bit version against the 16-bit one: 127 / 227 = ____ ; time for the same work: 227 / 127 = ____ times as long. <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>8-bit: 128 * 64 * 1 = 8,192 bytes; 16-bit: 128 * 64 * 2 = 16,384 bytes, twice as many
+127 / 227 = 0.56: the 8-bit version is 44% slower and takes 227 / 127 = 1.79 times as long,
+while moving half the bytes of A</pre>
+</details>
+<p class="ln"><b>L04</b> NVIDIA's profiler guide: Long Scoreboard counts cycles in which a warp waits for data from a load through the L1 memory (local, global, surface or texture). The Lab 5 and Lab 6 handouts: a kernel hides that wait by beginning the copies of the next tile before computing on the current one. <span class="from">from: NVIDIA's Nsight Compute profiling guide; the Lab 5 and Lab 6 handouts</span></p>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> If the loads of a tile start only when that tile is needed, what does each warp do between the load and the multiply? ____ . Which counter of L02 shows it? ____ . <span class="from">from: L02, L04</span></p>
+<details><summary>CHECK</summary>
+<pre>it waits for its own load each time: the copy and the computation take turns instead of
+overlapping
+Long Scoreboard, up from almost 0 to more than 3 cycles</pre>
+</details>
+<p class="ln"><b>L06</b> NVIDIA's PTX manual places the numbers of A in the threads of a warp, for thread n with g = n / 4 rounded down and t = n % 4. For 8-bit numbers (instruction m16n8k32), the first A register holds A(g, 4t) to A(g, 4t + 3), four numbers with neighbouring k. For 16-bit numbers (instruction m16n8k16), it holds A(g, 2t) and A(g, 2t + 1). <span class="from">from: NVIDIA's PTX manual</span></p>
+<p class="ln do"><b>L07</b> <b class="x">DO</b> Take t = 0. The 8-bit layout gives thread t = 0 the numbers k = ____ . Converted to 16 bits, the 16-bit layout wants k = 0 and 1 in thread t' = ____ and k = 2 and 3 in thread t' = ____ . Can a conversion of each number's format move numbers between threads? ____ . <span class="from">from: L06</span></p>
+<details><summary>CHECK</summary>
+<pre>8-bit thread t = 0 holds k = 0, 1, 2, 3
+the 16-bit layout puts k = 0, 1 in t' = 0 and k = 2, 3 in t' = 1
+no: a conversion changes each number's bits inside its own register; half of the numbers must
+still move to another thread, which is the extra layout conversions of L02</pre>
+</details>
+<p class="ln"><b>L08</b> Triton's maintainer in the issue: "in a mixed precision setting, both args can't be fetched with ldmatrix", and "ldmatrix can't transpose b8 inputs". NVIDIA's PTX manual: ldmatrix collectively loads matrices from shared memory into the registers of all threads of a warp, for the mma instruction. <span class="from">from: Triton issue 1397; NVIDIA's PTX manual</span></p>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> Put L04, L07 and L08 together: what did the conversion change about the path of A's numbers from memory to the tensor core? ____ . <span class="from">from: L03, L05, L07, L08</span></p>
+<details><summary>CHECK</summary>
+<pre>the 16-bit A can go from shared memory straight into the tensor core layout with ldmatrix;
+the 8-bit A, converted on the way, cannot: its numbers arrive in the 8-bit layout, must be
+rearranged between threads after conversion, and in the reported kernel its loads were not
+started ahead, so each tile's multiply waited for its own load</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> Collect L03 (half the bytes of A, 1.79 times the time), L02 (the 8-bit load not started ahead, extra layout conversions, Long Scoreboard up), L05 (each tile's multiply waits for its own load), L07 (8-bit and 16-bit layouts give the same k to different threads) and L08 (ldmatrix cannot fetch both arguments in mixed precision). Write one sentence on where the lost 44% went. <span class="from">from: L02, L03, L05, L07, L08</span></p>
+<details><summary>CHECK</summary>
+<pre>The conversion costs almost nothing itself; what it changes is the layout: an 8-bit number and
+its 16-bit version belong to different threads, so the converted tile needs extra moves between
+threads before every multiply, the shortcut from shared memory straight into the tensor core
+layout no longer applies, and in the reported kernel the loads stopped being started ahead,
+leaving each multiply to wait for its own tile.
+
+Tempting answer that fails: "a cast is one cheap instruction per number, so it cannot cost
+44%". The same report measures 127 against 227 TFLOP/s with half the bytes of A (L03).</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>Storing half of the data in a smaller format should make a computation faster, since less data moves. Here it made it slower, because the small numbers and the converted numbers have to sit in different places inside the hardware, and the tool could not keep loading the next pieces in advance while it rearranged them. The cost of a step lies in what it forces around it, not in the step itself.</p>
+<p>For a manager: a change that looks free can switch off an optimization; ask whether a small change alters how data reaches the hardware before assuming its cost is small.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>No. 127 TFLOP/s with 8-bit A against 227 TFLOP/s with 16-bit A: 44% slower while moving half
+the bytes of A (L03).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>Why store A as 8-bit integers at all? For A of 4096 by 4096 numbers, compute the bytes in 8 bits and in 16 bits, and say what a fix has to keep and what it has to change.</p>
+<details><summary>CHECK</summary>
+<pre>4096 * 4096 = 16,777,216 numbers: 16.8 MB in 8 bits, 33.6 MB in 16 bits. The 8-bit storage
+halves the memory and the bytes read for A, which is the reason to keep it. A fix keeps 8-bit
+storage and changes how the numbers reach the 16-bit layout: rearranging them on the way, in
+shared memory or in registers, without stopping the early loads. The reporter proposed a route
+through shared memory; the maintainer later wrote that the int8 slowness itself was not yet
+addressed.</pre>
+</details>
+</div>
+
+<nav><a href="39-k-equal-pairs.html">prev: 39 why only pairs with the same k</a><a href="41-a-mask-of-five-threads.html">next: 41 a mask that named 5 of 32 threads</a></nav>
+</main>
+</body>
+</html>

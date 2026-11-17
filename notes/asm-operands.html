@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="In asm(&quot;template&quot; : outputs : inputs), each %n counts the operand lists in order, outputs first; the letters say the register kind and = marks a written one.">
+<meta name="keywords" content="Lab 6, GPU chip">
+<title>%0 and %1: binding variables to an instruction</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="site">
+<a class="brand" href="MIT-6.S894.html">6.S894 self-study</a>
+<nav><a href="MIT-6.S894.html#syllabus">Lessons</a><a href="index.html">Notes</a><a href="../index.html">Lab pages</a><a href="../words.html">Words</a></nav>
+</header>
+<main>
+<p class="crumbs"><a href="../index.html">GPU Learnings</a> / <a href="index.html">notes</a> / <a href="MIT-6.S894.html">MIT 6.S894</a></p>
+<h1>%0 and %1: binding variables to an instruction</h1>
+<p class="sub">Topics: Lab 6, GPU chip. A single idea, with a few lines to calculate. Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+
+<p class="label">The idea</p>
+<div class="story">
+<p>An instruction that the kernel's language does not have is inserted as text with an asm statement, and the text never mentions a variable of the program. Something connects the two.</p>
+<p>The question here: how does an asm statement say which variable stands for which operand, and which of them the instruction writes?</p>
+</div>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> NVIDIA's guide Inline PTX Assembly in CUDA: asm("template-string" : "constraint"(output) : "constraint"(input)); each %n of the template refers to the n-th operand of the lists, counted in text order from 0, outputs first; "=" marks a register that is written; "r" is a 32-bit register, "f" a 32-bit float register. <span class="from">from: NVIDIA's guide Inline PTX Assembly in CUDA</span></p>
+<p class="ln do"><b>L02</b> <b class="x">DO</b> In asm("add.s32 %0, %2, %1;" : "=r"(i) : "r"(k), "r"(j)), what are %0, %1 and %2, and what does the line compute? ____ . <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>%0 = i, %1 = k, %2 = j: the instruction computes i = j + k</pre>
+</details>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> The Lab 6 tensor core statement lists 4 outputs and 4 + 2 + 4 inputs. Which numbers belong to D, A, B and C? ____ . <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>%0 to %3 are D, %4 to %7 are A, %8 and %9 are B, %10 to %13 are C</pre>
+</details>
+
+<p class="label">Worked out in full</p>
+<ul class="related">
+<li><a href="../37-from-variables-to-operands.html">37. Lab 6: %0 and %1, how your variables reach the instruction's operands</a></li>
+</ul>
+
+<p class="label">Related notes</p>
+<ul class="related">
+<li><a href="tensor-core-placement.html">Which thread holds which number for a tensor core</a>: what each of those operands holds in each thread</li>
+<li><a href="registers-have-names.html">Registers have names, not addresses</a>: why the operands are registers and never computed places</li>
+<li><a href="hidden-by-the-common-case.html">Bugs hidden by the common case</a>: how code that breaks a rule can still satisfy every test</li>
+</ul>
+
+<div class="backlinks">
+<p class="label">Lessons and notes that point here</p>
+<!-- backlinks:begin -->
+<ul class="related">
+<li><a href="hidden-by-the-common-case.html">Bugs hidden by the common case</a></li>
+<li><a href="MIT-6.S894.html">MIT 6.S894 Accelerated Computing, Labs 1 and 2, on your own computer</a></li>
+<li><a href="registers-have-names.html">Registers have names, not addresses</a></li>
+<li><a href="tensor-core-placement.html">Which thread holds which number for a tensor core</a></li>
+</ul>
+<!-- backlinks:end -->
+</div>
+
+<nav><a href="index.html">all notes</a><a href="MIT-6.S894.html">MIT 6.S894 course page</a></nav>
+</main>
+<footer class="site">
+<p>Independent self-study material for MIT 6.S894 Accelerated Computing, written from one learner's work, and not affiliated with or endorsed by MIT or the course staff. The course pages are at <a href="https://accelerated-computing.academy/fall25/">accelerated-computing.academy/fall25</a> and the starter code at <a href="https://github.com/accelerated-computing-class">github.com/accelerated-computing-class</a>. Every measured number comes from one laptop, a Ryzen 5 4600H with a GTX 1650, unless a sentence says otherwise.</p>
+</footer>
+</body>
+</html>

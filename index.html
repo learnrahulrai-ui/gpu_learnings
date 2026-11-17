@@ -9,7 +9,7 @@
 <body>
 <main>
 <h1>GPU Learnings: do it, don't read it</h1>
-<p class="sub">Made from real chats working through MIT 6.S894 Lab 1 (Mandelbrot on CPU, CPU SIMD, GPU) and the Lab 2 prelab (fma_latency, warp_scheduler), on a Ryzen 5 4600H and a GTX 1650, through Lecture 2 (registers, waits, SIMD, if-else, exec units), through Lecture 3 and Lab 3 (memory chips, which threads are neighbours, the wave step), and through Labs 4 and 5 (which index gets x, the kernel from the formula, the tile side 64, split-k).</p>
+<p class="sub">Made from real chats working through MIT 6.S894 Lab 1 (Mandelbrot on CPU, CPU SIMD, GPU) and the Lab 2 prelab (fma_latency, warp_scheduler), on a Ryzen 5 4600H and a GTX 1650, through Lecture 2 (registers, waits, SIMD, if-else, exec units), through Lecture 3 and Lab 3 (memory chips, which threads are neighbours, the wave step), through Labs 4 and 5 (which index gets x, the kernel from the formula, the tile side 64, split-k), and through Lecture 5, Lab 6 and real library bugs (registers with names, the tensor core prelab line by line, k-equal pairs, a Triton slowdown, a CUTLASS shuffle mask, two NVIDIA Warp bugs).</p>
 
 <div class="guess">
 <p class="label">Stuck in the middle of the lab?</p>
@@ -86,7 +86,19 @@
                     30 which index gets x --&gt; 31 formula to kernel --&gt; 32 why 64
                                                                                   |
                                                                                   v
-                                                                         33 split-k</pre>
+                                                                         33 split-k
+                                                                                  |
+                                                                                  v
+        34 the thread number decides --&gt; 35 four numbers, one product --&gt; 36 places
+                                                                                  |
+                                                                                  v
+        37 from variables to operands --&gt; 38 registers have names --&gt; 39 k-equal pairs
+                                                                                  |
+                                                                                  v
+        40 a cast that stops the early copies --&gt; 41 a mask of five threads
+                                                                                  |
+                                                                                  v
+             42 a byte distance divided --&gt; 43 shared memory counted too early</pre>
 
 <ol class="topics" start="0">
 <li><a href="00-what-a-gpu-is.html">What a GPU is, measured on one laptop</a>: 896 arithmetic circuits against 48, four timings, and why the fastest result does not prove what it seems to.</li>
@@ -123,8 +135,18 @@
 <li><a href="31-from-the-formula-to-the-kernel.html">From the formula to the kernel</a>: the written indices as threads and k as a loop, 96.6 ms from L2 against a 45 ms target, 393,216 bytes that do not fit, and bk &lt; size_k as the reference's k loop taken in pieces.</li>
 <li><a href="32-why-64.html">Why 64</a>: 1/16 against 1/32 numbers from L2 per multiply-add, a tile side of 44.5 set by the chip and not by the matrix, and 17.3 ms of shared memory reads cut to 4.33 ms by a 4 by 4 patch.</li>
 <li><a href="33-split-k.html">Split-k</a>: 4 blocks for 48 SMs and at most 19% of the possible, 16 pieces of k in 64 blocks, a finished loop holding an unfinished sum, and a 14 from the laptop in the decision to split.</li>
+<li><a href="34-the-thread-number-decides.html">The thread number decides</a>: threadIdx.x as the only input that differs, a swap of two threads that was harmless before and is silently wrong now, and the 4 as the instruction's quarter of A.</li>
+<li><a href="35-four-numbers-one-product.html">A whole product from four numbers</a>: D(0, 0) = 32 + 48 + 68 + 92 + 10 = 250 from threads 0 to 3, and D(0, 1) mixing threads 0 to 3 with threads 4 to 7.</li>
+<li><a href="36-places-in-a-b-and-c.html">Places in a, b and c</a>: 8 from the caller, g and t from the instruction, places 25, 89, 11 and 26 for thread 13, and place 13 holding A(1, 5).</li>
+<li><a href="37-from-variables-to-operands.html">From variables to operands</a>: %0 and %1 counting the operand lists, "=r" for TF32 data and "f" for floats, and rounding off by half a step where cutting is off by almost a whole one.</li>
+<li><a href="38-registers-have-names.html">Registers have names</a>: 32 registers called R7 with 32 values, 64 KB per scheduler, and an array read at a computed element number moved to local memory.</li>
+<li><a href="39-k-equal-pairs.html">K-equal pairs</a>: 8 of 64 possible products, the same k in a thread's A and B numbers, and 8-bit numbers that belong to other threads once converted.</li>
+<li><a href="40-a-cast-that-stops-early-copies.html">A cast that stops the early copies</a>: Triton issue 1397, half the bytes of A and 127 TFLOP/s against 227.</li>
+<li><a href="41-a-mask-of-five-threads.html">A mask of five threads</a>: CUTLASS issue 1094, 0x1f naming threads 0 to 4 while 32 execute, right on an A100 by a shuffle that changed nothing, refused by an H100.</li>
+<li><a href="42-a-byte-distance-divided.html">A byte distance divided</a>: NVIDIA Warp issue 2282, 16 * c bytes divided by 12, vectors read from floats 0, 3, 6 instead of 0, 4, 8.</li>
+<li><a href="43-shared-memory-counted-too-early.html">Shared memory counted too early</a>: NVIDIA Warp issue 2294, 4,224 bytes requested against 4,288 needed, and the same shortfall launching fine at K = 13.</li>
 </ol>
-<p>And: <a href="failures.html">the failure list</a>, 64 ways a clean-looking result goes wrong, each pointing to the page that works it out.</p>
+<p>And: <a href="failures.html">the failure list</a>, 73 ways a clean-looking result goes wrong, each pointing to the page that works it out.</p>
 </main>
 </body>
 </html>

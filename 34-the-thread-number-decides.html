@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Thread Number Decides</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>34. Lab 6: why the thread's number inside its warp decides the data, and where the 4 comes from</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>Lab 6 of MIT 6.S894 replaces the multiply-adds of the earlier matrix kernels with tensor core instructions. Each such instruction multiplies a 16 by 8 matrix A by an 8 by 8 matrix B and adds a 16 by 8 matrix C, and 32 threads execute it together. The prelab asks for one such multiply, done by one block of 32 threads.</p>
+<p>The learner began the way every earlier kernel began: give the thread a number, then split the number by 4. Both lines looked like plain arithmetic that any program could contain, with nothing to do with tensor cores. The learner asked what was new about them in this lab, and where the 4 came from, since no matrix in the program had a 4 in it.</p>
+<p>What does the first line of this kernel commit the program to that the first line of every earlier kernel did not?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>In Labs 1 to 5, swapping the work of thread 13 and thread 18 left the result correct. In the Lab 6 prelab, thread 13 loads the numbers meant for thread 18 and thread 18 loads those meant for thread 13. Is the result still correct? Yes or no.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "This is the retarder reason everybody knows, right? It has been the same for all the previous lab. What is new in this lab that I have to write this line?" / "If I could give the work of thread 13 to thread 18, why didn't I do that in the previous labs?" / "int n = threadIdx.x; int g = n / 4 ; int t = n % 4 ; I have written these 3 lines these have nothing to do with tensor these are pure math" / "why did I choose 4?" / "I don't know what my matrix will contain in the future, right? So when you divide by four, you know nothing that the matrix will be of size eight, right?"</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The Lab 6 handout: the instruction <code>mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32</code> computes D = A * B + C, with A of 16 by 8 numbers, B of 8 by 8 and C and D of 16 by 8. NVIDIA's CUDA programming guide: the hardware executes threads in units of 32 that NVIDIA calls warps, each thread with its own registers; the handout: this instruction is executed by a whole warp, its inputs and outputs spread over the registers of all 32 threads. The prelab starter launches the kernel as one block of exactly 32 threads. <span class="from">from: the Lab 6 handout and starter; the CUDA programming guide</span></p>
+<p class="ln"><b>L02</b> NVIDIA's PTX manual fixes which numbers each thread holds. For the thread whose number in its warp is n, with g = n / 4 rounded down and t = n % 4, its four A registers hold A(g, t), A(g + 8, t), A(g, t + 4) and A(g + 8, t + 4), its two B registers B(t, g) and B(t + 4, g), and its four C registers C(g, 2t), C(g, 2t + 1), C(g + 8, 2t) and C(g + 8, 2t + 1). The first number in the brackets counts down the matrix, the second across. <span class="from">from: NVIDIA's PTX manual, mma fragments for m16n8k8 with tf32</span></p>
+<p class="ln"><b>L03</b> Your first lines: <span class="from">from: your code</span></p>
+<pre>int n = threadIdx.x;
+int g = n / 4;
+int t = n % 4;</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>int n = threadIdx.x;</code><span>n is this thread's number in its block, 0 to 31 in the prelab.</span></li>
+<li><code>int g = n / 4;</code><span>g is n divided by 4, rounded down: 0 to 7.</span></li>
+<li><code>int t = n % 4;</code><span>t is the remainder of n divided by 4: 0 to 3. So n = 4 * g + t.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> Which of the kernel's inputs differ between the 32 threads? The addresses a, b and c: ____ . blockIdx.x: ____ . threadIdx.x: ____ . So every number that must differ between threads can be computed only from ____ . <span class="from">from: L01, L03</span></p>
+<details><summary>CHECK</summary>
+<pre>a, b and c: the same three addresses in every thread
+blockIdx.x: 0 in every thread, since there is one block
+threadIdx.x: 0 to 31, a different value in each thread
+so every difference between threads is computed from threadIdx.x and from nothing else</pre>
+</details>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> In Labs 1 to 5 every instruction worked thread by thread: a thread's result used only its own registers. Give thread 13 the work of thread 18 and thread 18 the work of thread 13. Is every number of the result still computed exactly once? ____ . What can change? ____ . <span class="from">from: the Lab 6 handout; L01</span></p>
+<details><summary>CHECK</summary>
+<pre>yes: each thread still computes whole numbers of the result from its own data, and the swap
+is one to one, so every number is computed once
+only the speed can change, through which addresses the 32 threads of an instruction touch</pre>
+</details>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> Now the swap in Lab 6. Thread 13 has g = ____ and t = ____ ; by L02 the instruction reads its first A register as A( ____ , ____ ). After the swap that register holds what thread 18 should hold: thread 18 has g = ____ , t = ____ , so it is A( ____ , ____ ). Result: ____ . <span class="from">from: L02, L03, L05</span></p>
+<details><summary>CHECK</summary>
+<pre>thread 13: g = 13 / 4 = 3, t = 13 % 4 = 1: read as A(3, 1)
+thread 18: g = 4, t = 2: it holds A(4, 2)
+the instruction multiplies A(4, 2) as if it were A(3, 1): a wrong product, and no error is
+reported, because nothing in a register says which number of A it is</pre>
+</details>
+<p class="ln do"><b>L07</b> <b class="x">DO</b> So n must be the number the hardware uses for this thread inside its warp, not any number that differs between threads. In the prelab, threadIdx.x is that number. The CUDA guide: warp w of a block holds the threads numbered 32w to 32w + 31. In a block of 128 threads, the thread with threadIdx.x = 77 is in warp ____ with number ____ inside it. Would n = threadIdx.x be right there? ____ . <span class="from">from: L01, L02, L06</span></p>
+<details><summary>CHECK</summary>
+<pre>warp 77 / 32 = 2, number 77 - 64 = 13 inside it
+no: with n = 77 the thread computes g = 19 and loads A(19, 1), past the 16 lines of A; the
+number inside the warp is threadIdx.x % 32</pre>
+</details>
+<p class="ln do"><b>L08</b> <b class="x">DO</b> Where does the 4 come from? By L02, list the first A register of threads 0 to 7: ____ . How many threads share each value of g? ____ . How many values does t take? ____ . What part of A do the first registers of all 32 threads cover? ____ . <span class="from">from: L02</span></p>
+<details><summary>CHECK</summary>
+<pre>threads 0, 1, 2, 3: A(0, 0), A(0, 1), A(0, 2), A(0, 3); threads 4 to 7: A(1, 0) to A(1, 3)
+4 threads for each g; t takes 4 values, 0 to 3
+the first registers of the 32 threads cover A(0..7, 0..3): a quarter of A, 8 down by 4 across,
+filled one line of 4 after another; dividing by 4 finds the line, the remainder the place in it</pre>
+</details>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> Does the 4 depend on the matrices your program will multiply? ____ . What must your program do with any larger matrix before this instruction can use it? ____ . <span class="from">from: L01, L02, L08</span></p>
+<details><summary>CHECK</summary>
+<pre>no: the 4 belongs to the instruction's placement, fixed by NVIDIA for the m16n8k8 shape; any
+matrix of your program is cut into pieces of 16 by 8 and 8 by 8, and each piece is placed by
+the same rule, so every kernel that uses this instruction divides the warp number by 4</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> Collect L04 (threadIdx.x is the only input that differs between threads), L05 (in Labs 1 to 5 any one-to-one swap of work stays correct), L06 (in Lab 6 the swap gives a wrong product with no error), L07 (n must be the number inside the warp, threadIdx.x % 32 in a bigger block) and L08 and L09 (the 4 is the instruction's quarter of A, not a property of your matrices). Write one sentence on what the first line commits the kernel to. <span class="from">from: L04, L05, L06, L07, L08, L09</span></p>
+<details><summary>CHECK</summary>
+<pre>The first line commits the kernel to the hardware's own number for the thread inside its warp,
+because the tensor core instruction reads every register as a fixed number of A, B or C
+according to that number; in the earlier labs the split of work between threads was the
+programmer's free choice, and here it is fixed by NVIDIA, the 4 being part of the same rule.
+
+Tempting answer that fails: "n is the usual thread number, as in every lab". Swapping the work
+of threads 13 and 18 was harmless in Labs 1 to 5 and gives a wrong product here (L06).</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>In earlier GPU programs the programmer decided which thread computes which part of the result, and any fair split gave the right answer. The tensor core instruction takes that choice away: it treats each thread's storage as fixed pieces of the matrices according to the thread's place among the 32 threads that execute it together. So the program's first job is to compute that place exactly, and the numbers it uses come from the instruction, not from the data.</p>
+<p>For a manager: when hardware fixes how work is divided, the code must follow the hardware's numbering exactly; ask where a numbering comes from before accepting that it is arbitrary.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>No. Thread 13's first A register is read as A(3, 1) but holds A(4, 2), thread 18's the other
+way round; the instruction computes a wrong product and reports no error (L06).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>A kernel launches blocks of 256 threads, 8 warps, and each warp executes the same instruction on its own 16 by 8 piece. Which thread holds A(5, 6) of warp 3's piece, and what is its threadIdx.x?</p>
+<details><summary>CHECK</summary>
+<pre>A(5, 6) is A(g, t + 4) with g = 5 and t = 2, the third A register of the thread numbered
+4 * 5 + 2 = 22 inside its warp (L02). In warp 3 that thread has threadIdx.x = 3 * 32 + 22 = 118.
+The kernel must compute n = 118 % 32 = 22 before dividing by 4.</pre>
+</details>
+</div>
+
+<nav><a href="33-split-k.html">prev: 33 split-k</a><a href="35-four-numbers-one-product.html">next: 35 four numbers of A, one whole product</a></nav>
+</main>
+</body>
+</html>

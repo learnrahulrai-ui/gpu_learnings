@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>From Variables to Operands</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>37. Lab 6: %0 and %1, how your variables reach the instruction's operands</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>After loading its floats, each thread of the Lab 6 prelab has to hand them to an instruction that the kernel's language does not have. The handout supplies the instruction as text, and the kernel inserts that text with an asm statement. The learner's statements first converted each float of A and B into the tensor core's TF32 format, then executed the multiply.</p>
+<p>The syntax broke the learner's reading: percent signs followed by numbers, two colons, letters in quotes such as "=r" and "f", and an instruction name that mentioned neither the learner's variables nor any thread. It looked like two languages mixed in one line, with no rule saying which part was which.</p>
+<p>What does each part of an asm statement do, and which part belongs to the instruction and which to the program?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>In asm("add.s32 %0, %1, %2;" : "=r"(i) : "r"(k), "r"(j)), which variable does %1 stand for, k or j? Write the letter.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "Why would the first and second column become suddenly input and output? All I see, I don't see input written over here." / "So, if I have an instruction, % 0 and % 1 means what" / "Why does it need to have this percentage, 0%, 1% middle men" / "So this is, again, we are mixing NVIDIA and C++ again. NVIDIA gave me the instruction name, but C++ variables are these two." / "Why would I want to preserve bits"</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> NVIDIA's guide Inline PTX Assembly in CUDA: the basic form is <code>asm("template-string" : "constraint"(output) : "constraint"(input));</code>. The template string holds instruction text with references to the operands; each %n in it refers to the n-th operand of the lists that follow, counted in text order from 0, and the outputs are always listed before the inputs. The input operands are loaded into registers before the statement, and the result register is stored to the output after it; the "=" in "=r" marks a register that is written. <span class="from">from: NVIDIA's guide Inline PTX Assembly in CUDA</span></p>
+<p class="ln"><b>L02</b> The same guide: the constraint letter gives the kind of register, "r" a 32-bit unsigned register and "f" a 32-bit float register (also "h" for 16 bits, "l" for 64 bits and "d" for 64-bit floats). <span class="from">from: NVIDIA's guide Inline PTX Assembly in CUDA</span></p>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> The guide's example <code>asm("add.s32 %0, %1, %2;" : "=r"(i) : "r"(j), "r"(k));</code>: %0 is ____ , %1 is ____ , %2 is ____ ; which one is written? ____ . If the inputs are listed as "r"(k), "r"(j), what is %1? ____ . <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>%0 = i (the first operand, the only output), %1 = j, %2 = k; i is written: i = j + k
+listed as (k), (j): %1 = k, because the numbers count the lists in text order</pre>
+</details>
+<p class="ln"><b>L04</b> Your conversion of the first A value: <span class="from">from: your code</span></p>
+<pre>uint32_t a0_tf32;
+asm("cvt.rna.tf32.f32 %0, %1;" : "=r"(a0_tf32) : "f"(a0));</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>uint32_t a0_tf32;</code><span>Declare a 32-bit unsigned whole-number variable a0_tf32.</span></li>
+<li><code>asm("cvt.rna.tf32.f32 %0, %1;" : "=r"(a0_tf32) : "f"(a0));</code><span>Insert the instruction cvt.rna.tf32.f32 into the kernel; its %0 is a0_tf32, written, in a 32-bit register; its %1 is a0, read, from a float register.</span></li>
+</ol>
+</div>
+<p class="ln"><b>L05</b> NVIDIA's PTX manual: <code>cvt.rna.tf32.f32 d, a</code> converts the float a into the TF32 format, the rounding .rna meaning to the nearest value, ties away from zero; a register holding TF32 data must be declared with the 32-bit type .b32, which has no number kind of its own. The Lab 6 handout: the tensor core keeps 10 of a float's 23 fraction bits, the handout's own route being to hand over the float's bits unchanged and let the other 13 be cut off. <span class="from">from: NVIDIA's PTX manual; the Lab 6 handout</span></p>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> In your conversion, %0 is ____ and %1 is ____ . Why is the output's letter "=r" and the input's "f"? ____ . <span class="from">from: L01, L02, L04, L05</span></p>
+<details><summary>CHECK</summary>
+<pre>%0 = a0_tf32 (output), %1 = a0 (input)
+a0 is a float, so it travels in a float register, "f"; the result is TF32 data, which must sit
+in a 32-bit register without a number kind (L05), and "r" gives a 32-bit register; "=" because
+the instruction writes it</pre>
+</details>
+<p class="ln do"><b>L07</b> <b class="x">DO</b> Cut or round? Take x = 1 + 1.75 / 1024 = 1.001708984375. Keeping 10 fraction bits keeps multiples of 1/1024 above 1. Cut off: ____ , error ____ . Rounded to nearest: ____ , error ____ . <span class="from">from: L05</span></p>
+<details><summary>CHECK</summary>
+<pre>cut off: 1 + 1/1024 = 1.0009765625, error 0.000732421875 (0.75 of a step)
+rounded: 1 + 2/1024 = 1.001953125, error 0.000244140625 (0.25 of a step)
+in general cutting can be off by almost a whole step of 1/1024, rounding by at most half a step</pre>
+</details>
+<p class="ln"><b>L08</b> Your tensor core statement. NVIDIA's PTX manual: for this instruction D and C are each four 32-bit float registers, A is four and B two 32-bit registers holding TF32 data: <span class="from">from: your code; NVIDIA's PTX manual</span></p>
+<pre>asm volatile(
+    "mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32 "
+    "{%0,%1,%2,%3}, {%4,%5,%6,%7}, {%8,%9}, {%10,%11,%12,%13};"
+    : "=f"(d0), "=f"(d1), "=f"(d2), "=f"(d3)
+    : "r"(a0_tf32), "r"(a1_tf32), "r"(a2_tf32), "r"(a3_tf32),
+      "r"(b0_tf32), "r"(b1_tf32),
+      "f"(c0), "f"(c1), "f"(c2), "f"(c3)
+);</pre>
+<div class="english">
+<p class="label">Read the code in English, line by line</p>
+<ol class="code-en">
+<li><code>asm volatile(</code><span>Insert instruction text into the kernel; volatile, the guide says, keeps the compiler from deleting or moving it.</span></li>
+<li><code>    "mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32 "</code><span>The tensor core instruction's name, from the handout.</span></li>
+<li><code>    "{%0,%1,%2,%3}, {%4,%5,%6,%7}, {%8,%9}, {%10,%11,%12,%13};"</code><span>Its operands in the order D, A, B, C, written as operand numbers 0 to 13.</span></li>
+<li><code>    : "=f"(d0), "=f"(d1), "=f"(d2), "=f"(d3)</code><span>After the first colon, the outputs: operands 0 to 3 are written into the floats d0 to d3.</span></li>
+<li><code>    : "r"(a0_tf32), "r"(a1_tf32), "r"(a2_tf32), "r"(a3_tf32),</code><span>After the second colon, the inputs: operands 4 to 7 are the four A values, in 32-bit registers,</span></li>
+<li><code>      "r"(b0_tf32), "r"(b1_tf32),</code><span>operands 8 and 9 the two B values,</span></li>
+<li><code>      "f"(c0), "f"(c1), "f"(c2), "f"(c3)</code><span>and operands 10 to 13 the four C values, in float registers.</span></li>
+<li><code>);</code><span>End of the statement.</span></li>
+</ol>
+</div>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> Count the operands: outputs ____ , inputs ____ , so the numbers go from %0 to % ____ . Why do the four C values use "f" while A and B use "r"? ____ . <span class="from">from: L01, L02, L05, L08</span></p>
+<details><summary>CHECK</summary>
+<pre>4 outputs (D) and 4 + 2 + 4 = 10 inputs: %0 to %13
+NVIDIA's PTX manual types C and D of this instruction as 32-bit float registers, while A and B
+hold TF32 data, which must sit in 32-bit registers without a number kind: "f" and "r"</pre>
+</details>
+<p class="ln do"><b>L10</b> <b class="x">DO</b> Where in the statement do your variable names reach the instruction? ____ . Could you rename d0 to answer? ____ . <span class="from">from: L01, L08</span></p>
+<details><summary>CHECK</summary>
+<pre>nowhere in the instruction text: the text names only %0 to %13; the lists after the colons
+bind each number to a variable, and the compiler puts each variable in a register before or
+after the instruction
+yes: rename it in the output list and nothing else changes; the instruction sees registers,
+not names</pre>
+</details>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L11</b> <b class="x">DO</b> Collect L03 (%n counts the operand lists in text order, outputs first), L06 ("=r" for TF32 data, "f" for a float), L07 (rounding is off by at most half a step, cutting by almost a whole step), L09 (14 operands, C and D as floats, A and B as 32-bit registers) and L10 (variable names never enter the instruction text). Write one sentence on what an asm statement is. <span class="from">from: L03, L06, L07, L09, L10</span></p>
+<details><summary>CHECK</summary>
+<pre>An asm statement joins the two languages: the template string is the instruction exactly as
+NVIDIA defines it, with %0, %1 and so on where registers go; the lists after the colons say,
+in order, which of your variables stand for those numbers, which are written and in what kind
+of register; so the instruction never meets a variable name, and the program never needs to
+know the instruction's internals.
+
+Tempting answer that fails: "%0 and %1 mean output and input". They count the operands in
+the order of the lists; the "=" marks an output, and in the guide's example with inputs (k),
+(j) the %1 is k (L03).</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>The tensor core instruction has no name in the kernel's own language, so the program inserts NVIDIA's instruction text directly and lists which of its variables stand for each numbered operand of that text. An equals sign in the list marks a variable that the instruction writes, and a letter says what kind of storage it needs. Converting the floats first, by rounding, keeps them a little closer to their true values than letting the hardware cut off the extra digits.</p>
+<p>For a manager: a line that mixes two languages is a contract between them; ask which part each side owns, because a mistake in the binding compiles cleanly and computes the wrong thing.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>k. The numbers count the operands in the order they are listed: %0 is the output i, %1 the
+first input listed, k, and %2 the second, j (L03).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>If the D outputs were listed in the order d1, d0, d2, d3, what would change in the result, and could the compiler warn about it?</p>
+<details><summary>CHECK</summary>
+<pre>%0 would then be d1 and %1 would be d0: the instruction still writes D(g, 2t) into its first
+output register, which now lands in d1, and D(g, 2t + 1) lands in d0. Each thread would then
+store its two numbers of each pair in each other's places of c. The compiler cannot warn: both
+bindings are legal, and only the meaning, set by the placement, differs.</pre>
+</details>
+</div>
+
+<nav><a href="36-places-in-a-b-and-c.html">prev: 36 the places 8g + t, 8t + g and 8g + 2t</a><a href="38-registers-have-names.html">next: 38 registers have names, not places</a></nav>
+</main>
+</body>
+</html>

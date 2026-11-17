@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A Whole Product From Four Numbers</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>35. Lab 6: four numbers of A per thread, and one whole product per warp</h1>
+<p class="sub">Each line uses only what the lines above it made. The grey note says which line it takes from. Fill every ____ on paper, then open CHECK. Under each piece of code, a panel reads it in English line by line. Any unfamiliar word: <a href="words.html">words used on this site</a>.</p>
+
+<p class="label">The story</p>
+<div class="story">
+<p>In the Lab 6 prelab each of the 32 threads loads 4 numbers of A, 2 of B and 4 of C, and then all 32 execute one tensor core instruction. Every number of the result D is a sum of 8 products, one for each of 8 values of k, plus a number of C.</p>
+<p>The learner could not make the counts agree. A thread holds 4 numbers of A, yet one number of D needs 8 of them; it holds 2 numbers of B, yet 8 are needed; and a thread is supposed to compute only with its own registers. To the learner the result looked like it appeared from nowhere, and the instruction looked as if it could not even know which thread it was executing in.</p>
+<p>Where do the other numbers come from when one thread's D is computed, and which threads supply them?</p>
+</div>
+
+<div class="guess">
+<p class="label">Guess first</p>
+<p>The number D(0, 0) is C(0, 0) plus 8 products of a number of A and a number of B. How many of the 32 threads hold the numbers those 8 products need? Write a number.</p>
+<p>Write your guess on paper now, before any calculation on this page.</p>
+</div>
+
+<p class="you">Your words: "how can thread 0 with just one mma deal with 4 of a that makes no sense at all" / "So, the thread has only basically four A numbers and four B numbers, then it can do only partial sum, right?" / "Why would it need the whole wrap? I mean, MMA is local to one thread, right?" / "the hardware doesn't know about whatever is going on, right? The hardware doesn't know about the thread it is in" / "i refuse to understand cna you draw the full algorithm a dry run for a small case for one number c00"</p>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The Lab 6 handout: the instruction computes D = A * B + C with A of 16 by 8 numbers, B of 8 by 8 and C and D of 16 by 8, so D(i, j) = C(i, j) + the sum over k = 0 to 7 of A(i, k) * B(k, j). NVIDIA's CUDA programming guide: 32 threads that execute instructions together form a warp, each thread with its own registers; the handout: this instruction is executed by a whole warp, with its inputs and outputs spread over the registers of all 32 threads. <span class="from">from: the Lab 6 handout; the CUDA programming guide</span></p>
+<p class="ln"><b>L02</b> NVIDIA's PTX manual: the thread numbered n inside its warp, with g = n / 4 rounded down and t = n % 4, holds A(g, t), A(g + 8, t), A(g, t + 4), A(g + 8, t + 4); B(t, g), B(t + 4, g); and C or D at (g, 2t), (g, 2t + 1), (g + 8, 2t), (g + 8, 2t + 1). <span class="from">from: NVIDIA's PTX manual</span></p>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> Read the owners backwards. A(r, c) belongs to the thread with g = r % 8 and t = c % 4, that is n = 4 * (r % 8) + (c % 4). B(r, c) belongs to n = 4 * c + (r % 4). For D(0, 0): the numbers A(0, k), k = 0 to 7, sit in threads ____ ; the numbers B(k, 0) in threads ____ ; C(0, 0) in thread ____ . <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>A(0, k): n = 4 * 0 + (k % 4): threads 0, 1, 2, 3 (each holds two of them, k and k + 4)
+B(k, 0): n = 4 * 0 + (k % 4): threads 0, 1, 2, 3 (each holds two, k and k + 4)
+C(0, 0): thread 0, its first C register</pre>
+</details>
+<p class="ln do"><b>L04</b> <b class="x">DO</b> Take A(0, k) = 1, 2, 3, 4, 5, 6, 7, 8 for k = 0 to 7, B(k, 0) = 2, 3, 4, 5, 6, 7, 8, 9, and C(0, 0) = 10. Thread t (0 to 3) holds A(0, t), A(0, t + 4), B(t, 0) and B(t + 4, 0). Its two products: thread 0 ____ ; thread 1 ____ ; thread 2 ____ ; thread 3 ____ . Their total, and D(0, 0): ____ . <span class="from">from: L01, L03</span></p>
+<details><summary>CHECK</summary>
+<pre>thread 0: 1 * 2 + 5 * 6 = 32
+thread 1: 2 * 3 + 6 * 7 = 48
+thread 2: 3 * 4 + 7 * 8 = 68
+thread 3: 4 * 5 + 8 * 9 = 92
+32 + 48 + 68 + 92 = 240, and D(0, 0) = 240 + 10 = 250, delivered into thread 0's first D register
+the same 250 as the 8 products added in order: 2 + 6 + 12 + 20 + 30 + 42 + 56 + 72 + 10</pre>
+</details>
+<p class="ln do"><b>L05</b> <b class="x">DO</b> Now D(0, 1) = C(0, 1) + the sum over k of A(0, k) * B(k, 1). The numbers A(0, k) sit in threads ____ ; the numbers B(k, 1) in threads ____ . Which thread receives D(0, 1), and in which register? ____ . <span class="from">from: L02, L03</span></p>
+<details><summary>CHECK</summary>
+<pre>A(0, k): threads 0 to 3, as before
+B(k, 1): n = 4 * 1 + (k % 4): threads 4, 5, 6, 7
+D(0, 1) is at (g, 2t + 1) with g = 0 and t = 0: thread 0, its second D register
+so thread 0 receives a number made from A held by threads 0 to 3 and B held by threads 4 to 7</pre>
+</details>
+<p class="ln do"><b>L06</b> <b class="x">DO</b> When does a thread's own A meet its own B? A(g, k) sits in threads 4g to 4g + 3 and B(k, j) in threads 4j to 4j + 3. The two sets are the same threads only when ____ . For how many of the 8 values of j is that true for one g? ____ . <span class="from">from: L03, L05</span></p>
+<details><summary>CHECK</summary>
+<pre>only when j = g
+for 1 of the 8 values of j; for the other 7, every product of D(g, j) multiplies numbers
+held by two different sets of 4 threads</pre>
+</details>
+<p class="ln do"><b>L07</b> <b class="x">DO</b> Count by thread and by warp. Numbers loaded per thread: 4 + 2 + 4 = ____ ; per warp: ____ , against the 128 + 64 + 128 numbers of A, B and C. Tensor core instructions executed per warp: ____ ; multiply-adds it does: ____ . <span class="from">from: L01, L02</span></p>
+<details><summary>CHECK</summary>
+<pre>10 per thread; 32 * 10 = 320 per warp = 128 + 64 + 128: every number of A, B and C loaded
+exactly once by exactly one thread
+1 instruction per warp (each of the 32 threads executes it, together); 16 * 8 * 8 = 1,024
+multiply-adds</pre>
+</details>
+<p class="ln"><b>L08</b> The instruction's text names only registers, never a thread. The CUDA guide: each thread of a warp has its own registers; the PTX manual's placement (L02) is written in terms of the thread's number inside the warp. So the hardware takes the named registers from each of the 32 threads and knows whose they are. <span class="from">from: the CUDA programming guide; NVIDIA's PTX manual; L02</span></p>
+
+<div class="connect">
+<p class="label">Connect the numbers</p>
+<p class="ln do"><b>L09</b> <b class="x">DO</b> Collect L03 (D(0, 0) needs numbers from threads 0 to 3), L04 (32 + 48 + 68 + 92 + 10 = 250), L05 (D(0, 1) mixes threads 0 to 3 with threads 4 to 7), L06 (a thread's own A meets its own B for 1 value of j in 8), L07 (320 loads, 1 instruction, 1,024 multiply-adds per warp) and L08 (the hardware takes the registers of all 32 threads). Write one sentence on where the numbers of one thread's D come from. <span class="from">from: L03, L04, L05, L06, L07, L08</span></p>
+<details><summary>CHECK</summary>
+<pre>A thread's numbers of D are computed by the hardware from the registers of several threads of
+its warp: the 4 numbers of A and 2 of B a thread loads are its share of the whole 16 by 8 and
+8 by 8 matrices, which the 32 threads together hold exactly once, and one instruction for the
+whole warp combines all the shares.
+
+Tempting answer that fails: "each thread multiplies its own 4 numbers of A by its own 2 of B".
+True by coincidence for D(0, 0), whose numbers all sit in threads 0 to 3 (L04); false for
+D(0, 1), whose B numbers sit in threads 4 to 7 (L05), and for 7 of every 8 values of j (L06).</pre>
+</details>
+</div>
+
+<div class="plain">
+<p class="label">In plain words</p>
+<p>Each of the 32 threads brings a few numbers, and one instruction for all of them multiplies the whole matrices that the 32 threads hold together. A single number of the result is built from numbers brought by several different threads, so no thread on its own could compute it. The threads only load and store; the multiplication of the whole small matrices happens once, for all of them.</p>
+<p>For a manager: a count that looks impossible for one thread can be exact for the 32 together; ask in which unit a count is made before deciding that work is missing.</p>
+</div>
+
+<div class="guess">
+<p class="label">Your guess against the machine</p>
+<p>Compare with the guess you wrote at the top. Count it as close if it is within a fifth of the real value, or on the right side of a yes-or-no. Add one mark to your paper tally if it was close.</p>
+<details><summary>CHECK your guess</summary>
+<pre>4 threads: threads 0 to 3 hold all of A(0, 0) to A(0, 7) and B(0, 0) to B(7, 0), and thread 0
+also holds C(0, 0) (L03). For D(0, 1) the answer would be 8 threads (L05).</pre>
+</details>
+</div>
+
+<div class="interview">
+<p class="label">The interviewer's next question</p>
+<p>Which threads supply the numbers for D(5, 6), and which thread receives it, in which register?</p>
+<details><summary>CHECK</summary>
+<pre>A(5, k): n = 4 * 5 + (k % 4): threads 20 to 23. B(k, 6): n = 4 * 6 + (k % 4): threads 24 to 27.
+C(5, 6) and D(5, 6): g = 5 and 2t = 6, so t = 3: thread 23, its first C and D register.
+Thread 23 receives a number made from the registers of 8 threads, itself among them.</pre>
+</details>
+</div>
+
+<nav><a href="34-the-thread-number-decides.html">prev: 34 the thread number decides</a><a href="36-places-in-a-b-and-c.html">next: 36 the places 8g + t, 8t + g and 8g + 2t</a></nav>
+</main>
+</body>
+</html>

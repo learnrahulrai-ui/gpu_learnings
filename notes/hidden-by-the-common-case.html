@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A rule broken in a way the usual inputs never show: a shuffle mask that named 5 of 32 threads, a byte distance divided by an element size, a shared-memory count taken too early.">
+<meta name="keywords" content="real bugs, GPU chip">
+<title>Bugs hidden by the common case</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="site">
+<a class="brand" href="MIT-6.S894.html">6.S894 self-study</a>
+<nav><a href="MIT-6.S894.html#syllabus">Lessons</a><a href="index.html">Notes</a><a href="../index.html">Lab pages</a><a href="../words.html">Words</a></nav>
+</header>
+<main>
+<p class="crumbs"><a href="../index.html">GPU Learnings</a> / <a href="index.html">notes</a> / <a href="MIT-6.S894.html">MIT 6.S894</a></p>
+<h1>Bugs hidden by the common case</h1>
+<p class="sub">Topics: real bugs, GPU chip. A single idea, with a few lines to calculate. Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+
+<p class="label">The idea</p>
+<div class="story">
+<p>Some faults in widely used GPU libraries stayed hidden for months or years, not because nobody tested, but because every usual test produces exactly the right answer.</p>
+<p>The question here: what do such faults have in common, and which input exposes each of them?</p>
+</div>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> CUTLASS issue 1094 (2023): __shfl_sync(0x1f, threadIdx.x / 32, 0) worked on an A100 and failed on an H100; 0x1f names threads 0 to 4 of 32. NVIDIA Warp issue 2282 (2026): a distance in bytes divided by sizeof(T) reads padded vec3 arrays from floats 0, 3, 6 instead of 0, 4, 8. NVIDIA Warp issue 2294 (2026): a kernel requested 4,224 bytes of shared memory and needed 4,288; with a smaller size the same 64-byte shortfall launched fine. <span class="from">from: CUTLASS issue 1094; NVIDIA Warp issues 2282 and 2294</span></p>
+<p class="ln do"><b>L02</b> <b class="x">DO</b> Which input shows each fault? Shuffle: ____ . Division: ____ . Count: ____ . <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>shuffle: a GPU that enforces the mask rule (the H100); on the A100 the copied value equalled what
+every thread already had
+division: an array whose element distance is not a multiple of the element size (padded vec3)
+count: sizes at which the memory past the request is not usable (K = 16, not K = 13)</pre>
+</details>
+
+<p class="label">Worked out in full</p>
+<ul class="related">
+<li><a href="../41-a-mask-of-five-threads.html">41. CUTLASS 1094: a shuffle mask that named 5 of the 32 threads executing it</a></li>
+<li><a href="../42-a-byte-distance-divided.html">42. NVIDIA Warp 2282: a distance in bytes divided by the size of an element</a></li>
+<li><a href="../43-shared-memory-counted-too-early.html">43. NVIDIA Warp 2294: shared memory counted before a later line moved the tile</a></li>
+</ul>
+
+<p class="label">Related notes</p>
+<ul class="related">
+<li><a href="checking-the-output.html">What the printed difference can hide</a>: what a check of the output can and cannot see</li>
+<li><a href="tensor-core-placement.html">Which thread holds which number for a tensor core</a>: how a wrong placement also computes silently</li>
+<li><a href="asm-operands.html">%0 and %1: binding variables to an instruction</a>: how a wrong binding compiles cleanly</li>
+</ul>
+
+<div class="backlinks">
+<p class="label">Lessons and notes that point here</p>
+<!-- backlinks:begin -->
+<ul class="related">
+<li><a href="asm-operands.html">%0 and %1: binding variables to an instruction</a></li>
+<li><a href="k-equal-pairs.html">k-equal pairs and what a layout guarantees</a></li>
+<li><a href="MIT-6.S894.html">MIT 6.S894 Accelerated Computing, Labs 1 and 2, on your own computer</a></li>
+</ul>
+<!-- backlinks:end -->
+</div>
+
+<nav><a href="index.html">all notes</a><a href="MIT-6.S894.html">MIT 6.S894 course page</a></nav>
+</main>
+<footer class="site">
+<p>Independent self-study material for MIT 6.S894 Accelerated Computing, written from one learner's work, and not affiliated with or endorsed by MIT or the course staff. The course pages are at <a href="https://accelerated-computing.academy/fall25/">accelerated-computing.academy/fall25</a> and the starter code at <a href="https://github.com/accelerated-computing-class">github.com/accelerated-computing-class</a>. Every measured number comes from one laptop, a Ryzen 5 4600H with a GTX 1650, unless a sentence says otherwise.</p>
+</footer>
+</body>
+</html>

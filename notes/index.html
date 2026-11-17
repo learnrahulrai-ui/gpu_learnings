@@ -42,20 +42,24 @@
 <p class="label">All notes, A to Z</p>
 <!-- all:begin -->
 <ul class="related">
+<li><a href="asm-operands.html">%0 and %1: binding variables to an instruction</a>: In asm("template" : outputs : inputs), each %n counts the operand lists in order, outputs first; the letters say the register kind and = marks a written one.</li>
 <li><a href="program-counter.html">A program counter for every thread</a>: Since Volta, each thread keeps its own program counter; the 32-thread unit still matters, because equal program counters let one instruction serve 32 threads.</li>
 <li><a href="second-round.html">A second round of blocks</a>: On the course GPU, 12.5 percent more work took 87 percent more time. Blocks that do not fit wait for a second round.</li>
 <li><a href="reduction.html">Adding up an array: chain or tree</a>: A plain loop over 20 million floats is a chain of 20 million adds and stops counting at 16,777,216; a tree has 25 levels and gets 20,000,000.</li>
 <li><a href="select-not-jump.html">An if-else under one instruction</a>: With one instruction for 8 indices, both sides of an if-else execute and a mask keeps one value per index; the work of the side not kept is the cost.</li>
 <li><a href="core-size.html">Bigger cores or more cores</a>: On the Lecture 2 graph, 12 times the transistors gave 4 times the work per clock; 12 small cores in the same area give 12 times, but only on work that splits.</li>
+<li><a href="hidden-by-the-common-case.html">Bugs hidden by the common case</a>: A rule broken in a way the usual inputs never show: a shuffle mask that named 5 of 32 threads, a byte distance divided by an element size, a shared-memory count taken too early.</li>
 <li><a href="combining-speedups.html">Combining speedups</a>: The product of step-by-step speedups always equals the total, so it tests nothing. Compare a technique's gain alone with its gain on top of the others.</li>
 <li><a href="filling-the-wait.html">Filling the 4-cycle wait: needed against held</a>: A scheduler of the GTX 1650 holds up to 8 sets of 32 threads, but chains of multiply-adds need only 2. Why filling the chip to its maximum is not the target.</li>
 <li><a href="indices-to-threads.html">From the formula to threads and a loop</a>: In the matrix product, the indices of the written place name independent pieces and become threads; the summed index k stays each thread's loop, walked in pieces when a block's lines do not fit on chip.</li>
 <li><a href="independent-chains.html">Independent chains inside one thread</a>: A multiply-add that needs the previous result waits 4 cycles; a second chain fills the wait; a fourth chain finds nothing left to fill.</li>
 <li><a href="iters.html">iters: repetitions until the while loop is left</a>: What each number of the Mandelbrot picture counts, why it ranges from 1 to 1000, and why equal numbers of places are not equal work.</li>
+<li><a href="k-equal-pairs.html">k-equal pairs and what a layout guarantees</a>: A matrix product uses only the 8 of 64 pairings with equal k; the hardware multiplies places, so the layout must put k-equal numbers in paired places, and a format change can break that.</li>
 <li><a href="subtract-two-lengths.html">Measuring by subtracting two lengths</a>: 281 / 64 = 4.39 is not the cost of one multiply-add; (1055 - 281) / (256 - 64) = 4.03 is. And a single division makes four chains look faster than two.</li>
 <li><a href="nearby.html">Nearby: 32 stores in 4 blocks of 32 bytes</a>: The profiler's 2,048 requests and 8,192 sectors derived by hand, and a split of places that would move 8 times more.</li>
 <li><a href="operations-per-byte.html">Operations per byte</a>: Adding two arrays does 0.083 adds per byte moved; the GTX 1650 needs about 10.5 to keep its arithmetic busy, so memory sets the time.</li>
 <li><a href="owner.html">Owner: exactly one writer per place</a>: A correct split gives every place one owner; a fast split also gives every owner similar work: 4.72 against 5.98 on the Lab 2 picture.</li>
+<li><a href="registers-have-names.html">Registers have names, not addresses</a>: A register is named in the instruction text and owned by one thread; with no crossbar and no computed names, an array read at a computed element number leaves the registers.</li>
 <li><a href="reuse-per-number.html">Reuse per number fetched, and the side of a tile</a>: A BM by BN tile fetches 1/BN + 1/BM numbers per multiply-add; for L2 not to set the time its side must reach 4 * 26.7 / 2.4 = 44.5 on the course GPU, whatever the size of the matrices.</li>
 <li><a href="two-buffers.html">Separate buffers and a launch per step</a>: An in-place update is safe when every place has one writer and every shared value is read from a buffer nobody writes; the end of a launch separates the steps.</li>
 <li><a href="simd-avx2.html">SIMD on the CPU: 8 places in one AVX2 instruction</a>: Why 8 places per instruction gave 7.07 times, not 8, and why the picture, not the instructions, decides it.</li>
@@ -74,6 +78,7 @@
 <li><a href="which-index-gets-x.html">Which index of C gets x</a>: A thread ID counts the threads before it, x first, and 32 consecutive IDs execute one instruction; so the index of C that steps through memory one number at a time must take x.</li>
 <li><a href="which-loop-splits.html">Which loop of a loop nest splits</a>: Iterations that write different entries can execute at the same time; iterations that add into one entry form a chain.</li>
 <li><a href="memory-chips.html">Which memory chip holds an address</a>: GPU memory is several chips side by side; dealing addresses out to them by mod puts neighbouring addresses on different chips, and the busiest chip sets the time.</li>
+<li><a href="tensor-core-placement.html">Which thread holds which number for a tensor core</a>: One tensor core instruction multiplies 16 by 8 by 8 for a whole warp; NVIDIA fixes which thread holds each number, so a kernel's split of work follows the hardware's numbering, not a free choice.</li>
 <li><a href="neighbours-in-memory.html">Which threads are neighbours in memory</a>: In an index line, the variable multiplied by 1 decides who are neighbours: the thread number puts one instruction's floats side by side, the loop variable scatters them.</li>
 </ul>
 <!-- all:end -->
@@ -96,16 +101,20 @@
 </ul>
 <p><b>GPU chip</b></p>
 <ul class="related">
+<li><a href="asm-operands.html">%0 and %1: binding variables to an instruction</a></li>
 <li><a href="program-counter.html">A program counter for every thread</a></li>
 <li><a href="second-round.html">A second round of blocks</a></li>
+<li><a href="hidden-by-the-common-case.html">Bugs hidden by the common case</a></li>
 <li><a href="filling-the-wait.html">Filling the 4-cycle wait: needed against held</a></li>
 <li><a href="independent-chains.html">Independent chains inside one thread</a></li>
 <li><a href="nearby.html">Nearby: 32 stores in 4 blocks of 32 bytes</a></li>
+<li><a href="registers-have-names.html">Registers have names, not addresses</a></li>
 <li><a href="sm.html">SM: the block of hardware a GPU chip is built from</a></li>
 <li><a href="warp.html">The 32-thread unit</a></li>
 <li><a href="register-budget.html">The register budget</a></li>
 <li><a href="exec-units.html">What a count of exec units limits</a></li>
 <li><a href="which-index-gets-x.html">Which index of C gets x</a></li>
+<li><a href="tensor-core-placement.html">Which thread holds which number for a tensor core</a></li>
 </ul>
 <p><b>Lab 3</b></p>
 <ul class="related">
@@ -122,6 +131,12 @@
 <ul class="related">
 <li><a href="split-k.html">Split-k: pieces of one sum in different blocks</a></li>
 </ul>
+<p><b>Lab 6</b></p>
+<ul class="related">
+<li><a href="asm-operands.html">%0 and %1: binding variables to an instruction</a></li>
+<li><a href="k-equal-pairs.html">k-equal pairs and what a layout guarantees</a></li>
+<li><a href="tensor-core-placement.html">Which thread holds which number for a tensor core</a></li>
+</ul>
 <p><b>Lecture 2</b></p>
 <ul class="related">
 <li><a href="select-not-jump.html">An if-else under one instruction</a></li>
@@ -135,6 +150,10 @@
 <ul class="related">
 <li><a href="memory-chips.html">Which memory chip holds an address</a></li>
 </ul>
+<p><b>Lecture 5</b></p>
+<ul class="related">
+<li><a href="registers-have-names.html">Registers have names, not addresses</a></li>
+</ul>
 <p><b>measuring</b></p>
 <ul class="related">
 <li><a href="combining-speedups.html">Combining speedups</a></li>
@@ -144,12 +163,17 @@
 </ul>
 <p><b>memory</b></p>
 <ul class="related">
+<li><a href="k-equal-pairs.html">k-equal pairs and what a layout guarantees</a></li>
 <li><a href="nearby.html">Nearby: 32 stores in 4 blocks of 32 bytes</a></li>
 <li><a href="operations-per-byte.html">Operations per byte</a></li>
 <li><a href="reuse-per-number.html">Reuse per number fetched, and the side of a tile</a></li>
 <li><a href="tiles.html">Tiles in shared memory</a></li>
 <li><a href="memory-chips.html">Which memory chip holds an address</a></li>
 <li><a href="neighbours-in-memory.html">Which threads are neighbours in memory</a></li>
+</ul>
+<p><b>real bugs</b></p>
+<ul class="related">
+<li><a href="hidden-by-the-common-case.html">Bugs hidden by the common case</a></li>
 </ul>
 <p><b>splitting work</b></p>
 <ul class="related">

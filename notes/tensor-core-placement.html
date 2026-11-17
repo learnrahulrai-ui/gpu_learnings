@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="One tensor core instruction multiplies 16 by 8 by 8 for a whole warp; NVIDIA fixes which thread holds each number, so a kernel&#x27;s split of work follows the hardware&#x27;s numbering, not a free choice.">
+<meta name="keywords" content="Lab 6, GPU chip">
+<title>Which thread holds which number for a tensor core</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header class="site">
+<a class="brand" href="MIT-6.S894.html">6.S894 self-study</a>
+<nav><a href="MIT-6.S894.html#syllabus">Lessons</a><a href="index.html">Notes</a><a href="../index.html">Lab pages</a><a href="../words.html">Words</a></nav>
+</header>
+<main>
+<p class="crumbs"><a href="../index.html">GPU Learnings</a> / <a href="index.html">notes</a> / <a href="MIT-6.S894.html">MIT 6.S894</a></p>
+<h1>Which thread holds which number for a tensor core</h1>
+<p class="sub">Topics: Lab 6, GPU chip. A single idea, with a few lines to calculate. Each line uses only the lines above it, and the grey note names its source. Fill every ____ on paper, then open CHECK. Any unfamiliar word: <a href="../words.html">words used on this site</a>.</p>
+
+<p class="label">The idea</p>
+<div class="story">
+<p>A tensor core instruction multiplies whole small matrices, but its inputs and outputs live in the registers of 32 separate threads, each holding a few numbers. Something must decide which thread holds which number.</p>
+<p>The question here: who decides it, and what does that change about how a kernel computes its thread numbers and its reads?</p>
+</div>
+
+<p class="label">Work it out</p>
+<p class="ln"><b>L01</b> The Lab 6 handout: the instruction mma.sync.aligned.m16n8k8 with TF32 inputs computes D = A * B + C, A of 16 by 8, B of 8 by 8, C and D of 16 by 8, executed by the 32 threads that NVIDIA calls a warp. NVIDIA's PTX manual: the thread numbered n in its warp, with g = n / 4 rounded down and t = n % 4, holds A(g, t), A(g + 8, t), A(g, t + 4), A(g + 8, t + 4), B(t, g), B(t + 4, g) and C or D at (g, 2t), (g, 2t + 1), (g + 8, 2t), (g + 8, 2t + 1). <span class="from">from: the Lab 6 handout; NVIDIA's PTX manual</span></p>
+<p class="ln do"><b>L02</b> <b class="x">DO</b> Thread 13: g = ____ , t = ____ ; it holds A at ____ ; B at ____ ; C at ____ . With A, B and C stored with 8 numbers per line, their places in memory: ____ . <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>g = 3, t = 1: A(3, 1), A(11, 1), A(3, 5), A(11, 5); B(1, 3), B(5, 3); C(3, 2), C(3, 3), C(11, 2), C(11, 3)
+places 8 * line + place in line: A at 25, 89, 29, 93; B at 11, 43; C at 26, 27, 90, 91</pre>
+</details>
+<p class="ln do"><b>L03</b> <b class="x">DO</b> D(0, 1) needs A(0, k) and B(k, 1) for k = 0 to 7. Which threads hold them? ____ . Can one thread compute it from its own registers? ____ . <span class="from">from: L01</span></p>
+<details><summary>CHECK</summary>
+<pre>A(0, k) in threads 0 to 3 (4 * 0 + k % 4); B(k, 1) in threads 4 to 7 (4 * 1 + k % 4)
+no: the instruction combines registers of 8 threads, and delivers D(0, 1) to thread 0</pre>
+</details>
+
+<p class="label">Worked out in full</p>
+<ul class="related">
+<li><a href="../34-the-thread-number-decides.html">34. Lab 6: why the thread's number inside its warp decides the data, and where the 4 comes from</a></li>
+<li><a href="../35-four-numbers-one-product.html">35. Lab 6: four numbers of A per thread, and one whole product per warp</a></li>
+<li><a href="../36-places-in-a-b-and-c.html">36. Lab 6: the places 8g + t, 8t + g and 8g + 2t, and who decides each factor</a></li>
+</ul>
+
+<p class="label">Related notes</p>
+<ul class="related">
+<li><a href="asm-operands.html">%0 and %1: binding variables to an instruction</a>: how a kernel hands its variables to the instruction's numbered operands</li>
+<li><a href="k-equal-pairs.html">k-equal pairs and what a layout guarantees</a>: why the placement puts the same k in the same place of A and B</li>
+<li><a href="registers-have-names.html">Registers have names, not addresses</a>: why the operands must be named registers</li>
+</ul>
+
+<div class="backlinks">
+<p class="label">Lessons and notes that point here</p>
+<!-- backlinks:begin -->
+<ul class="related">
+<li><a href="asm-operands.html">%0 and %1: binding variables to an instruction</a></li>
+<li><a href="hidden-by-the-common-case.html">Bugs hidden by the common case</a></li>
+<li><a href="k-equal-pairs.html">k-equal pairs and what a layout guarantees</a></li>
+<li><a href="MIT-6.S894.html">MIT 6.S894 Accelerated Computing, Labs 1 and 2, on your own computer</a></li>
+<li><a href="registers-have-names.html">Registers have names, not addresses</a></li>
+</ul>
+<!-- backlinks:end -->
+</div>
+
+<nav><a href="index.html">all notes</a><a href="MIT-6.S894.html">MIT 6.S894 course page</a></nav>
+</main>
+<footer class="site">
+<p>Independent self-study material for MIT 6.S894 Accelerated Computing, written from one learner's work, and not affiliated with or endorsed by MIT or the course staff. The course pages are at <a href="https://accelerated-computing.academy/fall25/">accelerated-computing.academy/fall25</a> and the starter code at <a href="https://github.com/accelerated-computing-class">github.com/accelerated-computing-class</a>. Every measured number comes from one laptop, a Ryzen 5 4600H with a GTX 1650, unless a sentence says otherwise.</p>
+</footer>
+</body>
+</html>

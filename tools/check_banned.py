@@ -37,11 +37,11 @@ ANALOGY = re.compile(r"\b(think of it as|it is like a|just like a|imagine a|simi
 THINK_IN_DO = re.compile(r"\b(think|imagine|understand)\b", re.I)
 
 # Allowed exceptions: warp is defined on these pages before use; program output quoted verbatim.
-WARP_OK = {"11-program-counter.html", "12-the-48-trap.html", "13-the-864-cliff.html", "14-ownership.html", "17-hardware-or-launch.html", "18-two-places-per-thread.html", "25-what-32-fp32-counts.html", "27-which-threads-are-neighbours.html", "28-the-shared-base.html", "29-the-naive-wave-step.html", "30-which-index-gets-x.html", "words.html",
-           "notes/warp.html", "notes/filling-the-wait.html", "notes/register-budget.html", "notes/program-counter.html", "notes/index.html",
+WARP_OK = {"11-program-counter.html", "12-the-48-trap.html", "13-the-864-cliff.html", "14-ownership.html", "17-hardware-or-launch.html", "18-two-places-per-thread.html", "25-what-32-fp32-counts.html", "27-which-threads-are-neighbours.html", "28-the-shared-base.html", "29-the-naive-wave-step.html", "30-which-index-gets-x.html", "34-the-thread-number-decides.html", "35-four-numbers-one-product.html", "36-places-in-a-b-and-c.html", "37-from-variables-to-operands.html", "38-registers-have-names.html", "39-k-equal-pairs.html", "40-a-cast-that-stops-early-copies.html", "41-a-mask-of-five-threads.html", "42-a-byte-distance-divided.html", "43-shared-memory-counted-too-early.html", "words.html",
+           "notes/warp.html", "notes/tensor-core-placement.html", "notes/registers-have-names.html", "notes/hidden-by-the-common-case.html", "notes/asm-operands.html", "notes/k-equal-pairs.html", "notes/filling-the-wait.html", "notes/register-budget.html", "notes/program-counter.html", "notes/index.html",
            "notes/lesson-04-gpu-32-threads.html", "notes/lesson-05-timing-one-multiply-add.html", "notes/lesson-06-how-many-threads.html", "notes/lesson-08-independent-work.html",
            "notes/lesson-09-many-cores.html", "notes/lesson-10-many-threads.html"}
-OUTPUT_OK = re.compile(r"Latency of \w+ code snippet|\"Latency of \"|\"Running \"|\"\s*Runtime: \"|\bnon_coalesced_load\b|\bcoalesced_load\b|\bcoalesced-loads\.cu\b")  # strings printed by the starter code, and Lab 3 identifiers
+OUTPUT_OK = re.compile(r"Latency of \w+ code snippet|\"Latency of \"|\"Running \"|\"\s*Runtime: \"|\bnon_coalesced_load\b|\bcoalesced_load\b|\bcoalesced-loads\.cu\b|mma\.sync\.aligned\.m16n8k\d+\.row\.col[\w.]*|\bNVIDIA Warp\b|\bMuJoCo Warp\b")  # strings printed by the starter code, and Lab 3 identifiers
 
 # Prose style of the tutorial (notes/MIT-6.S894.html, notes/lesson-*.html).
 TUTORIAL = re.compile(r"notes/(MIT-6\.S894|lesson-[^/]*)\.html$")
